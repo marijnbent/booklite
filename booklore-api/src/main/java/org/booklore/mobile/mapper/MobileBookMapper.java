@@ -31,8 +31,8 @@ public interface MobileBookMapper {
     @Mapping(target = "lastReadTime", source = "progress.lastReadTime")
     @Mapping(target = "readProgress", source = "progress", qualifiedByName = "mapReadProgress")
     @Mapping(target = "primaryFileType", source = "book", qualifiedByName = "mapPrimaryFileType")
-    @Mapping(target = "coverHash", source = "book.bookCoverHash")
-    @Mapping(target = "audiobookCoverHash", source = "book.audiobookCoverHash")
+    @Mapping(target = "coverUpdatedOn", source = "book.metadata.coverUpdatedOn")
+    @Mapping(target = "audiobookCoverUpdatedOn", source = "book.metadata.audiobookCoverUpdatedOn")
     MobileBookSummary toSummary(BookEntity book, UserBookProgressEntity progress);
 
     @Mapping(target = "id", source = "book.id")
@@ -60,8 +60,8 @@ public interface MobileBookMapper {
     @Mapping(target = "shelves", source = "book.shelves", qualifiedByName = "mapShelves")
     @Mapping(target = "readProgress", source = "progress", qualifiedByName = "mapReadProgress")
     @Mapping(target = "primaryFileType", source = "book", qualifiedByName = "mapPrimaryFileType")
-    @Mapping(target = "coverHash", source = "book.bookCoverHash")
-    @Mapping(target = "audiobookCoverHash", source = "book.audiobookCoverHash")
+    @Mapping(target = "coverUpdatedOn", source = "book.metadata.coverUpdatedOn")
+    @Mapping(target = "audiobookCoverUpdatedOn", source = "book.metadata.audiobookCoverUpdatedOn")
     @Mapping(target = "fileTypes", source = "book", qualifiedByName = "mapFileTypes")
     @Mapping(target = "files", source = "book", qualifiedByName = "mapFiles")
     @Mapping(target = "epubProgress", source = "progress", qualifiedByName = "mapEpubProgress")
