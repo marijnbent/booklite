@@ -7,6 +7,8 @@ createTempEnv();
 let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
 let accessToken = "";
 let koboToken = "";
+let favoritesCollectionId = 0;
+let bookId = 0;
 
 describe("kobo contract", () => {
   beforeAll(async () => {
@@ -38,7 +40,7 @@ describe("kobo contract", () => {
 
     accessToken = login.json().accessToken;
 
-    await dbModule.db.insert(schema.books).values({
+    const inserted = await dbModule.db.insert(schema.books).values({
       ownerUserId: 1,
       title: "Kobo Sample",
       author: "Author",
@@ -51,6 +53,22 @@ describe("kobo contract", () => {
       koboSyncable: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
+    }).returning({ id: schema.books.id });
+
+    bookId = inserted[0].id;
+
+    const collectionsRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/collections",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+    favoritesCollectionId = collectionsRes.json().find((c: any) => c.slug === "favorites")?.id;
+
+    await app.inject({
+      method: "PUT",
+      url: `/api/v1/books/${bookId}/favorite`,
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload: { favorite: true }
     });
 
     await app.inject({
@@ -61,7 +79,8 @@ describe("kobo contract", () => {
         syncEnabled: true,
         twoWayProgressSync: true,
         markReadingThreshold: 1,
-        markFinishedThreshold: 99
+        markFinishedThreshold: 99,
+        syncCollectionIds: [favoritesCollectionId]
       }
     });
 

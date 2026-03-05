@@ -4,10 +4,17 @@ import { koboUserSettings, users } from "./db/schema";
 import { hashPassword } from "./auth/password";
 import { nowIso } from "./utils/time";
 import { randomToken } from "./utils/hash";
+import {
+  ensureSystemCollectionsForAllUsers,
+  ensureSystemCollectionsForUser
+} from "./services/systemCollections";
 
 export const bootstrapOwnerFromEnv = async (): Promise<void> => {
   const [{ total }] = await db.select({ total: count() }).from(users);
-  if (total > 0) return;
+  if (total > 0) {
+    await ensureSystemCollectionsForAllUsers();
+    return;
+  }
 
   const email = process.env.BOOTSTRAP_OWNER_EMAIL?.trim().toLowerCase();
   const username = process.env.BOOTSTRAP_OWNER_USERNAME?.trim();
@@ -35,5 +42,9 @@ export const bootstrapOwnerFromEnv = async (): Promise<void> => {
     markReadingThreshold: 1,
     markFinishedThreshold: 99,
     updatedAt: timestamp
+  });
+
+  await ensureSystemCollectionsForUser(owner.id, {
+    preselectFavoritesForKobo: true
   });
 };

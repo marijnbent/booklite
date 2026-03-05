@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS collections (
   user_id INTEGER NOT NULL,
   name TEXT NOT NULL,
   icon TEXT,
+  slug TEXT,
+  is_system INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -98,6 +100,14 @@ CREATE TABLE IF NOT EXISTS kobo_user_settings (
   mark_finished_threshold REAL NOT NULL DEFAULT 99,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS kobo_sync_collections (
+  user_id INTEGER NOT NULL,
+  collection_id INTEGER NOT NULL,
+  PRIMARY KEY (user_id, collection_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS kobo_reading_state (
@@ -161,6 +171,24 @@ CREATE TRIGGER IF NOT EXISTS books_au AFTER UPDATE ON books BEGIN
   INSERT INTO book_search(rowid, title, author, series, description)
   VALUES (new.id, new.title, COALESCE(new.author, ''), COALESCE(new.series, ''), COALESCE(new.description, ''));
 END;
+`);
+
+const collectionCols = sqlite
+  .prepare("PRAGMA table_info(collections)")
+  .all() as Array<{ name: string }>;
+
+if (!collectionCols.some((col) => col.name === "slug")) {
+  sqlite.exec("ALTER TABLE collections ADD COLUMN slug TEXT");
+}
+
+if (!collectionCols.some((col) => col.name === "is_system")) {
+  sqlite.exec("ALTER TABLE collections ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0");
+}
+
+sqlite.exec(`
+CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_user_slug
+ON collections(user_id, slug)
+WHERE slug IS NOT NULL;
 `);
 
 export const db = drizzle(sqlite, { schema });

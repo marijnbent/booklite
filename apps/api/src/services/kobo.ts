@@ -6,10 +6,12 @@ import {
   collectionBooks,
   collections,
   koboReadingState,
+  koboSyncCollections,
   koboSyncSnapshots,
   koboUserSettings
 } from "../db/schema";
 import { nowIso } from "../utils/time";
+import crypto from "node:crypto";
 
 const encodeSyncToken = (snapshotId: string): string =>
   Buffer.from(JSON.stringify({ snapshotId }), "utf8").toString("base64");
@@ -45,6 +47,63 @@ export const getKoboUserByToken = async (token: string): Promise<{
     .limit(1);
 
   return result[0] ?? null;
+};
+
+const getSelectedSyncCollections = async (
+  userId: number
+): Promise<Array<{ id: number; name: string; updatedAt: string }>> =>
+  db
+    .select({
+      id: collections.id,
+      name: collections.name,
+      updatedAt: collections.updatedAt
+    })
+    .from(koboSyncCollections)
+    .innerJoin(
+      collections,
+      and(
+        eq(collections.id, koboSyncCollections.collectionId),
+        eq(collections.userId, userId)
+      )
+    )
+    .where(eq(koboSyncCollections.userId, userId));
+
+const getSyncedBooksForUser = async (
+  userId: number
+): Promise<Array<{ id: number; title: string; author: string | null; coverPath: string | null; updatedAt: string }>> => {
+  const rows = await db.all(
+    sql`
+      SELECT DISTINCT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt
+      FROM kobo_sync_collections ksc
+      JOIN collections c ON c.id = ksc.collection_id
+      JOIN collection_books cb ON cb.collection_id = c.id
+      JOIN books b ON b.id = cb.book_id
+      WHERE ksc.user_id = ${userId}
+        AND c.user_id = ${userId}
+        AND lower(b.file_ext) = 'epub'
+    `
+  );
+
+  return rows as Array<{ id: number; title: string; author: string | null; coverPath: string | null; updatedAt: string }>;
+};
+
+export const isBookInKoboSyncScope = async (userId: number, bookId: number): Promise<boolean> => {
+  const rows = await db.all<{ id: number }>(
+    sql`
+      SELECT b.id
+      FROM kobo_sync_collections ksc
+      JOIN collections c ON c.id = ksc.collection_id
+      JOIN collection_books cb ON cb.collection_id = c.id
+      JOIN books b ON b.id = cb.book_id
+      WHERE ksc.user_id = ${userId}
+        AND c.user_id = ${userId}
+        AND b.id = ${bookId}
+        AND lower(b.file_ext) = 'epub'
+      LIMIT 1
+    `
+  );
+
+  return Boolean(rows[0]);
 };
 
 const buildBookMetadata = (
@@ -114,14 +173,10 @@ const buildEntitlement = (
 };
 
 const buildTagEntitlements = async (userId: number): Promise<Record<string, unknown>[]> => {
-  const userCollections = await db
-    .select({ id: collections.id, name: collections.name, updatedAt: collections.updatedAt })
-    .from(collections)
-    .where(eq(collections.userId, userId));
+  const selectedCollections = await getSelectedSyncCollections(userId);
+  if (selectedCollections.length === 0) return [];
 
-  if (userCollections.length === 0) return [];
-
-  const collectionIds = userCollections.map((item) => item.id);
+  const collectionIds = selectedCollections.map((item) => item.id);
   const mapping = await db
     .select({
       collectionId: collectionBooks.collectionId,
@@ -132,7 +187,7 @@ const buildTagEntitlements = async (userId: number): Promise<Record<string, unkn
     .where(
       and(
         inArray(collectionBooks.collectionId, collectionIds),
-        eq(books.koboSyncable, 1)
+        sql`lower(${books.fileExt}) = 'epub'`
       )
     );
 
@@ -143,7 +198,7 @@ const buildTagEntitlements = async (userId: number): Promise<Record<string, unkn
     grouped.set(row.collectionId, existing);
   }
 
-  return userCollections.map((collection) => {
+  return selectedCollections.map((collection) => {
     const items = (grouped.get(collection.id) ?? []).map((bookId) => ({
       RevisionId: String(bookId),
       Type: "ProductRevisionTagItem"
@@ -164,6 +219,10 @@ const buildTagEntitlements = async (userId: number): Promise<Record<string, unkn
 };
 
 const buildProgressEntitlements = async (userId: number): Promise<Record<string, unknown>[]> => {
+  const syncedBooks = await getSyncedBooksForUser(userId);
+  const syncedBookIds = syncedBooks.map((book) => book.id);
+  if (syncedBookIds.length === 0) return [];
+
   const rows = await db
     .select({
       bookId: bookProgress.bookId,
@@ -173,8 +232,9 @@ const buildProgressEntitlements = async (userId: number): Promise<Record<string,
       updatedAt: bookProgress.updatedAt
     })
     .from(bookProgress)
-    .innerJoin(books, eq(bookProgress.bookId, books.id))
-    .where(and(eq(bookProgress.userId, userId), eq(books.koboSyncable, 1)));
+    .where(
+      and(eq(bookProgress.userId, userId), inArray(bookProgress.bookId, syncedBookIds))
+    );
 
   return rows.map((row) => ({
     ChangedReadingState: {
@@ -213,16 +273,7 @@ export const getLibrarySyncPayload = async (
   payload: Record<string, unknown>[];
   snapshotId: string;
 }> => {
-  const currentBooks = await db
-    .select({
-      id: books.id,
-      title: books.title,
-      author: books.author,
-      coverPath: books.coverPath,
-      updatedAt: books.updatedAt
-    })
-    .from(books)
-    .where(eq(books.koboSyncable, 1));
+  const currentBooks = await getSyncedBooksForUser(userId);
 
   const prevSnapshot = await db
     .select({ id: koboSyncSnapshots.id, snapshotJson: koboSyncSnapshots.snapshotJson })
@@ -294,8 +345,6 @@ export const getLibrarySyncPayload = async (
   return { payload, snapshotId };
 };
 
-import crypto from "node:crypto";
-
 export const koboHeaders = {
   syncToken: "x-kobo-synctoken",
   sync: "x-kobo-sync"
@@ -305,10 +354,13 @@ export const buildSyncTokenHeader = (snapshotId: string): string =>
   encodeSyncToken(snapshotId);
 
 export const getBookMetadataForKobo = async (
+  userId: number,
   bookId: number,
   token: string,
   baseUrl: string
 ): Promise<Record<string, unknown> | null> => {
+  if (!(await isBookInKoboSyncScope(userId, bookId))) return null;
+
   const rows = await db
     .select({
       id: books.id,
@@ -318,7 +370,7 @@ export const getBookMetadataForKobo = async (
       updatedAt: books.updatedAt
     })
     .from(books)
-    .where(and(eq(books.id, bookId), eq(books.koboSyncable, 1)))
+    .where(eq(books.id, bookId))
     .limit(1);
 
   if (!rows[0]) return null;

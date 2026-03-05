@@ -11,6 +11,7 @@ import {
   getKoboReadingState,
   getKoboUserByToken,
   getLibrarySyncPayload,
+  isBookInKoboSyncScope,
   koboHeaders,
   resolveBookIdFromImageId,
   upsertKoboReadingStates
@@ -25,12 +26,15 @@ const koboAuth = async (token: string) => {
 };
 
 const respondCover = async (
-  token: string,
+  userId: number,
   imageId: string,
   reply: any
 ): Promise<any> => {
   const bookId = resolveBookIdFromImageId(imageId);
   if (!bookId) return reply.code(404).send({ error: "Image not found" });
+  if (!(await isBookInKoboSyncScope(userId, bookId))) {
+    return reply.code(404).send({ error: "Image not found" });
+  }
 
   const row = await db
     .select({ coverPath: books.coverPath })
@@ -120,6 +124,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     if (!Number.isFinite(bookId)) return reply.code(404).send({ error: "Invalid book id" });
 
     const metadata = await getBookMetadataForKobo(
+      auth.userId,
       bookId,
       params.token,
       process.env.BASE_URL ?? "http://localhost:6060"
@@ -186,10 +191,13 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     const row = await db
       .select({ filePath: books.filePath, title: books.title, fileExt: books.fileExt })
       .from(books)
-      .where(and(eq(books.id, params.bookId), eq(books.koboSyncable, 1)))
+      .where(eq(books.id, params.bookId))
       .limit(1);
 
     if (!row[0]) return reply.code(404).send({ error: "Book not found" });
+    if (!(await isBookInKoboSyncScope(auth.userId, params.bookId))) {
+      return reply.code(404).send({ error: "Book not found" });
+    }
 
     const absolute = path.join(process.env.BOOKS_DIR ?? "/books", row[0].filePath);
     if (!fs.existsSync(absolute)) return reply.code(404).send({ error: "File not found" });
@@ -209,7 +217,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
         .parse(request.params);
       const auth = await koboAuth(params.token);
       if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
-      return respondCover(params.token, params.imageId, reply);
+      return respondCover(auth.userId, params.imageId, reply);
     }
   );
 
@@ -221,7 +229,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
         .parse(request.params);
       const auth = await koboAuth(params.token);
       if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
-      return respondCover(params.token, params.imageId, reply);
+      return respondCover(auth.userId, params.imageId, reply);
     }
   );
 
@@ -233,7 +241,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
         .parse(request.params);
       const auth = await koboAuth(params.token);
       if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
-      return respondCover(params.token, params.imageId, reply);
+      return respondCover(auth.userId, params.imageId, reply);
     }
   );
 
@@ -245,7 +253,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
         .parse(request.params);
       const auth = await koboAuth(params.token);
       if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
-      return respondCover(params.token, params.imageId, reply);
+      return respondCover(auth.userId, params.imageId, reply);
     }
   );
 

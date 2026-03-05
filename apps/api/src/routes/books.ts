@@ -1,12 +1,16 @@
 import path from "node:path";
 import { FastifyPluginAsync } from "fastify";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
-import { bookProgress, books } from "../db/schema";
+import { bookProgress, books, collectionBooks, collections } from "../db/schema";
 import { requireAuth } from "../auth/guards";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "../services/metadata";
+import {
+  ensureSystemCollectionsForUser,
+  getFavoritesCollectionId
+} from "../services/systemCollections";
 
 const patchBookSchema = z.object({
   title: z.string().min(1).optional(),
@@ -18,9 +22,53 @@ const patchBookSchema = z.object({
   positionRef: z.string().nullable().optional()
 });
 
+const updateBookCollectionsSchema = z.object({
+  collectionIds: z.array(z.coerce.number().int().positive())
+});
+
+const favoriteSchema = z.object({
+  favorite: z.boolean()
+});
+
+const mapBookRow = (row: any) => ({
+  id: row.id,
+  ownerUserId: row.owner_user_id,
+  title: row.title,
+  author: row.author,
+  series: row.series,
+  description: row.description,
+  coverPath: row.cover_path,
+  filePath: row.file_path,
+  fileExt: row.file_ext,
+  fileSize: row.file_size,
+  koboSyncable: row.kobo_syncable,
+  isFavorite: row.is_favorite === 1,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  progress:
+    row.progress_status === null
+      ? null
+      : {
+          status: row.progress_status,
+          progressPercent: row.progress_percent,
+          positionRef: row.position_ref,
+          updatedAt: row.progress_updated_at
+        }
+});
+
+const ensureBookExists = async (bookId: number): Promise<boolean> => {
+  const found = await db
+    .select({ id: books.id })
+    .from(books)
+    .where(eq(books.id, bookId))
+    .limit(1);
+  return Boolean(found[0]);
+};
+
 export const booksRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/books", { preHandler: requireAuth }, async (request, reply) => {
     if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+    await ensureSystemCollectionsForUser(request.auth.userId);
 
     const query = z
       .object({
@@ -33,10 +81,13 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
     const rows = query.q
       ? await db.all(
           sql`
-            SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at
+            SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+                   CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
             FROM books b
             JOIN book_search bs ON bs.rowid = b.id
             LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
+            LEFT JOIN collections fav ON fav.user_id = ${request.auth.userId} AND fav.slug = 'favorites'
+            LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
             WHERE book_search MATCH ${query.q}
             ORDER BY b.updated_at DESC
             LIMIT ${query.limit} OFFSET ${query.offset}
@@ -44,38 +95,18 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
         )
       : await db.all(
           sql`
-            SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at
+            SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+                   CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
             FROM books b
             LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
+            LEFT JOIN collections fav ON fav.user_id = ${request.auth.userId} AND fav.slug = 'favorites'
+            LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
             ORDER BY b.updated_at DESC
             LIMIT ${query.limit} OFFSET ${query.offset}
           `
         );
 
-    return rows.map((row: any) => ({
-      id: row.id,
-      ownerUserId: row.owner_user_id,
-      title: row.title,
-      author: row.author,
-      series: row.series,
-      description: row.description,
-      coverPath: row.cover_path,
-      filePath: row.file_path,
-      fileExt: row.file_ext,
-      fileSize: row.file_size,
-      koboSyncable: row.kobo_syncable,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      progress:
-        row.progress_status === null
-          ? null
-          : {
-              status: row.progress_status,
-              progressPercent: row.progress_percent,
-              positionRef: row.position_ref,
-              updatedAt: row.progress_updated_at
-            }
-    }));
+    return rows.map(mapBookRow);
   });
 
   fastify.get(
@@ -83,14 +114,18 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
 
       const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
 
       const rows = await db.all(
         sql`
-          SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at
+          SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+                 CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
           FROM books b
           LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
+          LEFT JOIN collections fav ON fav.user_id = ${request.auth.userId} AND fav.slug = 'favorites'
+          LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
           WHERE b.id = ${params.id}
           LIMIT 1
         `
@@ -99,30 +134,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       const row = rows[0] as any;
       if (!row) return reply.code(404).send({ error: "Book not found" });
 
-      return {
-        id: row.id,
-        ownerUserId: row.owner_user_id,
-        title: row.title,
-        author: row.author,
-        series: row.series,
-        description: row.description,
-        coverPath: row.cover_path,
-        filePath: row.file_path,
-        fileExt: row.file_ext,
-        fileSize: row.file_size,
-        koboSyncable: row.kobo_syncable,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        progress:
-          row.progress_status === null
-            ? null
-            : {
-                status: row.progress_status,
-                progressPercent: row.progress_percent,
-                positionRef: row.position_ref,
-                updatedAt: row.progress_updated_at
-              }
-      };
+      return mapBookRow(row);
     }
   );
 
@@ -200,6 +212,179 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
             }
           });
       }
+
+      return { ok: true };
+    }
+  );
+
+  fastify.get(
+    "/api/v1/books/:id/collections",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
+
+      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+      if (!(await ensureBookExists(params.id))) {
+        return reply.code(404).send({ error: "Book not found" });
+      }
+
+      const rows = await db.all(
+        sql`
+          SELECT c.id, c.name, c.icon, c.slug, c.is_system,
+                 CASE WHEN cb.book_id IS NULL THEN 0 ELSE 1 END AS assigned
+          FROM collections c
+          LEFT JOIN collection_books cb
+            ON cb.collection_id = c.id
+           AND cb.book_id = ${params.id}
+          WHERE c.user_id = ${request.auth.userId}
+          ORDER BY c.is_system DESC, c.name COLLATE NOCASE ASC
+        `
+      );
+
+      return rows.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        icon: row.icon,
+        slug: row.slug,
+        isSystem: row.is_system === 1,
+        assigned: row.assigned === 1
+      }));
+    }
+  );
+
+  fastify.put(
+    "/api/v1/books/:id/collections",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
+
+      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+      const body = updateBookCollectionsSchema.parse(request.body);
+
+      if (!(await ensureBookExists(params.id))) {
+        return reply.code(404).send({ error: "Book not found" });
+      }
+
+      const nextIds = [...new Set(body.collectionIds)];
+      if (nextIds.length > 0) {
+        const valid = await db
+          .select({ id: collections.id })
+          .from(collections)
+          .where(
+            and(eq(collections.userId, request.auth.userId), inArray(collections.id, nextIds))
+          );
+
+        if (valid.length !== nextIds.length) {
+          return reply
+            .code(400)
+            .send({ error: "One or more collectionIds are invalid for this user" });
+        }
+      }
+
+      const currentRows = await db
+        .select({ collectionId: collectionBooks.collectionId })
+        .from(collectionBooks)
+        .innerJoin(collections, eq(collections.id, collectionBooks.collectionId))
+        .where(
+          and(
+            eq(collections.userId, request.auth.userId),
+            eq(collectionBooks.bookId, params.id)
+          )
+        );
+
+      const touchedIds = [...new Set([...currentRows.map((row) => row.collectionId), ...nextIds])];
+
+      db.transaction((tx) => {
+        for (const row of currentRows) {
+          tx
+            .delete(collectionBooks)
+            .where(
+              and(
+                eq(collectionBooks.collectionId, row.collectionId),
+                eq(collectionBooks.bookId, params.id)
+              )
+            )
+            .run();
+        }
+
+        for (const collectionId of nextIds) {
+          const maxSort = tx
+            .select({ maxSort: sql<number>`COALESCE(MAX(${collectionBooks.sortOrder}), 0)` })
+            .from(collectionBooks)
+            .where(eq(collectionBooks.collectionId, collectionId))
+            .all();
+
+          tx
+            .insert(collectionBooks)
+            .values({
+              collectionId,
+              bookId: params.id,
+              sortOrder: (maxSort[0]?.maxSort ?? 0) + 1
+            })
+            .onConflictDoNothing()
+            .run();
+        }
+
+        if (touchedIds.length > 0) {
+          tx
+            .update(collections)
+            .set({ updatedAt: nowIso() })
+            .where(inArray(collections.id, touchedIds))
+            .run();
+        }
+      });
+
+      return { ok: true };
+    }
+  );
+
+  fastify.put(
+    "/api/v1/books/:id/favorite",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
+
+      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+      const body = favoriteSchema.parse(request.body);
+
+      if (!(await ensureBookExists(params.id))) {
+        return reply.code(404).send({ error: "Book not found" });
+      }
+
+      const favoritesCollectionId = await getFavoritesCollectionId(request.auth.userId);
+
+      if (body.favorite) {
+        const maxSort = await db
+          .select({ maxSort: sql<number>`COALESCE(MAX(${collectionBooks.sortOrder}), 0)` })
+          .from(collectionBooks)
+          .where(eq(collectionBooks.collectionId, favoritesCollectionId));
+
+        await db
+          .insert(collectionBooks)
+          .values({
+            collectionId: favoritesCollectionId,
+            bookId: params.id,
+            sortOrder: (maxSort[0]?.maxSort ?? 0) + 1
+          })
+          .onConflictDoNothing();
+      } else {
+        await db
+          .delete(collectionBooks)
+          .where(
+            and(
+              eq(collectionBooks.collectionId, favoritesCollectionId),
+              eq(collectionBooks.bookId, params.id)
+            )
+          );
+      }
+
+      await db
+        .update(collections)
+        .set({ updatedAt: nowIso() })
+        .where(eq(collections.id, favoritesCollectionId));
 
       return { ok: true };
     }

@@ -5,6 +5,7 @@ import { db } from "../db/client";
 import { collectionBooks, collections } from "../db/schema";
 import { requireAuth } from "../auth/guards";
 import { nowIso } from "../utils/time";
+import { ensureSystemCollectionsForUser } from "../services/systemCollections";
 
 const createCollectionSchema = z.object({
   name: z.string().min(1),
@@ -24,6 +25,7 @@ const reorderSchema = z.object({
 export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/collections", { preHandler: requireAuth }, async (request, reply) => {
     if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+    await ensureSystemCollectionsForUser(request.auth.userId);
 
     return db.all(sql`
       SELECT c.*, COUNT(cb.book_id) AS book_count
@@ -40,6 +42,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
       const body = createCollectionSchema.parse(request.body);
       const timestamp = nowIso();
 
@@ -49,6 +52,8 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
           userId: request.auth.userId,
           name: body.name,
           icon: body.icon ?? null,
+          slug: null,
+          isSystem: 0,
           createdAt: timestamp,
           updatedAt: timestamp
         })
@@ -63,8 +68,20 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
       const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
       const body = patchCollectionSchema.parse(request.body);
+
+      const existing = await db
+        .select({ id: collections.id, isSystem: collections.isSystem })
+        .from(collections)
+        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)))
+        .limit(1);
+
+      if (!existing[0]) return reply.code(404).send({ error: "Collection not found" });
+      if (existing[0].isSystem === 1) {
+        return reply.code(400).send({ error: "System collections cannot be renamed or edited" });
+      }
 
       const set: Record<string, unknown> = { updatedAt: nowIso() };
       if (body.name !== undefined) set.name = body.name;
@@ -86,7 +103,18 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
       const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+
+      const found = await db
+        .select({ id: collections.id, isSystem: collections.isSystem })
+        .from(collections)
+        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)))
+        .limit(1);
+      if (!found[0]) return reply.code(404).send({ error: "Collection not found" });
+      if (found[0].isSystem === 1) {
+        return reply.code(400).send({ error: "System collections cannot be deleted" });
+      }
 
       await db
         .delete(collections)
@@ -101,6 +129,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
       const params = z
         .object({
           id: z.coerce.number().int().positive(),
@@ -146,6 +175,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
       const params = z
         .object({
           id: z.coerce.number().int().positive(),
@@ -176,6 +206,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
       const body = reorderSchema.parse(request.body);
 
       const found = await db
@@ -213,6 +244,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth },
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
       const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
 
       return db.all(sql`

@@ -25,6 +25,7 @@ export interface BookItem {
     fileExt: string;
     fileSize: number;
     koboSyncable: number;
+    isFavorite?: boolean;
     createdAt: string;
     updatedAt: string;
     progress?: {
@@ -39,6 +40,8 @@ export interface CollectionItem {
     userId: number;
     name: string;
     icon: string | null;
+    slug?: string | null;
+    isSystem?: boolean;
     createdAt: string;
     updatedAt: string;
     bookCount?: number;
@@ -49,6 +52,7 @@ export interface KoboSettings {
     twoWayProgressSync: boolean;
     markReadingThreshold: number;
     markFinishedThreshold: number;
+    syncCollectionIds: number[];
 }
 export interface AppSettings {
     metadataProviderFallback: "google" | "none";

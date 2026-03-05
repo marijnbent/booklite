@@ -7,6 +7,7 @@ import { requireOwner } from "../auth/guards";
 import { hashPassword } from "../auth/password";
 import { nowIso } from "../utils/time";
 import { randomToken } from "../utils/hash";
+import { ensureSystemCollectionsForUser } from "../services/systemCollections";
 
 const createUserSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
@@ -65,6 +66,10 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
       markReadingThreshold: 1,
       markFinishedThreshold: 99,
       updatedAt: nowIso()
+    });
+
+    await ensureSystemCollectionsForUser(created.id, {
+      preselectFavoritesForKobo: true
     });
 
     return reply.code(201).send(created);

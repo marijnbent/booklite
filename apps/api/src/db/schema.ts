@@ -55,6 +55,8 @@ export const collections = sqliteTable("collections", {
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   icon: text("icon"),
+  slug: text("slug"),
+  isSystem: integer("is_system").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull()
 });
@@ -80,6 +82,17 @@ export const koboUserSettings = sqliteTable("kobo_user_settings", {
   markFinishedThreshold: real("mark_finished_threshold").notNull().default(99),
   updatedAt: text("updated_at").notNull()
 });
+
+export const koboSyncCollections = sqliteTable(
+  "kobo_sync_collections",
+  {
+    userId: integer("user_id").notNull(),
+    collectionId: integer("collection_id").notNull()
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.collectionId] })
+  })
+);
 
 export const koboReadingState = sqliteTable(
   "kobo_reading_state",
@@ -126,6 +139,7 @@ export const schema = {
   collections,
   collectionBooks,
   koboUserSettings,
+  koboSyncCollections,
   koboReadingState,
   koboSyncSnapshots,
   importJobs,
