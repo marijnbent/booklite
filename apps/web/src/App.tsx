@@ -1,15 +1,15 @@
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AppShell } from "./components/AppShell";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { LoginPage } from "./pages/LoginPage";
-import { SetupPage } from "./pages/SetupPage";
-import { LibraryPage } from "./pages/LibraryPage";
-import { CollectionsPage } from "./pages/CollectionsPage";
-import { UploadsPage } from "./pages/UploadsPage";
-import { KoboPage } from "./pages/KoboPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { AppShell } from "@/components/AppShell";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { LoginPage } from "@/pages/LoginPage";
+import { SetupPage } from "@/pages/SetupPage";
+import { LibraryPage } from "@/pages/LibraryPage";
+import { CollectionsPage } from "@/pages/CollectionsPage";
+import { UploadsPage } from "@/pages/UploadsPage";
+import { KoboPage } from "@/pages/KoboPage";
+import { ProfilePage } from "@/pages/ProfilePage";
+import { AdminUsersPage } from "@/pages/AdminUsersPage";
 
 export const App: React.FC = () => (
   <Routes>

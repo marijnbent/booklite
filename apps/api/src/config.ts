@@ -12,6 +12,7 @@ export const config = {
   appDataDir: process.env.APP_DATA_DIR ?? path.join(process.cwd(), "app-data"),
   booksDir: process.env.BOOKS_DIR ?? path.join(process.cwd(), "books"),
   webDistDir: process.env.WEB_DIST_DIR ?? path.join(process.cwd(), "apps/web/dist"),
+  frontendMode: process.env.BOOKLITE_FRONTEND_MODE ?? "auto",
   jwtSecret: process.env.JWT_SECRET ?? "booklite-dev-secret-change-me",
   accessTokenTtlSeconds: toInt(process.env.ACCESS_TOKEN_TTL_SECONDS, 900),
   refreshTokenTtlSeconds: toInt(process.env.REFRESH_TOKEN_TTL_SECONDS, 604800),

@@ -2,9 +2,11 @@ import { buildApp } from "./app";
 import { config } from "./config";
 import { bootstrapOwnerFromEnv } from "./bootstrap";
 import { startJobRunner } from "./services/jobs";
+import { registerFrontend } from "./frontend";
 
 const main = async (): Promise<void> => {
   const app = buildApp();
+  await registerFrontend(app);
 
   await bootstrapOwnerFromEnv();
   startJobRunner();

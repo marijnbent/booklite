@@ -1,5 +1,5 @@
 services:
-  api:
+  booklite-dev:
     image: node:22-alpine
     working_dir: /workspace
     command: sh -c "npm install && npm run dev -w @booklite/api"
@@ -15,12 +15,3 @@ services:
       - ../:/workspace
       - ../app-data:/app/data
       - ../books:/books
-
-  web:
-    image: node:22-alpine
-    working_dir: /workspace
-    command: sh -c "npm install && npm run dev -w @booklite/web"
-    ports:
-      - "4173:4173"
-    volumes:
-      - ../:/workspace

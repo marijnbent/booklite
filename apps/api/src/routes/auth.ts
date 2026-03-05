@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { refreshTokens, users } from "../db/schema";
@@ -11,7 +11,7 @@ import { requireAuth } from "../auth/guards";
 import { signAccessToken } from "../auth/jwt";
 
 const loginSchema = z.object({
-  usernameOrEmail: z.string().min(1),
+  usernameOrEmail: z.string().trim().min(1),
   password: z.string().min(1)
 });
 
@@ -61,6 +61,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const body = loginSchema.parse(request.body);
+      const identifier = body.usernameOrEmail;
 
       const account = await db
         .select({
@@ -73,7 +74,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         })
         .from(users)
         .where(
-          or(eq(users.username, body.usernameOrEmail), eq(users.email, body.usernameOrEmail))
+          or(
+            sql`trim(${users.username}) = trim(${identifier})`,
+            sql`lower(trim(${users.email})) = lower(trim(${identifier}))`
+          )
         )
         .limit(1);
 

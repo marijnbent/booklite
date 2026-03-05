@@ -9,8 +9,8 @@ import { nowIso } from "../utils/time";
 import { randomToken } from "../utils/hash";
 
 const createUserSchema = z.object({
-  email: z.string().email(),
-  username: z.string().min(3),
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  username: z.string().trim().min(3),
   password: z.string().min(6),
   role: z.enum(["OWNER", "MEMBER"]).default("MEMBER")
 });

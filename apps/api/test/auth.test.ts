@@ -17,8 +17,8 @@ describe("auth", () => {
       method: "POST",
       url: "/api/v1/setup",
       payload: {
-        email: "owner@example.com",
-        username: "owner",
+        email: " Owner@Example.com ",
+        username: " owner ",
         password: "secret123"
       }
     });
@@ -29,7 +29,7 @@ describe("auth", () => {
       method: "POST",
       url: "/api/v1/auth/login",
       payload: {
-        usernameOrEmail: "owner",
+        usernameOrEmail: " owner@example.com ",
         password: "secret123"
       }
     });
@@ -49,6 +49,7 @@ describe("auth", () => {
 
     expect(me.statusCode).toBe(200);
     expect(me.json().username).toBe("owner");
+    expect(me.json().email).toBe("owner@example.com");
   });
 
   it("refresh rotates tokens", async () => {

@@ -1,11 +1,8 @@
-import path from "node:path";
-import fs from "node:fs";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import sensible from "@fastify/sensible";
-import fastifyStatic from "@fastify/static";
 import { config } from "./config";
 import { healthRoutes } from "./routes/health";
 import { setupRoutes } from "./routes/setup";
@@ -53,27 +50,6 @@ export const buildApp = () => {
   app.register(collectionsRoutes);
   app.register(koboSettingsRoutes);
   app.register(koboDeviceRoutes);
-
-  if (fs.existsSync(config.webDistDir)) {
-    app.register(fastifyStatic, {
-      root: config.webDistDir,
-      prefix: "/"
-    });
-
-    app.setNotFoundHandler(async (request, reply) => {
-      const url = request.url;
-      if (url.startsWith("/api/")) {
-        return reply.code(404).send({ error: "Not found" });
-      }
-
-      const indexPath = path.join(config.webDistDir, "index.html");
-      if (fs.existsSync(indexPath)) {
-        return reply.type("text/html").send(fs.createReadStream(indexPath));
-      }
-
-      return reply.code(404).send({ error: "Not found" });
-    });
-  }
 
   return app;
 };

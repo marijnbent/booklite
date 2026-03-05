@@ -1,7 +1,7 @@
 # Deployment Files
 
 - `compose.yml` runs the production-like single-container stack.
-- `compose.dev.yml` runs API and web in separate dev containers with bind mounts.
+- `compose.dev.yml` runs a single development container (API + Vite middleware) with bind mounts.
 
 From repo root:
 

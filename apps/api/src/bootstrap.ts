@@ -9,8 +9,8 @@ export const bootstrapOwnerFromEnv = async (): Promise<void> => {
   const [{ total }] = await db.select({ total: count() }).from(users);
   if (total > 0) return;
 
-  const email = process.env.BOOTSTRAP_OWNER_EMAIL;
-  const username = process.env.BOOTSTRAP_OWNER_USERNAME;
+  const email = process.env.BOOTSTRAP_OWNER_EMAIL?.trim().toLowerCase();
+  const username = process.env.BOOTSTRAP_OWNER_USERNAME?.trim();
   const password = process.env.BOOTSTRAP_OWNER_PASSWORD;
   if (!email || !username || !password) return;
 

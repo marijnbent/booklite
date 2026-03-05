@@ -55,6 +55,9 @@ See `.env.example`:
 - `BOOKS_DIR` (default `/books`)
 - `JWT_SECRET`
 - `BASE_URL`
+- `BOOKLITE_FRONTEND_MODE` (`auto`/`vite`/`static`/`off`, default `auto`)
+  - `auto` resolves to `vite` when `NODE_ENV` is not `production`
+  - `auto` resolves to `static` when `NODE_ENV=production`
 - `GOOGLE_BOOKS_API_KEY` (optional)
 
 ## Development
@@ -65,8 +68,13 @@ npm run dev
 npm run docker:dev
 ```
 
-- API: `http://localhost:6060`
-- Web: `http://localhost:4173`
+- App (API + UI): `http://localhost:6060`
+
+Optional split dev mode (legacy API + Vite proxy):
+
+```bash
+npm run dev:split
+```
 
 ## Build and Test
 
