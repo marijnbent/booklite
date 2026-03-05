@@ -1,0 +1,13 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { AppShell } from "./components/AppShell";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { LoginPage } from "./pages/LoginPage";
+import { SetupPage } from "./pages/SetupPage";
+import { LibraryPage } from "./pages/LibraryPage";
+import { CollectionsPage } from "./pages/CollectionsPage";
+import { UploadsPage } from "./pages/UploadsPage";
+import { KoboPage } from "./pages/KoboPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
+export const App = () => (_jsxs(Routes, { children: [_jsx(Route, { path: "/setup", element: _jsx(SetupPage, {}) }), _jsx(Route, { path: "/login", element: _jsx(LoginPage, {}) }), _jsx(Route, { element: _jsx(ProtectedRoute, {}), children: _jsxs(Route, { element: _jsx(AppShell, {}), children: [_jsx(Route, { path: "/library", element: _jsx(LibraryPage, {}) }), _jsx(Route, { path: "/collections", element: _jsx(CollectionsPage, {}) }), _jsx(Route, { path: "/uploads", element: _jsx(UploadsPage, {}) }), _jsx(Route, { path: "/kobo", element: _jsx(KoboPage, {}) }), _jsx(Route, { path: "/profile", element: _jsx(ProfilePage, {}) }), _jsx(Route, { element: _jsx(ProtectedRoute, { ownerOnly: true }), children: _jsx(Route, { path: "/admin-users", element: _jsx(AdminUsersPage, {}) }) }), _jsx(Route, { path: "/", element: _jsx(Navigate, { to: "/library", replace: true }) })] }) }), _jsx(Route, { path: "*", element: _jsx(Navigate, { to: "/library", replace: true }) })] }));

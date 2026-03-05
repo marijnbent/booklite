@@ -1,3 +1,0 @@
-ALTER TABLE book_metadata
-    ADD COLUMN IF NOT EXISTS reviews_locked BOOLEAN DEFAULT FALSE;
-

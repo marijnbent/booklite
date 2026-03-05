@@ -1,0 +1,78 @@
+import { beforeAll, describe, expect, it } from "vitest";
+import { createTempEnv } from "./helpers";
+
+createTempEnv();
+
+let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
+
+describe("auth", () => {
+  beforeAll(async () => {
+    const mod = await import("../src/app");
+    app = mod.buildApp();
+    await app.ready();
+  });
+
+  it("supports setup + login + me", async () => {
+    const setup = await app.inject({
+      method: "POST",
+      url: "/api/v1/setup",
+      payload: {
+        email: "owner@example.com",
+        username: "owner",
+        password: "secret123"
+      }
+    });
+
+    expect(setup.statusCode).toBe(201);
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: "owner",
+        password: "secret123"
+      }
+    });
+
+    expect(login.statusCode).toBe(200);
+    const tokens = login.json();
+    expect(tokens.accessToken).toBeTypeOf("string");
+    expect(tokens.refreshToken).toBeTypeOf("string");
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`
+      }
+    });
+
+    expect(me.statusCode).toBe(200);
+    expect(me.json().username).toBe("owner");
+  });
+
+  it("refresh rotates tokens", async () => {
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: "owner",
+        password: "secret123"
+      }
+    });
+
+    const first = login.json();
+
+    const refreshed = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      payload: {
+        refreshToken: first.refreshToken
+      }
+    });
+
+    expect(refreshed.statusCode).toBe(200);
+    const second = refreshed.json();
+    expect(second.refreshToken).not.toBe(first.refreshToken);
+  });
+});

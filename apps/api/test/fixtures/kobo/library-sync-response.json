@@ -1,0 +1,17 @@
+[
+  {
+    "NewEntitlement": {
+      "BookEntitlement": {
+        "EntitlementId": "1",
+        "ProductId": "1",
+        "CrossRevisionId": "1",
+        "IsRemoved": false
+      },
+      "BookMetadata": {
+        "RevisionId": "1",
+        "Title": "Example",
+        "Attribution": "Author"
+      }
+    }
+  }
+]

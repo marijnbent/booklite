@@ -1,0 +1,183 @@
+:root {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: #161719;
+  background: radial-gradient(circle at top, #dbe8ff 0%, #f4f7fb 45%, #fdfdfd 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  padding: 20px;
+  background: linear-gradient(180deg, #111820 0%, #1f2a35 100%);
+  color: #f5f7fb;
+}
+
+.brand {
+  font-size: 1.45rem;
+  margin: 0 0 20px;
+  letter-spacing: 0.04em;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav a {
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #d5deea;
+}
+
+.nav a.active,
+.nav a:hover {
+  background: #324557;
+  color: #ffffff;
+}
+
+.content {
+  padding: 24px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #d7deea;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 26px rgba(26, 32, 44, 0.06);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+input,
+select,
+button,
+textarea {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #c0c8d4;
+  background: #fff;
+}
+
+button {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #2f6ef7;
+  background: #2f6ef7;
+  color: #fff;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #fff;
+  color: #2f6ef7;
+}
+
+button.danger {
+  border-color: #d63939;
+  background: #d63939;
+}
+
+.grid-books {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.book-card {
+  border: 1px solid #d6dce8;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+}
+
+.small {
+  font-size: 0.85rem;
+  color: #4f5d6f;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.collection-zone {
+  min-height: 80px;
+  padding: 12px;
+  border: 2px dashed #95a4b8;
+  border-radius: 10px;
+  background: #f5f8ff;
+}
+
+.collection-zone.over {
+  border-color: #2f6ef7;
+  background: #e8f0ff;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #eef3ff;
+  color: #2648aa;
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    padding: 12px;
+  }
+
+  .split {
+    grid-template-columns: 1fr;
+  }
+}

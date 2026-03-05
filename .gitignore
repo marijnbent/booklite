@@ -1,48 +1,26 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-example-chart/charts/
-
-## MacOS ###
+# OS
 .DS_Store
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### IntelliJ IDEA ###
-.idea
-*.iws
+# Editors
+.idea/
+.vscode/
 *.iml
 *.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+*.iws
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# Node workspace
+node_modules/
+**/node_modules/
+*.tsbuildinfo
+apps/**/dist/
+apps/**/.vite/
+apps/**/coverage/
 
-### VS Code ###
-.vscode/
-local/
-local-scripts/
+# Runtime data
+app-data/
+books/
 
-### Dev config, books, and data ###
-booklore-ui/test-results/
-booklore-api/src/main/resources/application-local.yaml
-/shared/
+# Environment
+.env
+.env.*
+!.env.example

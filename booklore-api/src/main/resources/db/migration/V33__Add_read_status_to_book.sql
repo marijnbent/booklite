@@ -1,2 +1,0 @@
-ALTER TABLE book
-    ADD COLUMN read_status VARCHAR(20) DEFAULT 'UNREAD';

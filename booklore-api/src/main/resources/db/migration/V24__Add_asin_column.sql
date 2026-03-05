@@ -1,2 +1,0 @@
-ALTER TABLE book_metadata ADD COLUMN asin VARCHAR(20);
-ALTER TABLE book_metadata ADD COLUMN asin_locked BOOLEAN DEFAULT FALSE;

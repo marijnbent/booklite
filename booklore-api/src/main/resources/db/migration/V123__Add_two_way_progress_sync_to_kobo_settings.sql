@@ -1,1 +1,0 @@
-ALTER TABLE kobo_user_settings ADD COLUMN IF NOT EXISTS two_way_progress_sync BOOLEAN NOT NULL DEFAULT FALSE;

@@ -1,0 +1,26 @@
+services:
+  api:
+    image: node:22-alpine
+    working_dir: /workspace
+    command: sh -c "npm install && npm run dev -w @booklite/api"
+    environment:
+      - PORT=6060
+      - APP_DATA_DIR=/app/data
+      - BOOKS_DIR=/books
+      - BASE_URL=http://localhost:6060
+      - JWT_SECRET=dev-secret
+    ports:
+      - "6060:6060"
+    volumes:
+      - ../:/workspace
+      - ../app-data:/app/data
+      - ../books:/books
+
+  web:
+    image: node:22-alpine
+    working_dir: /workspace
+    command: sh -c "npm install && npm run dev -w @booklite/web"
+    ports:
+      - "4173:4173"
+    volumes:
+      - ../:/workspace
