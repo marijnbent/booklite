@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Check,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 
 interface KoboSettings {
@@ -26,7 +27,7 @@ interface KoboSettings {
 
 export const KoboPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<"token" | "endpoint" | null>(null);
 
   const settings = useQuery({
     queryKey: ["kobo-settings"],
@@ -51,10 +52,12 @@ export const KoboPage: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kobo-settings"] })
   });
 
-  const handleCopy = async (text: string) => {
+  const handleCopy = async (text: string, field: "token" | "endpoint") => {
     await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedField(field);
+    setTimeout(() => {
+      setCopiedField((current) => (current === field ? null : current));
+    }, 2000);
   };
 
   if (settings.isLoading) {
@@ -73,6 +76,9 @@ export const KoboPage: React.FC = () => {
       </div>
     );
   }
+
+  const apiEndpoint = `${window.location.origin}/api/kobo/${model.token}`;
+  const koboConfigEndpoint = `api_endpoint=${apiEndpoint}`;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -189,20 +195,24 @@ export const KoboPage: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Textarea
-            value={model.token}
-            readOnly
-            rows={3}
-            className="font-mono text-xs bg-muted/30"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="kobo-token">Kobo token</Label>
+            <Textarea
+              id="kobo-token"
+              value={model.token}
+              readOnly
+              rows={3}
+              className="font-mono text-xs bg-muted/30"
+            />
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void handleCopy(model.token)}
+              onClick={() => void handleCopy(model.token, "token")}
               className="gap-1.5"
             >
-              {copied ? (
+              {copiedField === "token" ? (
                 <>
                   <Check className="size-3.5 text-status-completed" />
                   Copied
@@ -223,6 +233,49 @@ export const KoboPage: React.FC = () => {
             >
               <RefreshCw className={`size-3.5 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
               Regenerate
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="kobo-api-endpoint">API endpoint (put this in your Kobo config)</Label>
+            <Textarea
+              id="kobo-api-endpoint"
+              value={koboConfigEndpoint}
+              readOnly
+              rows={2}
+              className="font-mono text-xs bg-muted/30"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleCopy(koboConfigEndpoint, "endpoint")}
+              className="gap-1.5"
+            >
+              {copiedField === "endpoint" ? (
+                <>
+                  <Check className="size-3.5 text-status-completed" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3.5" />
+                  Copy endpoint
+                </>
+              )}
+            </Button>
+            <Button asChild variant="secondary" size="sm" className="gap-1.5">
+              <a
+                href="https://booklore.org/docs/integration/kobo"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <ExternalLink className="size-3.5" />
+                Setup instructions
+              </a>
             </Button>
           </div>
         </CardContent>
