@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "clean": "npm run clean -ws --if-present",
     "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev -w @booklite/api\" \"npm:dev -w @booklite/web\"",
     "build": "npm run build -ws --if-present",
     "test": "npm run test -ws --if-present",

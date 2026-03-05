@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest a new feature or enhancement for Booklore
+description: Suggest a new feature or enhancement for BookLite
 title: "[Feature] "
 labels: ["feature"]
 body:
@@ -13,7 +13,7 @@ body:
     attributes:
       label: What's Your Idea?
       description: Tell us about the feature you'd like to see
-      placeholder: "Example: Add a 'Currently Reading' shelf where I can track books I'm reading and see my progress"
+      placeholder: "Example: Add a simpler Kobo sync diagnostics panel"
     validations:
       required: true
 
@@ -22,7 +22,7 @@ body:
     attributes:
       label: Why Would This Be Helpful?
       description: Help us understand the problem this solves or the value it brings
-      placeholder: "Example: Right now, it's hard to keep track of multiple books I'm reading at once. Having a dedicated shelf with progress tracking would help me stay organized"
+      placeholder: "Example: I can’t quickly tell why one book didn’t sync to Kobo"
     validations:
       required: true
 
@@ -34,8 +34,8 @@ body:
       placeholder: |
         You might want to include:
         - Screenshots or mockups showing what you envision
-        - Examples from other apps you like (Goodreads, StoryGraph, etc.)
-        - Ideas for how it could work (progress bars, page counters, etc.)
+        - Examples from other apps you like
+        - Ideas for how it could work
         - Alternative approaches you've thought about
 
   - type: dropdown

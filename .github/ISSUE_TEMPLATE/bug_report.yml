@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug to help us improve Booklore
+description: Report a bug to help us improve BookLite
 title: "[Bug] "
 labels: [ "bug" ]
 body:
@@ -61,11 +61,11 @@ body:
       label: Your Setup
       description: Help us understand your environment
       placeholder: |
-        - Booklore Version: v1.1.0
+        - BookLite Version: v1.x
         - OS: macOS Sonoma 14.2
         - Browser: Chrome 120
         - Installation: Docker
-        - Storage Type: Local SSD
+        - Device: Kobo (if relevant)
     validations:
       required: true
 

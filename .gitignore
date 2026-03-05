@@ -15,6 +15,9 @@ node_modules/
 apps/**/dist/
 apps/**/.vite/
 apps/**/coverage/
+apps/web/src/**/*.js
+apps/api/test/**/*.js
+apps/web/vite.config.js
 
 # Runtime data
 app-data/
