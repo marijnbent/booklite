@@ -74,4 +74,19 @@ export interface AppSettings {
     metadataHardcoverApiKey: string;
     uploadLimitMb: number;
 }
+export type AdminActivityScope = "metadata" | "upload" | "kobo";
+export type AdminActivityLevel = "ERROR" | "WARN" | "INFO";
+export interface AdminActivityItem {
+    id: number;
+    scope: AdminActivityScope;
+    event: string;
+    level: AdminActivityLevel;
+    message: string;
+    details: unknown;
+    actorUserId: number | null;
+    targetUserId: number | null;
+    bookId: number | null;
+    jobId: string | null;
+    createdAt: string;
+}
 //# sourceMappingURL=index.d.ts.map

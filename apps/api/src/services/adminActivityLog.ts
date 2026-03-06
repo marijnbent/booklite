@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { adminActivityLog } from "../db/schema";
 import { nowIso } from "../utils/time";
@@ -62,6 +62,15 @@ const normalizeDetails = (details: AdminActivityDetails): string | null => {
   return JSON.stringify(normalizeValue(details));
 };
 
+const parseDetails = (value: string | null): SerializableValue | null => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as SerializableValue;
+  } catch {
+    return { parseError: "Invalid details JSON" };
+  }
+};
+
 const pruneAdminActivityLog = (): void => {
   db.run(sql`
     DELETE FROM admin_activity_log
@@ -85,20 +94,24 @@ export const logAdminActivity = async (input: {
   bookId?: number | null;
   jobId?: string | null;
 }): Promise<void> => {
-  await db.insert(adminActivityLog).values({
-    scope: input.scope,
-    event: input.event,
-    level: input.level ?? "ERROR",
-    message: input.message,
-    detailsJson: normalizeDetails(input.details),
-    actorUserId: input.actorUserId ?? null,
-    targetUserId: input.targetUserId ?? null,
-    bookId: input.bookId ?? null,
-    jobId: input.jobId ?? null,
-    createdAt: nowIso()
-  });
+  try {
+    await db.insert(adminActivityLog).values({
+      scope: input.scope,
+      event: input.event,
+      level: input.level ?? "ERROR",
+      message: input.message,
+      detailsJson: normalizeDetails(input.details),
+      actorUserId: input.actorUserId ?? null,
+      targetUserId: input.targetUserId ?? null,
+      bookId: input.bookId ?? null,
+      jobId: input.jobId ?? null,
+      createdAt: nowIso()
+    });
 
-  pruneAdminActivityLog();
+    pruneAdminActivityLog();
+  } catch {
+    // Operational logging should never break the primary request path.
+  }
 };
 
 export const listAdminActivity = async (options: {
@@ -106,13 +119,18 @@ export const listAdminActivity = async (options: {
   limit?: number;
 }) => {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 250);
-  const where = options.scope ? eq(adminActivityLog.scope, options.scope) : undefined;
-  const rows = await db
-    .select()
-    .from(adminActivityLog)
-    .where(where)
-    .orderBy(desc(adminActivityLog.createdAt), desc(adminActivityLog.id))
-    .limit(limit);
+  const rows = options.scope
+    ? await db
+        .select()
+        .from(adminActivityLog)
+        .where(eq(adminActivityLog.scope, options.scope))
+        .orderBy(desc(adminActivityLog.createdAt), desc(adminActivityLog.id))
+        .limit(limit)
+    : await db
+        .select()
+        .from(adminActivityLog)
+        .orderBy(desc(adminActivityLog.createdAt), desc(adminActivityLog.id))
+        .limit(limit);
 
   return rows.map((row) => ({
     id: row.id,
@@ -120,7 +138,7 @@ export const listAdminActivity = async (options: {
     event: row.event,
     level: row.level,
     message: row.message,
-    details: row.detailsJson ? JSON.parse(row.detailsJson) : null,
+    details: parseDetails(row.detailsJson),
     actorUserId: row.actorUserId,
     targetUserId: row.targetUserId,
     bookId: row.bookId,
@@ -132,11 +150,12 @@ export const listAdminActivity = async (options: {
 export const clearAdminActivity = async (options?: {
   scope?: AdminActivityScope;
 }): Promise<number> => {
-  const where = options?.scope ? eq(adminActivityLog.scope, options.scope) : undefined;
-  const rows = await db
-    .delete(adminActivityLog)
-    .where(where)
-    .returning({ id: adminActivityLog.id });
+  const rows = options?.scope
+    ? await db
+        .delete(adminActivityLog)
+        .where(eq(adminActivityLog.scope, options.scope))
+        .returning({ id: adminActivityLog.id })
+    : await db.delete(adminActivityLog).returning({ id: adminActivityLog.id });
 
   return rows.length;
 };

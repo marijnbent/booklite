@@ -13,6 +13,7 @@ import { idParams } from "../schemas";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "../services/metadata";
 import { resolveFilenameMetadata } from "../services/filenameNormalizer";
+import { logAdminActivity } from "../services/adminActivityLog";
 import {
   getKoboThresholdsForUser,
   inferStatusFromProgress
@@ -554,7 +555,8 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/api/v1/books/metadata/fetch-all",
     { preHandler: requireAuth },
-    async () => {
+    async (request) => {
+      const { userId } = getAuth(request);
       const allBooks = await db
         .select({
           id: books.id,
@@ -583,7 +585,20 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           } else {
             matched += 1;
           }
-        } catch {
+        } catch (error) {
+          await logAdminActivity({
+            scope: "metadata",
+            event: "metadata.bulk_refresh_failed",
+            message: "Bulk metadata refresh failed for a book",
+            actorUserId: userId,
+            bookId: book.id,
+            details: {
+              title: book.title,
+              author: book.author,
+              filePath: book.filePath,
+              error
+            }
+          });
           failed += 1;
         }
       }
@@ -623,8 +638,25 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!found[0]) return reply.code(404).send({ error: "Book not found" });
 
-      const result = await refreshBookMetadata(found[0]);
-      return { ok: true, source: result.source, updated: result.updated };
+      try {
+        const result = await refreshBookMetadata(found[0]);
+        return { ok: true, source: result.source, updated: result.updated };
+      } catch (error) {
+        await logAdminActivity({
+          scope: "metadata",
+          event: "metadata.manual_refresh_failed",
+          message: "Manual metadata refresh failed",
+          actorUserId: request.auth?.userId ?? null,
+          bookId: found[0].id,
+          details: {
+            title: found[0].title,
+            author: found[0].author,
+            filePath: found[0].filePath,
+            error
+          }
+        });
+        return reply.code(500).send({ error: "Metadata refresh failed" });
+      }
     }
   );
 

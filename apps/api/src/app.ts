@@ -16,6 +16,7 @@ import { koboSettingsRoutes } from "./routes/koboSettings";
 import { koboDeviceRoutes } from "./routes/koboDevice";
 import { appSettingsRoutes } from "./routes/appSettings";
 import { metadataRoutes } from "./routes/metadata";
+import { adminActivityRoutes } from "./routes/adminActivity";
 
 export const buildApp = () => {
   const app = Fastify({
@@ -45,6 +46,7 @@ export const buildApp = () => {
   app.register(authRoutes);
   app.register(usersRoutes);
   app.register(appSettingsRoutes);
+  app.register(adminActivityRoutes);
   app.register(metadataRoutes);
   app.register(uploadRoutes);
   app.register(importJobRoutes);

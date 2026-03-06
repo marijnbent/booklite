@@ -1,6 +1,7 @@
 import { config } from "../config";
 import { getSetting } from "../db/client";
 import { callOpenRouterJsonObject } from "./openrouter";
+import { logAdminActivity } from "./adminActivityLog";
 import {
   defaultMetadataProviderEnabled,
   toMetadataProviderEnabled,
@@ -1213,7 +1214,19 @@ ${providerRows}`;
       description,
       coverPath
     };
-  } catch {
+  } catch (error) {
+    await logAdminActivity({
+      scope: "metadata",
+      event: "metadata.openrouter_resolution_failed",
+      message: "OpenRouter metadata resolution failed",
+      details: {
+        title: queryTitle,
+        author: queryAuthor,
+        model,
+        candidateProviders: candidates.map((candidate) => candidate.provider),
+        error
+      }
+    });
     return null;
   }
 };
@@ -1241,8 +1254,22 @@ const resolveMetadata = async (
 
   const candidates: ProviderCandidate[] = [];
 
-  for (const settled of results) {
-    if (settled.status !== "fulfilled") continue;
+  for (const [index, settled] of results.entries()) {
+    if (settled.status !== "fulfilled") {
+      const provider = providerOrder[index];
+      await logAdminActivity({
+        scope: "metadata",
+        event: "metadata.provider_failed",
+        message: "Metadata provider request failed",
+        details: {
+          title,
+          author,
+          provider,
+          error: settled.reason
+        }
+      });
+      continue;
+    }
     const { provider, result } = settled.value;
     if (!result || !hasUsableMetadata(result)) continue;
     candidates.push(buildCandidate(provider, result, title, author));

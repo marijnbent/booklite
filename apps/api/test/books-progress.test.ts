@@ -85,7 +85,7 @@ describe("book progress inference", () => {
     ownerUserId = owner.id;
   });
 
-  it("keeps progress below the reading threshold as unread", async () => {
+  it("keeps progress below the reading threshold as unset", async () => {
     const bookId = await createBook();
     await setThresholds(10, 80);
 
@@ -95,7 +95,7 @@ describe("book progress inference", () => {
     const detail = await getBook(bookId);
     expect(detail.statusCode).toBe(200);
     expect(detail.json().progress).toMatchObject({
-      status: "UNREAD",
+      status: "UNSET",
       progressPercent: 9
     });
   });
@@ -114,7 +114,7 @@ describe("book progress inference", () => {
     });
   });
 
-  it("marks progress at the finished threshold as done", async () => {
+  it("marks progress at the finished threshold as read", async () => {
     const bookId = await createBook();
     await setThresholds(10, 80);
 
@@ -123,7 +123,7 @@ describe("book progress inference", () => {
 
     const detail = await getBook(bookId);
     expect(detail.json().progress).toMatchObject({
-      status: "DONE",
+      status: "READ",
       progressPercent: 80
     });
   });

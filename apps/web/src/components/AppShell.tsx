@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
 import {
   Book,
   Upload,
@@ -36,9 +37,8 @@ const navItems = [
   { to: "/docs", label: "Docs", icon: CircleHelp },
 ];
 
-const bottomItems = [
+const adminItems = [
   { to: "/admin-users", label: "Admin", icon: Shield, ownerOnly: true },
-  { to: "/profile", label: "Profile", icon: User },
 ];
 
 interface PublicAppSettings {
@@ -71,8 +71,7 @@ export const AppShell: React.FC = () => {
     ? [...navItems, { href: ebookDownloadUrl, label: "Ebooks", icon: Download }]
     : navItems;
 
-  const visibleBottomItems = bottomItems.filter((i) => !i.ownerOnly || me?.role === "OWNER");
-  const allItems = [...topItems, ...visibleBottomItems];
+  const visibleAdminItems = adminItems.filter((i) => !i.ownerOnly || me?.role === "OWNER");
 
   const handleLogout = async () => {
     await logout();
@@ -147,9 +146,13 @@ export const AppShell: React.FC = () => {
           <nav className="flex flex-1 flex-col gap-1 px-3 pt-2">
             {topItems.map((item) => renderNavItem(item))}
 
-            <div className="h-px bg-border/50 my-2 mx-1" />
-
-            {visibleBottomItems.map((item) => renderNavItem(item))}
+            {visibleAdminItems.length > 0 && (
+              <>
+                <div className="mt-auto" />
+                <Separator className="my-2" />
+                {visibleAdminItems.map((item) => renderNavItem(item))}
+              </>
+            )}
           </nav>
 
           <div className="px-3 pb-3">
@@ -164,6 +167,13 @@ export const AppShell: React.FC = () => {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-44">
+                <DropdownMenuItem asChild>
+                  <NavLink to="/profile">
+                    <User className="size-4" />
+                    Profile
+                  </NavLink>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setTheme(resolved === "dark" ? "light" : "dark")}>
                   {resolved === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                   {resolved === "dark" ? "Light mode" : "Dark mode"}
@@ -197,7 +207,18 @@ export const AppShell: React.FC = () => {
 
             {mobileOpen && (
               <nav className="md:hidden border-b border-border/40 bg-muted/20 p-2.5 flex flex-col gap-0.5 animate-fade-in">
-                {allItems.map((item) => renderNavItem(item, true))}
+                {topItems.map((item) => renderNavItem(item, true))}
+                {visibleAdminItems.length > 0 && (
+                  <>
+                    <Separator className="my-2" />
+                    {visibleAdminItems.map((item) => renderNavItem(item, true))}
+                  </>
+                )}
+                <Separator className="my-2" />
+                <div className="px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground/70">
+                  {me?.username}
+                </div>
+                {renderNavItem({ to: "/profile", label: "Profile", icon: User }, true)}
               </nav>
             )}
           </>

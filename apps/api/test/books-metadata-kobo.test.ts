@@ -184,6 +184,22 @@ describe("books metadata + kobo scope", () => {
       failed: 1
     });
 
+    const activityRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/activity-log?scope=metadata&limit=20",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+
+    expect(activityRes.statusCode).toBe(200);
+    expect(activityRes.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "metadata.bulk_refresh_failed",
+          bookId: unsyncedBookId
+        })
+      ])
+    );
+
     const syncedDetail = await app.inject({
       method: "GET",
       url: `/api/v1/books/${syncedBookId}`,

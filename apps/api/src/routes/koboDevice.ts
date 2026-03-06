@@ -21,6 +21,7 @@ import {
   upsertKoboReadingStates
 } from "../services/kobo";
 import { koboFallbackResources } from "../services/koboFallbackResources";
+import { logAdminActivity } from "../services/adminActivityLog";
 
 const koboAuth = async (token: string) => {
   const user = await getKoboUserByToken(token);
@@ -83,14 +84,43 @@ const respondCover = async (
 
     try {
       const response = await fetch(coverPath, { signal: controller.signal });
-      if (!response.ok) return sendPlaceholderCover(reply);
+      if (!response.ok) {
+        await logAdminActivity({
+          scope: "kobo",
+          event: "kobo.cover_fetch_failed",
+          level: "WARN",
+          message: "Remote Kobo cover fetch returned a non-success status",
+          actorUserId: userId,
+          bookId,
+          details: {
+            imageId,
+            coverPath,
+            status: response.status
+          }
+        });
+        return sendPlaceholderCover(reply);
+      }
 
       const contentTypeRaw = response.headers.get("content-type") ?? "";
       const contentType = contentTypeRaw.toLowerCase().includes("image/")
         ? contentTypeRaw
         : "image/jpeg";
       const bytes = Buffer.from(await response.arrayBuffer());
-      if (bytes.length === 0) return sendPlaceholderCover(reply);
+      if (bytes.length === 0) {
+        await logAdminActivity({
+          scope: "kobo",
+          event: "kobo.cover_fetch_failed",
+          level: "WARN",
+          message: "Remote Kobo cover fetch returned an empty body",
+          actorUserId: userId,
+          bookId,
+          details: {
+            imageId,
+            coverPath
+          }
+        });
+        return sendPlaceholderCover(reply);
+      }
 
       remoteCoverCache.set(coverPath, {
         bytes,
@@ -101,7 +131,20 @@ const respondCover = async (
       reply.header("content-type", contentType);
       reply.header("cache-control", "public, max-age=600");
       return reply.send(bytes);
-    } catch {
+    } catch (error) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.cover_fetch_failed",
+        level: "WARN",
+        message: "Remote Kobo cover fetch failed",
+        actorUserId: userId,
+        bookId,
+        details: {
+          imageId,
+          coverPath,
+          error
+        }
+      });
       return sendPlaceholderCover(reply);
     } finally {
       clearTimeout(timeout);
@@ -111,11 +154,38 @@ const respondCover = async (
   const absolutePath = path.isAbsolute(coverPath) ? coverPath : path.join(config.booksDir, coverPath);
 
   if (!fs.existsSync(absolutePath)) {
+    await logAdminActivity({
+      scope: "kobo",
+      event: "kobo.cover_file_missing",
+      level: "WARN",
+      message: "Local Kobo cover file is missing",
+      actorUserId: userId,
+      bookId,
+      details: {
+        imageId,
+        coverPath,
+        absolutePath
+      }
+    });
     return sendPlaceholderCover(reply);
   }
 
   const contentType = lookupMime(absolutePath) || "image/jpeg";
   if (typeof contentType !== "string" || !contentType.startsWith("image/")) {
+    await logAdminActivity({
+      scope: "kobo",
+      event: "kobo.cover_invalid_content_type",
+      level: "WARN",
+      message: "Local Kobo cover path does not point to an image",
+      actorUserId: userId,
+      bookId,
+      details: {
+        imageId,
+        coverPath,
+        absolutePath,
+        contentType
+      }
+    });
     return sendPlaceholderCover(reply);
   }
 
@@ -157,6 +227,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     let resources: Record<string, unknown> = { ...koboFallbackResources };
     let usedFallback = true;
     let upstreamStatus: number | null = null;
+    let upstreamError: unknown = null;
     try {
       const upstreamHeaders: Record<string, string> = {
         "user-agent": request.headers["user-agent"] ?? "BookLite/1.0",
@@ -185,8 +256,23 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
           usedFallback = false;
         }
       }
-    } catch {
+    } catch (error) {
+      upstreamError = error;
       // fall back to static resource list
+    }
+
+    if (usedFallback && (upstreamStatus !== null || upstreamError)) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.initialization_fallback_used",
+        level: "WARN",
+        message: "Kobo initialization fell back to bundled resources",
+        actorUserId: auth.userId,
+        details: {
+          upstreamStatus,
+          error: upstreamError
+        }
+      });
     }
 
     resources = {
@@ -463,15 +549,35 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     // Only force a full entitlement sync when no valid sync token is present.
     const forceFullSync = baselineSnapshotId === null;
 
-    const { payload, snapshotId } = await getLibrarySyncPayload(
-      auth.userId,
-      params.token,
-      process.env.BASE_URL ?? "http://localhost:6060",
-      {
-        baselineSnapshotId: baselineSnapshotId ?? undefined,
-        forceFullSync
-      }
-    );
+    let payload;
+    let snapshotId;
+    try {
+      const result = await getLibrarySyncPayload(
+        auth.userId,
+        params.token,
+        process.env.BASE_URL ?? "http://localhost:6060",
+        {
+          baselineSnapshotId: baselineSnapshotId ?? undefined,
+          forceFullSync
+        }
+      );
+      payload = result.payload;
+      snapshotId = result.snapshotId;
+    } catch (error) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.library_sync_failed",
+        message: "Kobo library sync payload generation failed",
+        actorUserId: auth.userId,
+        details: {
+          forceFullSync,
+          baselineSnapshotId,
+          query,
+          error
+        }
+      });
+      return reply.code(500).send({ error: "Kobo sync failed" });
+    }
 
     const payloadCounts = payload.reduce<Record<string, number>>((acc, entry) => {
       const key = Object.keys(entry)[0] ?? "Unknown";
@@ -585,7 +691,21 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     const readingStates =
       body.ReadingStates ?? body.readingStates ?? [];
 
-    await upsertKoboReadingStates(auth.userId, readingStates as Array<Record<string, any>>);
+    try {
+      await upsertKoboReadingStates(auth.userId, readingStates as Array<Record<string, any>>);
+    } catch (error) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.reading_state_upsert_failed",
+        message: "Kobo reading state update failed",
+        actorUserId: auth.userId,
+        details: {
+          count: readingStates.length,
+          error
+        }
+      });
+      return reply.code(500).send({ error: "Kobo reading state update failed" });
+    }
 
     return {
       RequestResult: "Success",
@@ -633,7 +753,21 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const absolute = path.join(config.booksDir, row[0].filePath);
-    if (!fs.existsSync(absolute)) return reply.code(404).send({ error: "File not found" });
+    if (!fs.existsSync(absolute)) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.download_file_missing",
+        level: "WARN",
+        message: "Kobo download target file is missing",
+        actorUserId: auth.userId,
+        bookId: params.bookId,
+        details: {
+          absolute,
+          filePath: row[0].filePath
+        }
+      });
+      return reply.code(404).send({ error: "File not found" });
+    }
 
     const stats = fs.statSync(absolute);
     const contentType =
@@ -751,16 +885,46 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
-    const response = await fetch(upstreamUrl, {
-      method: request.method,
-      headers,
-      body:
-        request.method === "GET" || request.method === "HEAD"
-          ? undefined
-          : JSON.stringify(request.body ?? {})
-    });
+    let response: Response;
+    try {
+      response = await fetch(upstreamUrl, {
+        method: request.method,
+        headers,
+        body:
+          request.method === "GET" || request.method === "HEAD"
+            ? undefined
+            : JSON.stringify(request.body ?? {})
+      });
+    } catch (error) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.passthrough_failed",
+        message: "Kobo passthrough request failed before a response was received",
+        actorUserId: auth.userId,
+        details: {
+          method: request.method,
+          strippedPath: stripped,
+          error
+        }
+      });
+      return reply.code(502).send({ error: "Kobo upstream request failed" });
+    }
 
     const body = await response.text();
+    if (response.status >= 500) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.passthrough_upstream_error",
+        level: "WARN",
+        message: "Kobo passthrough request returned an upstream server error",
+        actorUserId: auth.userId,
+        details: {
+          method: request.method,
+          strippedPath: stripped,
+          upstreamStatus: response.status
+        }
+      });
+    }
     fastify.log.info(
       {
         userId: auth.userId,

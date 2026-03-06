@@ -11,6 +11,7 @@ import { randomToken } from "../utils/hash";
 import { queueUploadJob, getUploadLimitBytes } from "../services/jobs";
 import { db } from "../db/client";
 import { collections } from "../db/schema";
+import { logAdminActivity } from "../services/adminActivityLog";
 
 const sanitizeFileName = (name: string): string =>
   name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200);
@@ -248,7 +249,19 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         let drafts: UploadDraftInput[];
         try {
           drafts = batchDraftSchema.parse(JSON.parse(fields.drafts));
-        } catch {
+        } catch (error) {
+          await logAdminActivity({
+            scope: "upload",
+            event: "upload.invalid_drafts_payload",
+            level: "WARN",
+            message: "Upload batch drafts payload could not be parsed",
+            actorUserId: userId,
+            details: {
+              draftsLength: fields.drafts.length,
+              uploadedFileCount: uploadedFiles.size,
+              error
+            }
+          });
           uploadedFiles.forEach((storedFile) => removeUploadedFileIfExists(storedFile.targetPath));
           return reply.code(400).send({ error: "Invalid drafts payload" });
         }
@@ -308,6 +321,20 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
             });
           } catch (error) {
             removeUploadedFileIfExists(storedFile.targetPath);
+            await logAdminActivity({
+              scope: "upload",
+              event: "upload.batch_queue_failed",
+              message: "Failed to queue batch upload draft",
+              actorUserId: userId,
+              details: {
+                draftId: draft.id,
+                title,
+                fileName: storedFile.originalName,
+                fileExt: storedFile.fileExt,
+                fileSize: storedFile.fileSize,
+                error
+              }
+            });
             results.push({
               id: draft.id,
               title,
@@ -347,7 +374,19 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       if (fields.collectionIds !== undefined) {
         try {
           collectionIds = z.array(z.coerce.number().int().positive()).parse(JSON.parse(fields.collectionIds));
-        } catch {
+        } catch (error) {
+          await logAdminActivity({
+            scope: "upload",
+            event: "upload.invalid_collection_ids_payload",
+            level: "WARN",
+            message: "Upload collectionIds payload could not be parsed",
+            actorUserId: userId,
+            details: {
+              collectionIdsLength: fields.collectionIds.length,
+              fileName: uploadedFile.originalName,
+              error
+            }
+          });
           removeUploadedFileIfExists(uploadedFile.targetPath);
           return reply.code(400).send({ error: "Invalid collectionIds payload" });
         }
@@ -373,6 +412,19 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(202).send(queued);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Upload failed";
+        await logAdminActivity({
+          scope: "upload",
+          event: "upload.queue_failed",
+          message: "Failed to queue upload",
+          actorUserId: userId,
+          details: {
+            title: fields.title?.trim() || path.parse(uploadedFile.originalName).name,
+            fileName: uploadedFile.originalName,
+            fileExt: uploadedFile.fileExt,
+            fileSize: uploadedFile.fileSize,
+            error
+          }
+        });
         const statusCode = message.startsWith("File exceeds ") ? 413 : 400;
         return reply.code(statusCode).send({ error: message });
       }

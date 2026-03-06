@@ -52,6 +52,10 @@ import {
   HardDrive,
   Info,
   Link2,
+  AlertTriangle,
+  RefreshCw,
+  Trash2,
+  TerminalSquare,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -81,6 +85,22 @@ interface AppSettings {
   ebookDownloadUrl: string;
 }
 
+type AdminActivityScope = "metadata" | "upload" | "kobo";
+
+interface AdminActivityItem {
+  id: number;
+  scope: AdminActivityScope;
+  event: string;
+  level: "ERROR" | "WARN" | "INFO";
+  message: string;
+  details: unknown;
+  actorUserId: number | null;
+  targetUserId: number | null;
+  bookId: number | null;
+  jobId: string | null;
+  createdAt: string;
+}
+
 type EnabledMetadataProvider =
   | "open_library"
   | "amazon"
@@ -104,6 +124,45 @@ const amazonDomainOptions: Array<{ value: AmazonDomain; label: string }> = [
   { value: "ca", label: "amazon.ca" },
   { value: "com.au", label: "amazon.com.au" },
 ];
+
+const activityScopeOptions: Array<{ value: "all" | AdminActivityScope; label: string }> = [
+  { value: "all", label: "All systems" },
+  { value: "metadata", label: "Metadata" },
+  { value: "upload", label: "Upload" },
+  { value: "kobo", label: "Kobo" },
+];
+
+const activityScopeMeta: Record<
+  AdminActivityScope,
+  { label: string; className: string }
+> = {
+  metadata: {
+    label: "Metadata",
+    className: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  },
+  upload: {
+    label: "Upload",
+    className: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  },
+  kobo: {
+    label: "Kobo",
+    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  },
+};
+
+const activityLevelClassName: Record<string, string> = {
+  ERROR: "bg-destructive/10 text-destructive",
+  WARN: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  INFO: "bg-muted text-muted-foreground",
+};
+
+const formatActivityTime = (value: string): string =>
+  new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+
+const formatActivityDetails = (details: unknown): string => JSON.stringify(details, null, 2);
 
 // Provider metadata for richer display
 const providerMeta: Record<
@@ -162,6 +221,7 @@ export const AdminUsersPage: React.FC = () => {
   const [expandedProviders, setExpandedProviders] = useState<Set<EnabledMetadataProvider>>(
     new Set()
   );
+  const [activityScope, setActivityScope] = useState<"all" | AdminActivityScope>("all");
 
   const users = useQuery({
     queryKey: ["users"],
@@ -171,6 +231,14 @@ export const AdminUsersPage: React.FC = () => {
   const settings = useQuery({
     queryKey: ["app-settings"],
     queryFn: () => apiFetch<AppSettings>("/api/v1/app-settings"),
+  });
+
+  const activity = useQuery({
+    queryKey: ["admin-activity", activityScope],
+    queryFn: () =>
+      apiFetch<AdminActivityItem[]>(
+        `/api/v1/admin/activity-log?limit=100${activityScope === "all" ? "" : `&scope=${activityScope}`}`
+      ),
   });
 
   const createUser = useMutation({
@@ -207,6 +275,16 @@ export const AdminUsersPage: React.FC = () => {
         body: JSON.stringify(payload),
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["app-settings"] }),
+  });
+
+  const clearActivity = useMutation({
+    mutationFn: (scope: AdminActivityScope | "all") =>
+      apiFetch<{ ok: true; cleared: number }>("/api/v1/admin/activity-log", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(scope === "all" ? {} : { scope }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-activity"] }),
   });
 
   const updateProviderEnabled = (
@@ -867,6 +945,121 @@ export const AdminUsersPage: React.FC = () => {
                 </div>
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border-border overflow-hidden">
+          <CardHeader className="pb-4 pt-5 px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <TerminalSquare className="size-4 text-muted-foreground" />
+                  <h2 className="text-lg font-semibold tracking-tight">Activity Log</h2>
+                  {activity.data && (
+                    <Badge variant="secondary" className="text-[11px] tabular-nums">
+                      {activity.data.length}
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Recent admin-visible errors from metadata, uploads, and Kobo sync.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={activityScope}
+                  onValueChange={(value) => setActivityScope(value as "all" | AdminActivityScope)}
+                >
+                  <SelectTrigger className="h-8 w-[10rem] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activityScopeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => activity.refetch()}
+                  disabled={activity.isFetching}
+                >
+                  <RefreshCw className={activity.isFetching ? "size-4 animate-spin" : "size-4"} />
+                  Refresh
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => clearActivity.mutate(activityScope)}
+                  disabled={clearActivity.isPending || !activity.data?.length}
+                >
+                  <Trash2 className="size-4" />
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-4 px-6 pb-6">
+            {activity.isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (activity.data ?? []).length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border py-12 text-center">
+                <AlertTriangle className="mb-3 size-8 text-muted-foreground/30" />
+                <p className="text-sm font-medium text-muted-foreground">No recent activity</p>
+                <p className="mt-1 text-xs text-muted-foreground/60">
+                  When metadata, upload, or Kobo operations fail, they will show up here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(activity.data ?? []).map((entry) => (
+                  <div key={entry.id} className="rounded-md border border-border bg-muted/20 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={activityScopeMeta[entry.scope].className}>
+                            {activityScopeMeta[entry.scope].label}
+                          </Badge>
+                          <Badge className={activityLevelClassName[entry.level] ?? activityLevelClassName.INFO}>
+                            {entry.level}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">{entry.event}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{entry.message}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatActivityTime(entry.createdAt)}
+                            {entry.actorUserId !== null ? ` · actor #${entry.actorUserId}` : ""}
+                            {entry.bookId !== null ? ` · book #${entry.bookId}` : ""}
+                            {entry.jobId ? ` · job ${entry.jobId}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {entry.details !== null && (
+                      <>
+                        <Separator className="my-3" />
+                        <pre className="max-h-56 overflow-auto rounded-md bg-background/80 p-3 text-[11px] leading-5 text-muted-foreground">
+                          {formatActivityDetails(entry.details)}
+                        </pre>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

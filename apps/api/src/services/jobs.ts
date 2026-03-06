@@ -7,6 +7,7 @@ import { fetchMetadataWithFallback } from "./metadata";
 import { filenameToBasicMetadata } from "./books";
 import { resolveFilenameMetadata } from "./filenameNormalizer";
 import { getFavoritesCollectionId } from "./systemCollections";
+import { logAdminActivity } from "./adminActivityLog";
 
 let running = false;
 
@@ -129,9 +130,9 @@ const processUploadJob = async (job: {
 
   if (controls.autoMetadata) {
     try {
-        const metadata = await fetchMetadataWithFallback(inserted.title, inserted.author ?? undefined);
-        if (metadata.source !== "NONE") {
-          const set: Record<string, unknown> = {};
+      const metadata = await fetchMetadataWithFallback(inserted.title, inserted.author ?? undefined);
+      if (metadata.source !== "NONE") {
+        const set: Record<string, unknown> = {};
 
         if (!titleExplicit && metadata.title && metadata.title !== inserted.title) {
           set.title = metadata.title;
@@ -162,8 +163,21 @@ const processUploadJob = async (job: {
           await db.update(books).set(set).where(eq(books.id, inserted.id));
         }
       }
-    } catch {
-      // metadata is non-critical for upload completion
+    } catch (error) {
+      await logAdminActivity({
+        scope: "metadata",
+        event: "metadata.upload_enrichment_failed",
+        message: "Metadata enrichment failed during upload processing",
+        actorUserId: job.userId,
+        bookId: inserted.id,
+        jobId: job.id,
+        details: {
+          title: inserted.title,
+          author: inserted.author,
+          fileName: payload.fileName,
+          error
+        }
+      });
     }
   }
 
@@ -246,6 +260,30 @@ const processOneQueuedJob = async (): Promise<boolean> => {
       throw new Error(`Unknown job type: ${job.type}`);
     }
   } catch (error) {
+    await logAdminActivity({
+      scope: job.type === "UPLOAD" ? "upload" : "metadata",
+      event: "upload.job_failed",
+      message: "Import job failed during background processing",
+      actorUserId: job.userId,
+      jobId: job.id,
+      details: {
+        type: job.type,
+        error,
+        payload: (() => {
+          try {
+            const parsed = JSON.parse(job.payloadJson) as Record<string, unknown>;
+            return {
+              fileName: parsed.fileName,
+              filePath: parsed.filePath,
+              fileExt: parsed.fileExt,
+              fileSize: parsed.fileSize
+            };
+          } catch {
+            return null;
+          }
+        })()
+      }
+    });
     await db
       .update(importJobs)
       .set({
