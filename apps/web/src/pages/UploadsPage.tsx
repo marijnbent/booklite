@@ -47,10 +47,6 @@ interface MetadataPreview {
     | "HARDCOVER"
     | "GOODREADS"
     | "DOUBAN"
-    | "LUBIMYCZYTAC"
-    | "RANOBEDB"
-    | "COMICVINE"
-    | "AUDIBLE"
     | "NONE";
   title?: string | null;
   author?: string | null;

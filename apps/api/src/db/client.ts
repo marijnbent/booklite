@@ -205,8 +205,6 @@ insertSetting.run("metadata_amazon_cookie", JSON.stringify(config.amazonBooksCoo
 insertSetting.run("metadata_google_language", JSON.stringify(config.googleBooksLanguage));
 insertSetting.run("metadata_google_api_key", JSON.stringify(config.googleBooksApiKey));
 insertSetting.run("metadata_hardcover_api_key", JSON.stringify(config.hardcoverApiKey));
-insertSetting.run("metadata_comicvine_api_key", JSON.stringify(config.comicvineApiKey));
-insertSetting.run("metadata_audible_domain", JSON.stringify(config.audibleDomain));
 insertSetting.run("upload_limit_mb", JSON.stringify(config.uploadLimitMb));
 
 export const walCheckpoint = (): void => {

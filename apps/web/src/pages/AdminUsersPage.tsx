@@ -47,8 +47,6 @@ interface AppSettings {
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
-  metadataComicvineApiKey: string;
-  metadataAudibleDomain: AudibleDomain;
   uploadLimitMb: number;
 }
 
@@ -59,13 +57,8 @@ type MetadataProvider =
   | "hardcover"
   | "goodreads"
   | "douban"
-  | "lubimyczytac"
-  | "ranobedb"
-  | "comicvine"
-  | "audible"
   | "none";
 type AmazonDomain = "com" | "co.uk" | "de" | "fr" | "es" | "it" | "nl" | "ca" | "com.au";
-type AudibleDomain = "com" | "co.uk" | "de" | "fr" | "it" | "ca" | "com.au";
 
 const metadataProviderOptions: Array<{ value: MetadataProvider; label: string }> = [
   { value: "open_library", label: "Open Library" },
@@ -74,10 +67,6 @@ const metadataProviderOptions: Array<{ value: MetadataProvider; label: string }>
   { value: "hardcover", label: "Hardcover" },
   { value: "goodreads", label: "Goodreads" },
   { value: "douban", label: "Douban" },
-  { value: "lubimyczytac", label: "Lubimyczytac" },
-  { value: "ranobedb", label: "RanobeDB" },
-  { value: "comicvine", label: "Comic Vine" },
-  { value: "audible", label: "Audible" },
   { value: "none", label: "None" }
 ];
 
@@ -91,16 +80,6 @@ const amazonDomainOptions: Array<{ value: AmazonDomain; label: string }> = [
   { value: "nl", label: "amazon.nl" },
   { value: "ca", label: "amazon.ca" },
   { value: "com.au", label: "amazon.com.au" }
-];
-
-const audibleDomainOptions: Array<{ value: AudibleDomain; label: string }> = [
-  { value: "com", label: "audible.com" },
-  { value: "co.uk", label: "audible.co.uk" },
-  { value: "de", label: "audible.de" },
-  { value: "fr", label: "audible.fr" },
-  { value: "it", label: "audible.it" },
-  { value: "ca", label: "audible.ca" },
-  { value: "com.au", label: "audible.com.au" }
 ];
 
 export const AdminUsersPage: React.FC = () => {
@@ -534,43 +513,6 @@ export const AdminUsersPage: React.FC = () => {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="metadata-comicvine-api-key">Comic Vine API token (optional)</Label>
-                    <Input
-                      id="metadata-comicvine-api-key"
-                      type="password"
-                      defaultValue={settings.data.metadataComicvineApiKey}
-                      placeholder="Enter Comic Vine API token"
-                      onBlur={(e) =>
-                        patchSettings.mutate({
-                          metadataComicvineApiKey: e.target.value
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="metadata-audible-domain">Audible region</Label>
-                    <Select
-                      value={settings.data.metadataAudibleDomain}
-                      onValueChange={(v) =>
-                        patchSettings.mutate({
-                          metadataAudibleDomain: v as AudibleDomain
-                        })
-                      }
-                    >
-                      <SelectTrigger id="metadata-audible-domain">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {audibleDomainOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
               </div>
 

@@ -430,6 +430,24 @@ export const LibraryPage: React.FC = () => {
     [queryClient]
   );
 
+  const refreshAllMetadata = useMutation({
+    mutationFn: async () =>
+      apiFetch<{
+        ok: boolean;
+        total: number;
+        refreshed: number;
+        updated: number;
+        matched: number;
+        fallback: number;
+        failed: number;
+      }>("/api/v1/books/metadata/fetch-all", {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["books"] });
+    },
+  });
+
   const toggleFavorite = useCallback(
     async (bookId: number, favorite: boolean) => {
       await apiFetch(`/api/v1/books/${bookId}/favorite`, {
@@ -518,6 +536,21 @@ export const LibraryPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => refreshAllMetadata.mutate()}
+              disabled={refreshAllMetadata.isPending}
+            >
+              {refreshAllMetadata.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              Refresh all metadata
+            </Button>
+
             {/* Sort */}
             <Select
               value={sort}

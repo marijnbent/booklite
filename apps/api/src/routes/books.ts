@@ -57,6 +57,83 @@ const mapBookRow = (row: any) => ({
         }
 });
 
+const koboSyncableCase = (userId: number) => sql`
+  CASE
+    WHEN lower(b.file_ext) = 'epub' AND EXISTS (
+      SELECT 1
+      FROM kobo_sync_collections ksc
+      INNER JOIN collections kc ON kc.id = ksc.collection_id
+      INNER JOIN collection_books kcb ON kcb.collection_id = kc.id
+      WHERE ksc.user_id = ${userId}
+        AND kc.user_id = ${userId}
+        AND kcb.book_id = b.id
+    ) THEN 1
+    ELSE 0
+  END
+`;
+
+type BookMetadataRefreshTarget = {
+  id: number;
+  title: string;
+  author: string | null;
+  description: string | null;
+  coverPath: string | null;
+  filePath: string;
+};
+
+const refreshBookMetadata = async (
+  target: BookMetadataRefreshTarget
+): Promise<{ source: string; updated: boolean }> => {
+  const metadata = await fetchMetadataWithFallback(target.title, target.author ?? undefined);
+
+  if (metadata.source === "NONE") {
+    const fallback = filenameToBasicMetadata(path.basename(target.filePath));
+    const title = fallback.title || target.title;
+    const author =
+      target.author && target.author.trim().length > 0 ? target.author : fallback.author;
+
+    const changed = title !== target.title || author !== target.author;
+    if (changed) {
+      await db
+        .update(books)
+        .set({
+          title,
+          author,
+          updatedAt: nowIso()
+        })
+        .where(eq(books.id, target.id));
+    }
+
+    return { source: "NONE", updated: changed };
+  }
+
+  const nextTitle = metadata.title ?? target.title;
+  const nextAuthor = metadata.author ?? target.author;
+  const nextDescription = metadata.description ?? null;
+  const nextCoverPath = metadata.coverPath ?? null;
+
+  const changed =
+    nextTitle !== target.title ||
+    nextAuthor !== target.author ||
+    nextDescription !== target.description ||
+    nextCoverPath !== target.coverPath;
+
+  if (changed) {
+    await db
+      .update(books)
+      .set({
+        title: nextTitle,
+        author: nextAuthor,
+        description: nextDescription,
+        coverPath: nextCoverPath,
+        updatedAt: nowIso()
+      })
+      .where(eq(books.id, target.id));
+  }
+
+  return { source: metadata.source, updated: changed };
+};
+
 const ensureBookExists = async (bookId: number): Promise<boolean> => {
   const found = await db
     .select({ id: books.id })
@@ -82,7 +159,9 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
     const rows = query.q
       ? await db.all(
           sql`
-            SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+            SELECT b.id, b.owner_user_id, b.title, b.author, b.series, b.description, b.cover_path, b.file_path, b.file_ext, b.file_size,
+                   ${koboSyncableCase(request.auth.userId)} AS kobo_syncable, b.created_at, b.updated_at,
+                   bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
                    CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
             FROM books b
             JOIN book_search bs ON bs.rowid = b.id
@@ -96,7 +175,9 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
         )
       : await db.all(
           sql`
-            SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+            SELECT b.id, b.owner_user_id, b.title, b.author, b.series, b.description, b.cover_path, b.file_path, b.file_ext, b.file_size,
+                   ${koboSyncableCase(request.auth.userId)} AS kobo_syncable, b.created_at, b.updated_at,
+                   bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
                    CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
             FROM books b
             LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
@@ -121,7 +202,9 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
 
       const rows = await db.all(
         sql`
-          SELECT b.*, bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+          SELECT b.id, b.owner_user_id, b.title, b.author, b.series, b.description, b.cover_path, b.file_path, b.file_ext, b.file_size,
+                 ${koboSyncableCase(request.auth.userId)} AS kobo_syncable, b.created_at, b.updated_at,
+                 bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
                  CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
           FROM books b
           LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
@@ -392,9 +475,60 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   fastify.post(
+    "/api/v1/books/metadata/fetch-all",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+
+      const allBooks = await db
+        .select({
+          id: books.id,
+          title: books.title,
+          author: books.author,
+          description: books.description,
+          coverPath: books.coverPath,
+          filePath: books.filePath
+        })
+        .from(books);
+
+      let refreshed = 0;
+      let updated = 0;
+      let matched = 0;
+      let fallback = 0;
+      let failed = 0;
+
+      for (const book of allBooks) {
+        try {
+          const result = await refreshBookMetadata(book);
+          refreshed += 1;
+          if (result.updated) updated += 1;
+          if (result.source === "NONE") {
+            fallback += 1;
+          } else {
+            matched += 1;
+          }
+        } catch {
+          failed += 1;
+        }
+      }
+
+      return {
+        ok: true,
+        total: allBooks.length,
+        refreshed,
+        updated,
+        matched,
+        fallback,
+        failed
+      };
+    }
+  );
+
+  fastify.post(
     "/api/v1/books/:id/metadata/fetch",
     { preHandler: requireAuth },
     async (request, reply) => {
+      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
       const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
 
       const found = await db
@@ -402,6 +536,8 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           id: books.id,
           title: books.title,
           author: books.author,
+          description: books.description,
+          coverPath: books.coverPath,
           filePath: books.filePath
         })
         .from(books)
@@ -410,44 +546,8 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!found[0]) return reply.code(404).send({ error: "Book not found" });
 
-      const metadata = await fetchMetadataWithFallback(
-        found[0].title,
-        found[0].author ?? undefined
-      );
-
-      if (metadata.source === "NONE") {
-        const fallback = filenameToBasicMetadata(path.basename(found[0].filePath));
-        const title = fallback.title || found[0].title;
-        const author =
-          found[0].author && found[0].author.trim().length > 0
-            ? found[0].author
-            : fallback.author;
-
-        if (title !== found[0].title || author !== found[0].author) {
-          await db
-            .update(books)
-            .set({
-              title,
-              author,
-              updatedAt: nowIso()
-            })
-            .where(eq(books.id, params.id));
-        }
-        return { ok: true, source: "NONE" };
-      }
-
-      await db
-        .update(books)
-        .set({
-          title: metadata.title ?? found[0].title,
-          author: metadata.author ?? found[0].author,
-          description: metadata.description ?? null,
-          coverPath: metadata.coverPath ?? null,
-          updatedAt: nowIso()
-        })
-        .where(eq(books.id, params.id));
-
-      return { ok: true, source: metadata.source };
+      const result = await refreshBookMetadata(found[0]);
+      return { ok: true, source: result.source, updated: result.updated };
     }
   );
 

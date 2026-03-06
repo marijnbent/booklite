@@ -20,10 +20,8 @@ export const config = {
   googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? "",
   googleBooksLanguage: process.env.GOOGLE_BOOKS_LANGUAGE ?? "",
   hardcoverApiKey: process.env.HARDCOVER_API_KEY ?? "",
-  comicvineApiKey: process.env.COMICVINE_API_KEY ?? "",
   amazonBooksDomain: process.env.AMAZON_BOOKS_DOMAIN ?? "com",
-  amazonBooksCookie: process.env.AMAZON_BOOKS_COOKIE ?? "",
-  audibleDomain: process.env.AUDIBLE_DOMAIN ?? "com"
+  amazonBooksCookie: process.env.AMAZON_BOOKS_COOKIE ?? ""
 };
 
 export const dbFilePath = path.join(config.appDataDir, "booklite.db");

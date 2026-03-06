@@ -12,10 +12,6 @@ const metadataProviderSchema = z.enum([
   "hardcover",
   "goodreads",
   "douban",
-  "lubimyczytac",
-  "ranobedb",
-  "comicvine",
-  "audible",
   "none"
 ]);
 type MetadataProvider = z.infer<typeof metadataProviderSchema>;
@@ -32,17 +28,6 @@ const amazonDomainSchema = z.enum([
   "com.au"
 ]);
 type AmazonDomain = z.infer<typeof amazonDomainSchema>;
-
-const audibleDomainSchema = z.enum([
-  "com",
-  "co.uk",
-  "de",
-  "fr",
-  "it",
-  "ca",
-  "com.au"
-]);
-type AudibleDomain = z.infer<typeof audibleDomainSchema>;
 
 const toProvider = (
   value: unknown,
@@ -61,8 +46,6 @@ const patchSettingsSchema = z.object({
   metadataGoogleLanguage: z.string().trim().max(8).optional(),
   metadataGoogleApiKey: z.string().trim().optional(),
   metadataHardcoverApiKey: z.string().trim().optional(),
-  metadataComicvineApiKey: z.string().trim().optional(),
-  metadataAudibleDomain: audibleDomainSchema.optional(),
   metadataProviderFallback: z.enum(["google", "none"]).optional(),
   uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional()
 });
@@ -78,14 +61,6 @@ const toAmazonDomain = (value: unknown, fallback: AmazonDomain): AmazonDomain =>
   return parsed.success ? parsed.data : fallback;
 };
 
-const toAudibleDomain = (
-  value: unknown,
-  fallback: AudibleDomain
-): AudibleDomain => {
-  const parsed = audibleDomainSchema.safeParse(value);
-  return parsed.success ? parsed.data : fallback;
-};
-
 const resolveSettings = async (): Promise<{
   metadataProviderPrimary: MetadataProvider;
   metadataProviderSecondary: MetadataProvider;
@@ -95,8 +70,6 @@ const resolveSettings = async (): Promise<{
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
-  metadataComicvineApiKey: string;
-  metadataAudibleDomain: AudibleDomain;
   metadataProviderFallback: "google" | "none";
   uploadLimitMb: number;
 }> => {
@@ -143,14 +116,6 @@ const resolveSettings = async (): Promise<{
     metadataHardcoverApiKey: await getSetting<string>(
       "metadata_hardcover_api_key",
       config.hardcoverApiKey
-    ),
-    metadataComicvineApiKey: await getSetting<string>(
-      "metadata_comicvine_api_key",
-      config.comicvineApiKey
-    ),
-    metadataAudibleDomain: toAudibleDomain(
-      await getSetting<string>("metadata_audible_domain", config.audibleDomain),
-      "com"
     ),
     metadataProviderFallback: toLegacyFallback(
       metadataProviderSecondary,
@@ -212,12 +177,6 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       }
       if (body.metadataHardcoverApiKey !== undefined) {
         await upsert("metadata_hardcover_api_key", body.metadataHardcoverApiKey);
-      }
-      if (body.metadataComicvineApiKey !== undefined) {
-        await upsert("metadata_comicvine_api_key", body.metadataComicvineApiKey);
-      }
-      if (body.metadataAudibleDomain !== undefined) {
-        await upsert("metadata_audible_domain", body.metadataAudibleDomain);
       }
       if (body.uploadLimitMb !== undefined) {
         await upsert("upload_limit_mb", body.uploadLimitMb);

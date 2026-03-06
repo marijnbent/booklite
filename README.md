@@ -19,7 +19,7 @@ Included:
 - Local auth (JWT access + refresh rotation)
 - OWNER/MEMBER user model
 - Upload/import jobs
-- Configurable metadata providers (Open Library, Amazon, Google Books, Hardcover, Goodreads, Douban, Lubimyczytac, RanobeDB, Comic Vine, Audible)
+- Configurable metadata providers (Open Library, Amazon, Google Books, Hardcover, Goodreads, Douban)
 - Library search via SQLite FTS5
 - Collections CRUD + drag/drop assignment
 - Kobo token settings + Kobo device endpoints + progress sync
@@ -63,8 +63,6 @@ See `.env.example`:
 - `GOOGLE_BOOKS_LANGUAGE` (optional, example `en`)
 - `GOOGLE_BOOKS_API_KEY` (optional)
 - `HARDCOVER_API_KEY` (optional)
-- `COMICVINE_API_KEY` (optional)
-- `AUDIBLE_DOMAIN` (optional, default `com`)
 
 ## Development
 
