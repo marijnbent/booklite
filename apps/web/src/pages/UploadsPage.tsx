@@ -50,6 +50,7 @@ interface MetadataPreview {
     | "NONE";
   title?: string | null;
   author?: string | null;
+  series?: string | null;
   description?: string | null;
 }
 
@@ -214,6 +215,7 @@ export const UploadsPage: React.FC = () => {
             ...draft,
             title: draft.titleTouched ? draft.title : (preview.title ?? draft.title),
             author: draft.authorTouched ? draft.author : (preview.author ?? draft.author),
+            series: draft.series.trim().length > 0 ? draft.series : (preview.series ?? draft.series),
             description: draft.descriptionTouched
               ? draft.description
               : (preview.description ?? draft.description),

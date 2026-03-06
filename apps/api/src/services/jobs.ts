@@ -1,8 +1,10 @@
+import path from "node:path";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, getSetting, walCheckpoint } from "../db/client";
 import { books, collectionBooks, collections, importJobs } from "../db/schema";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "./metadata";
+import { filenameToBasicMetadata } from "./books";
 import { resolveFilenameMetadata } from "./filenameNormalizer";
 import { getFavoritesCollectionId } from "./systemCollections";
 
@@ -25,6 +27,20 @@ const touchCollections = async (collectionIds: number[]): Promise<void> => {
     .set({ updatedAt: nowIso() })
     .where(inArray(collections.id, collectionIds));
 };
+
+const normalizeForMatch = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(/\s+/g, " ").toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+};
+
+const isSameText = (left: string | null | undefined, right: string | null | undefined): boolean => {
+  const normalizedLeft = normalizeForMatch(left);
+  const normalizedRight = normalizeForMatch(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+};
+
+const getRawFileTitle = (fileName: string): string => path.parse(fileName).name;
 
 const processUploadJob = async (job: {
   id: string;
@@ -49,15 +65,31 @@ const processUploadJob = async (job: {
     autoMetadata: payload.controls?.autoMetadata ?? true
   };
 
-  const defaults = await resolveFilenameMetadata(payload.fileName);
-  const timestamp = nowIso();
   const normalizedControlTitle = controls.title?.trim() || undefined;
   const normalizedControlAuthor = controls.author?.trim() || undefined;
   const normalizedControlSeries = controls.series?.trim() || undefined;
   const normalizedControlDescription = controls.description?.trim() || undefined;
+  const rawFileTitle = getRawFileTitle(payload.fileName);
+
+  let defaults = filenameToBasicMetadata(payload.fileName);
+
+  const shouldTryAiFilenameResolution =
+    !normalizedControlTitle || isSameText(normalizedControlTitle, rawFileTitle);
+
+  if (shouldTryAiFilenameResolution) {
+    try {
+      defaults = await resolveFilenameMetadata(payload.fileName);
+    } catch {
+      defaults = filenameToBasicMetadata(payload.fileName);
+    }
+  }
+
+  const timestamp = nowIso();
 
   const titleExplicit = Boolean(
-    normalizedControlTitle && normalizedControlTitle !== defaults.title
+    normalizedControlTitle &&
+      !isSameText(normalizedControlTitle, rawFileTitle) &&
+      !isSameText(normalizedControlTitle, defaults.title)
   );
   const authorExplicit = normalizedControlAuthor !== undefined;
   const descriptionExplicit = normalizedControlDescription !== undefined;

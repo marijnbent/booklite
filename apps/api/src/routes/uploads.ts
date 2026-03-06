@@ -39,6 +39,15 @@ const parseBooleanField = (value: string | undefined, fallback: boolean): boolea
   return normalized === "1" || normalized === "true" || normalized === "yes";
 };
 
+const removeUploadedFileIfExists = (filePath: string | undefined): void => {
+  if (!filePath) return;
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch {
+    // best-effort cleanup only
+  }
+};
+
 export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/api/v1/uploads",
@@ -64,6 +73,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         if (uploadedFile) {
+          removeUploadedFileIfExists(uploadedFile.targetPath);
           return reply.code(400).send({ error: "Only one file is supported per request" });
         }
 
@@ -106,6 +116,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         try {
           collectionIds = z.array(z.coerce.number().int().positive()).parse(JSON.parse(fields.collectionIds));
         } catch {
+          removeUploadedFileIfExists(uploadedFile.targetPath);
           return reply.code(400).send({ error: "Invalid collectionIds payload" });
         }
 
@@ -122,6 +133,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
             );
 
           if (valid.length !== uniqueCollectionIds.length) {
+            removeUploadedFileIfExists(uploadedFile.targetPath);
             return reply.code(400).send({ error: "One or more collectionIds are invalid for this user" });
           }
         }
@@ -140,23 +152,28 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       const jobId = randomToken();
       const relativeFilePath = path.relative(config.booksDir, uploadedFile.targetPath);
 
-      await queueUploadJob({
-        id: jobId,
-        userId: request.auth.userId,
-        fileName: uploadedFile.originalName,
-        filePath: relativeFilePath,
-        fileSize: stat.size,
-        fileExt: uploadedFile.fileExt,
-        controls: {
-          title,
-          author,
-          series,
-          description,
-          collectionIds,
-          favorite,
-          autoMetadata
-        }
-      });
+      try {
+        await queueUploadJob({
+          id: jobId,
+          userId: request.auth.userId,
+          fileName: uploadedFile.originalName,
+          filePath: relativeFilePath,
+          fileSize: stat.size,
+          fileExt: uploadedFile.fileExt,
+          controls: {
+            title,
+            author,
+            series,
+            description,
+            collectionIds,
+            favorite,
+            autoMetadata
+          }
+        });
+      } catch {
+        removeUploadedFileIfExists(uploadedFile.targetPath);
+        throw new Error("Failed to queue upload job");
+      }
 
       return reply.code(202).send({
         jobId,
