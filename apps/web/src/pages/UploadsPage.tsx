@@ -4,7 +4,6 @@ import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -15,15 +14,9 @@ import {
   XCircle,
   Loader2,
   Clock,
-  FileText,
   Plus,
   Trash2,
   Star,
-  Sparkles,
-  AlertCircle,
-  BookOpen,
-  Search,
-  ArrowRight,
 } from "lucide-react";
 
 interface UploadJob {
@@ -318,9 +311,9 @@ export const UploadsPage: React.FC = () => {
     <div className="space-y-8">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Add Books</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Upload</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Drop your files, review the details, and add to your library.
+          Add books to your library from EPUB or PDF files.
         </p>
       </div>
 

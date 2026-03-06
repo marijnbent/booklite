@@ -4,12 +4,10 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -23,141 +21,89 @@ import {
   LogOut,
   Sun,
   Moon,
-  Monitor,
   Menu,
   X,
   CircleHelp,
 } from "lucide-react";
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: React.ReactNode;
-  ownerOnly?: boolean;
-}
-
-const navItems: NavItem[] = [
+const navItems = [
   { to: "/library", label: "Library", icon: <Book className="size-4" /> },
   { to: "/collections", label: "Collections", icon: <FolderOpen className="size-4" /> },
-  { to: "/uploads", label: "Uploads", icon: <Upload className="size-4" /> },
+  { to: "/uploads", label: "Upload", icon: <Upload className="size-4" /> },
   { to: "/kobo", label: "Kobo", icon: <TabletSmartphone className="size-4" /> },
-  { to: "/profile", label: "Profile", icon: <User className="size-4" /> },
-  { to: "/admin-users", label: "Admin", icon: <Shield className="size-4" />, ownerOnly: true },
   { to: "/docs", label: "Docs", icon: <CircleHelp className="size-4" /> },
+];
+
+const bottomItems = [
+  { to: "/admin-users", label: "Admin", icon: <Shield className="size-4" />, ownerOnly: true },
+  { to: "/profile", label: "Profile", icon: <User className="size-4" /> },
 ];
 
 export const AppShell: React.FC = () => {
   const { me, logout } = useAuth();
-  const { theme, setTheme, resolved } = useTheme();
+  const { resolved, setTheme } = useTheme();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const initials = me?.username
-    ? me.username.slice(0, 2).toUpperCase()
-    : "?";
-
-  const visibleNavItems = navItems.filter(
-    (item) => !item.ownerOnly || me?.role === "OWNER"
-  );
+  const allItems = [
+    ...navItems,
+    ...bottomItems.filter((i) => !i.ownerOnly || me?.role === "OWNER"),
+  ];
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Top navigation bar */}
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-1 px-4 sm:px-6">
-          {/* Logo */}
-          <NavLink
-            to="/library"
-            className="flex items-center gap-2 shrink-0 mr-6 group"
-          >
-            <div className="flex size-7 items-center justify-center rounded-md bg-primary/10 group-hover:bg-primary/15 transition-colors">
-              <Book className="size-3.5 text-primary" />
-            </div>
-            <span className="text-[15px] font-bold tracking-tight hidden sm:block" style={{ fontFamily: "Georgia, 'Iowan Old Style', serif" }}>
-              BookLite
-            </span>
-          </NavLink>
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      "flex items-center gap-2.5 px-3 py-2 text-[13px] font-medium rounded-md transition-colors",
+      isActive
+        ? "bg-primary/10 text-primary"
+        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+    );
 
-          {/* Desktop nav links */}
-          <nav className="hidden md:flex items-center gap-0.5">
-            {visibleNavItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-md transition-colors",
-                    isActive
-                      ? "text-primary bg-primary/8"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-                  )
-                }
-              >
+  return (
+    <div className="flex min-h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="hidden md:flex w-48 shrink-0 flex-col border-r border-border/60">
+        <div className="flex items-center gap-2 px-4 h-14">
+          <Book className="size-4 text-primary" />
+          <span className="text-sm font-semibold tracking-tight">BookLite</span>
+        </div>
+
+        <nav className="flex flex-col gap-0.5 px-2 pt-1 pb-2">
+          {navItems.map((item) => (
+            <NavLink key={item.to} to={item.to} className={linkClass}>
+              {item.icon}
+              {item.label}
+            </NavLink>
+          ))}
+          <div className="h-px bg-border/40 my-1.5" />
+          {bottomItems
+            .filter((i) => !i.ownerOnly || me?.role === "OWNER")
+            .map((item) => (
+              <NavLink key={item.to} to={item.to} className={linkClass}>
+                {item.icon}
                 {item.label}
               </NavLink>
             ))}
-          </nav>
+        </nav>
 
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Theme toggle */}
+        <div className="px-2 pb-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8 shrink-0">
-                {resolved === "dark" ? (
-                  <Moon className="size-4" />
-                ) : (
-                  <Sun className="size-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Theme</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setTheme("light")}>
-                <Sun className="size-4" />
-                Light
-                {theme === "light" && <span className="ml-auto text-primary">*</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dark")}>
-                <Moon className="size-4" />
-                Dark
-                {theme === "dark" && <span className="ml-auto text-primary">*</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("system")}>
-                <Monitor className="size-4" />
-                System
-                {theme === "system" && <span className="ml-auto text-primary">*</span>}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* User dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8 shrink-0 rounded-full">
-                <Avatar className="size-7">
-                  <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">{initials}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>
-                <div className="flex flex-col">
-                  <span>{me?.username}</span>
-                  <span className="text-xs font-normal text-muted-foreground">{me?.email}</span>
+              <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-accent transition-colors">
+                <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary shrink-0">
+                  {me?.username?.slice(0, 2).toUpperCase() ?? "?"}
                 </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/profile")}>
-                <User className="size-4" />
-                Profile
+                <span className="truncate font-medium">{me?.username}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-40">
+              <DropdownMenuItem onClick={() => setTheme(resolved === "dark" ? "light" : "dark")}>
+                {resolved === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                {resolved === "dark" ? "Light mode" : "Dark mode"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void handleLogout()} className="text-destructive focus:text-destructive">
@@ -166,49 +112,36 @@ export const AppShell: React.FC = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Mobile hamburger */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden size-8 shrink-0"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-          </Button>
         </div>
+      </aside>
 
-        {/* Mobile nav dropdown */}
-        {mobileOpen && (
-          <div className="md:hidden border-t border-border/40 bg-background animate-fade-in">
-            <nav className="flex flex-col p-2">
-              {visibleNavItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium rounded-md transition-colors",
-                      isActive
-                        ? "text-primary bg-primary/8"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-                    )
-                  }
-                >
-                  {item.icon}
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
+      {/* Main area */}
+      <div className="flex flex-1 flex-col min-w-0">
+        <header className="md:hidden flex items-center justify-between h-12 px-4 border-b border-border/60">
+          <div className="flex items-center gap-2">
+            <Book className="size-4 text-primary" />
+            <span className="text-sm font-semibold">BookLite</span>
           </div>
-        )}
-      </header>
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => setMobileOpen(!mobileOpen)}>
+            {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+          </Button>
+        </header>
 
-      {/* Page content */}
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 animate-fade-up">
-        <Outlet />
-      </main>
+        {mobileOpen && (
+          <nav className="md:hidden border-b border-border/40 p-2 flex flex-col gap-0.5 animate-fade-in">
+            {allItems.map((item) => (
+              <NavLink key={item.to} to={item.to} onClick={() => setMobileOpen(false)} className={linkClass}>
+                {item.icon}
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
+
+        <main className="flex-1 p-6 lg:p-8 animate-fade-in">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 };

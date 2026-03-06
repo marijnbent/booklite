@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Book, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -52,17 +52,11 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
-        {/* Branding */}
-        <div className="mb-8 flex items-center justify-center gap-2 text-muted-foreground">
-          <Book className="size-5" strokeWidth={1.5} />
-          <span className="text-sm font-medium tracking-wide">BookLite</span>
-        </div>
+        <h2 className="mb-6 text-center text-lg font-medium text-muted-foreground">
+          BookLite
+        </h2>
 
-        {/* Form card */}
-        <div className="rounded-lg border border-border bg-card shadow-sm">
-          {/* Thin accent line at top */}
-          <div className="h-px bg-primary/40" />
-
+        <div className="rounded-lg border border-border bg-card">
           <div className="p-6">
             <h1 className="text-xl font-semibold tracking-tight text-center mb-1">
               Welcome back

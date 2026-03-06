@@ -107,7 +107,7 @@ export const KoboPage: React.FC = () => {
     <div className="space-y-8 max-w-2xl">
       {/* Page header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Kobo</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Kobo</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Configure your Kobo e-reader sync settings
         </p>

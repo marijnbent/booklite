@@ -527,7 +527,7 @@ const CollectionExpanded: React.FC<{
   );
 
   return (
-    <div className="border border-border rounded-md bg-card overflow-hidden animate-scale-in">
+    <div className="border border-border rounded-md bg-card overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30">
         <span className="text-lg shrink-0">
@@ -773,7 +773,7 @@ export const CollectionsPage: React.FC = () => {
       {/* Page header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Collections</h1>
+          <h1 className="text-2xl font-semibold">Collections</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Organize your books into groups.
           </p>

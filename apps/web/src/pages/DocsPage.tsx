@@ -95,22 +95,19 @@ const BulletItem: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const NAV_ITEMS = [
-  { id: "kobo-setup", label: "Kobo setup", desc: "Sync books to your reader", icon: TabletSmartphone, color: "text-status-processing", bg: "bg-status-processing/8" },
-  { id: "metadata-and-ai", label: "Metadata & AI", desc: "How book data is found", icon: Sparkles, color: "text-primary", bg: "bg-primary/8" },
-  { id: "accounts-and-roles", label: "Accounts & roles", desc: "Permissions explained", icon: Users, color: "text-status-completed", bg: "bg-status-completed/8" },
-  { id: "troubleshooting", label: "Troubleshooting", desc: "Quick fixes", icon: Wrench, color: "text-status-queued", bg: "bg-status-queued/8" },
+  { id: "kobo-setup", label: "Kobo setup", icon: TabletSmartphone },
+  { id: "metadata-and-ai", label: "Metadata & AI", icon: Sparkles },
+  { id: "accounts-and-roles", label: "Accounts & roles", icon: Users },
+  { id: "troubleshooting", label: "Troubleshooting", icon: Wrench },
 ] as const;
 
 export const DocsPage: React.FC = () => {
   return (
     <div className="max-w-3xl">
-      {/* Page header */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold tracking-tight">Docs</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Everything you need to know about BookLite.
-        </p>
-      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">Docs</h1>
+      <p className="mt-1 text-sm text-muted-foreground mb-10">
+        Everything you need to know about BookLite.
+      </p>
 
       {/* Table of contents */}
       <nav className="mb-12 rounded-md border border-border bg-muted/20 p-4">
