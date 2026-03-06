@@ -1556,6 +1556,11 @@ export const LibraryPage: React.FC = () => {
             "[&>button:last-child]:hidden",
           )}
         >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{panelBook?.title ?? "Book details"}</DialogTitle>
+            <DialogDescription>View and manage book details.</DialogDescription>
+          </DialogHeader>
+
           {!panelBook && (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="size-5 animate-spin text-muted-foreground/40" />
@@ -1564,11 +1569,6 @@ export const LibraryPage: React.FC = () => {
 
           {panelBook && (
             <div className="flex flex-col min-h-0">
-              <DialogHeader className="sr-only">
-                <DialogTitle>{panelBook.title}</DialogTitle>
-                <DialogDescription>Book details</DialogDescription>
-              </DialogHeader>
-
               {/* Hero cover area */}
               <div className="relative flex justify-center bg-secondary/30 py-6">
                 <div className="w-36 aspect-[2/3] overflow-hidden rounded-lg shadow-md">
