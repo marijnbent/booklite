@@ -9,7 +9,7 @@
     "clean": "npm run clean -ws --if-present",
     "dev": "npm run dev -w @booklite/api",
     "dev:split": "concurrently -n api,web -c cyan,magenta \"npm:dev -w @booklite/api\" \"npm:dev -w @booklite/web\"",
-    "build": "npm run build -ws --if-present",
+    "build": "npm run build -w @booklite/shared && npm run build -w @booklite/api && npm run build -w @booklite/web",
     "test": "npm run test -ws --if-present",
     "typecheck": "npm run typecheck -ws --if-present",
     "docker:up": "docker compose up -d --build",
