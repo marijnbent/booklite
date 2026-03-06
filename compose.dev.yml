@@ -12,6 +12,6 @@ services:
     ports:
       - "6060:6060"
     volumes:
-      - ../:/workspace
-      - ../app-data:/app/data
-      - ../books:/books
+      - ./:/workspace
+      - ./app-data:/app/data
+      - ./books:/books

@@ -1,7 +1,7 @@
 services:
   booklite:
     build:
-      context: ..
+      context: .
       dockerfile: Dockerfile
     container_name: booklite
     environment:
@@ -19,6 +19,6 @@ services:
     ports:
       - "6060:6060"
     volumes:
-      - ../app-data:/app/data
-      - ../books:/books
+      - ./app-data:/app/data
+      - ./books:/books
     restart: unless-stopped
