@@ -10,6 +10,7 @@ import { UploadsPage } from "@/pages/UploadsPage";
 import { KoboPage } from "@/pages/KoboPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
+import { DocsPage } from "@/pages/DocsPage";
 
 export const App: React.FC = () => (
   <Routes>
@@ -22,6 +23,7 @@ export const App: React.FC = () => (
         <Route path="/collections" element={<CollectionsPage />} />
         <Route path="/uploads" element={<UploadsPage />} />
         <Route path="/kobo" element={<KoboPage />} />
+        <Route path="/docs" element={<DocsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
 
         <Route element={<ProtectedRoute ownerOnly />}>

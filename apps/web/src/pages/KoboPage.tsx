@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -324,14 +325,10 @@ export const KoboPage: React.FC = () => {
               )}
             </Button>
             <Button asChild variant="secondary" size="sm" className="gap-1.5">
-              <a
-                href="https://booklore.org/docs/integration/kobo#step-2-configure-your-kobo"
-                target="_blank"
-                rel="noreferrer noopener"
-              >
+              <Link to="/docs#kobo-setup">
                 <ExternalLink className="size-3.5" />
                 Setup instructions
-              </a>
+              </Link>
             </Button>
           </div>
         </CardContent>

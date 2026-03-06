@@ -29,6 +29,7 @@ import {
   Monitor,
   Menu,
   X,
+  CircleHelp,
 } from "lucide-react";
 
 interface NavItem {
@@ -38,13 +39,17 @@ interface NavItem {
   ownerOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
+const primaryNavItems: NavItem[] = [
   { to: "/library", label: "Library", icon: <Book className="size-4" /> },
   { to: "/collections", label: "Collections", icon: <FolderOpen className="size-4" /> },
   { to: "/uploads", label: "Uploads", icon: <Upload className="size-4" /> },
   { to: "/kobo", label: "Kobo", icon: <TabletSmartphone className="size-4" /> },
   { to: "/profile", label: "Profile", icon: <User className="size-4" /> },
   { to: "/admin-users", label: "Admin", icon: <Shield className="size-4" />, ownerOnly: true },
+];
+
+const footerNavItems: NavItem[] = [
+  { to: "/docs", label: "Docs", icon: <CircleHelp className="size-4" /> },
 ];
 
 export const AppShell: React.FC = () => {
@@ -58,7 +63,10 @@ export const AppShell: React.FC = () => {
     ? me.username.slice(0, 2).toUpperCase()
     : "?";
 
-  const visibleNavItems = navItems.filter(
+  const visiblePrimaryNavItems = primaryNavItems.filter(
+    (item) => !item.ownerOnly || me?.role === "OWNER"
+  );
+  const visibleFooterNavItems = footerNavItems.filter(
     (item) => !item.ownerOnly || me?.role === "OWNER"
   );
 
@@ -88,7 +96,7 @@ export const AppShell: React.FC = () => {
 
       {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-1">
-        {visibleNavItems.map((item) => (
+        {visiblePrimaryNavItems.map((item) => (
           <Tooltip key={item.to}>
             <TooltipTrigger asChild>
               <NavLink
@@ -138,6 +146,35 @@ export const AppShell: React.FC = () => {
             </div>
           </div>
         )}
+
+        <nav className="flex flex-col gap-1">
+          {visibleFooterNavItems.map((item) => (
+            <Tooltip key={item.to}>
+              <TooltipTrigger asChild>
+                <NavLink
+                  to={item.to}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-muted/50",
+                      isActive && "bg-sidebar-muted/70 text-sidebar-foreground shadow-sm",
+                      collapsed && "justify-center px-2"
+                    )
+                  }
+                >
+                  <span className="shrink-0">{item.icon}</span>
+                  {!collapsed && <span>{item.label}</span>}
+                </NavLink>
+              </TooltipTrigger>
+              {collapsed && (
+                <TooltipContent side="right">
+                  {item.label}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          ))}
+        </nav>
 
         {/* Collapse toggle -- desktop only */}
         <button

@@ -58,6 +58,9 @@ const patchSettingsSchema = z
     metadataGoogleLanguage: z.string().trim().max(8).optional(),
     metadataGoogleApiKey: z.string().trim().optional(),
     metadataHardcoverApiKey: z.string().trim().optional(),
+    metadataOpenrouterApiKey: z.string().trim().optional(),
+    metadataOpenrouterModel: z.string().trim().max(100).optional(),
+    metadataOpenrouterEnabled: z.boolean().optional(),
     uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional()
   })
   .strict();
@@ -92,6 +95,9 @@ const resolveSettings = async (): Promise<{
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
+  metadataOpenrouterApiKey: string;
+  metadataOpenrouterModel: string;
+  metadataOpenrouterEnabled: boolean;
   uploadLimitMb: number;
 }> => ({
   metadataProviderEnabled: toMetadataProviderEnabled(
@@ -118,6 +124,15 @@ const resolveSettings = async (): Promise<{
     "metadata_hardcover_api_key",
     config.hardcoverApiKey
   ),
+  metadataOpenrouterApiKey: await getSetting<string>(
+    "metadata_openrouter_api_key",
+    config.openrouterApiKey ?? ""
+  ),
+  metadataOpenrouterModel: await getSetting<string>(
+    "metadata_openrouter_model",
+    config.openrouterModel ?? "google/gemini-2.0-flash-lite-001"
+  ),
+  metadataOpenrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false),
   uploadLimitMb: await getSetting<number>("upload_limit_mb", 100)
 });
 
@@ -167,6 +182,15 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       }
       if (body.metadataHardcoverApiKey !== undefined) {
         await upsert("metadata_hardcover_api_key", body.metadataHardcoverApiKey);
+      }
+      if (body.metadataOpenrouterApiKey !== undefined) {
+        await upsert("metadata_openrouter_api_key", body.metadataOpenrouterApiKey);
+      }
+      if (body.metadataOpenrouterModel !== undefined) {
+        await upsert("metadata_openrouter_model", body.metadataOpenrouterModel);
+      }
+      if (body.metadataOpenrouterEnabled !== undefined) {
+        await upsert("metadata_openrouter_enabled", body.metadataOpenrouterEnabled);
       }
       if (body.uploadLimitMb !== undefined) {
         await upsert("upload_limit_mb", body.uploadLimitMb);

@@ -46,6 +46,9 @@ interface AppSettings {
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
+  metadataOpenrouterApiKey: string;
+  metadataOpenrouterModel: string;
+  metadataOpenrouterEnabled: boolean;
   uploadLimitMb: number;
 }
 
@@ -478,7 +481,64 @@ export const AdminUsersPage: React.FC = () => {
                       }
                     />
                   </div>
+                </div>
 
+                <Separator />
+
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium">AI Metadata Resolver</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Uses an LLM via OpenRouter to intelligently merge provider results,
+                      correct wrong metadata, and fill in missing series information.
+                    </p>
+                  </div>
+
+                  <div className="rounded-md border border-border/50 px-3 py-2 flex items-center justify-between">
+                    <span className="text-sm">AI metadata resolver</span>
+                    <Switch
+                      checked={settings.data.metadataOpenrouterEnabled}
+                      onCheckedChange={(checked) =>
+                        patchSettings.mutate({
+                          metadataOpenrouterEnabled: Boolean(checked)
+                        })
+                      }
+                    />
+                  </div>
+
+                  {settings.data.metadataOpenrouterEnabled && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="metadata-openrouter-api-key">OpenRouter API key</Label>
+                        <Input
+                          id="metadata-openrouter-api-key"
+                          type="password"
+                          defaultValue={settings.data.metadataOpenrouterApiKey}
+                          placeholder="Enter OpenRouter API key"
+                          onBlur={(e) =>
+                            patchSettings.mutate({
+                              metadataOpenrouterApiKey: e.target.value
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="metadata-openrouter-model">OpenRouter model</Label>
+                        <Input
+                          id="metadata-openrouter-model"
+                          type="text"
+                          defaultValue={settings.data.metadataOpenrouterModel}
+                          placeholder="google/gemini-2.0-flash-lite-001"
+                          onBlur={(e) =>
+                            patchSettings.mutate({
+                              metadataOpenrouterModel: e.target.value
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

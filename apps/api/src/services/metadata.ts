@@ -223,6 +223,9 @@ const resolveMetadataProviderSettings = async (): Promise<{
   googleLanguage: string;
   googleApiKey: string;
   hardcoverApiKey: string;
+  openrouterApiKey: string;
+  openrouterModel: string;
+  openrouterEnabled: boolean;
 }> => {
   return {
     providerEnabled: toProviderEnabled(
@@ -243,7 +246,18 @@ const resolveMetadataProviderSettings = async (): Promise<{
     ).trim(),
     hardcoverApiKey: (
       await getSetting<string>("metadata_hardcover_api_key", config.hardcoverApiKey)
-    ).trim()
+    ).trim(),
+    openrouterApiKey: (
+      (await getSetting<string>("metadata_openrouter_api_key", config.openrouterApiKey ?? "")) ??
+      ""
+    ).trim(),
+    openrouterModel: (
+      (await getSetting<string>(
+        "metadata_openrouter_model",
+        config.openrouterModel ?? "google/gemini-2.0-flash-lite-001"
+      )) ?? ""
+    ).trim(),
+    openrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false)
   };
 };
 
@@ -1013,6 +1027,229 @@ const selectBestField = (
   return bestValue;
 };
 
+const truncateForPrompt = (value: string, maxLength: number): string => {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength).trimEnd()}...`;
+};
+
+const toOptionalText = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const parseLlmJsonObject = (content: string): Record<string, unknown> | null => {
+  const trimmed = content.trim();
+  const strippedCodeFence = trimmed
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  const start = strippedCodeFence.indexOf("{");
+  const end = strippedCodeFence.lastIndexOf("}");
+  if (start < 0 || end < 0 || end <= start) return null;
+
+  try {
+    const parsed = JSON.parse(strippedCodeFence.slice(start, end + 1));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+const resolveDescriptionFromProviders = (
+  candidates: ProviderCandidate[],
+  llmDescription: string | undefined
+): string | undefined => {
+  if (!hasText(llmDescription)) return undefined;
+
+  const llmNormalized = normalizeForMatch(llmDescription);
+  if (!llmNormalized) return undefined;
+
+  let bestValue: string | undefined;
+  let bestScore = 0;
+
+  for (const candidate of candidates) {
+    const description = candidate.metadata.description;
+    if (!hasText(description)) continue;
+
+    const snippet = truncateForPrompt(cleanText(description), 200);
+    const snippetNormalized = normalizeForMatch(snippet);
+    const fullNormalized = normalizeForMatch(description);
+    if (!snippetNormalized && !fullNormalized) continue;
+
+    let score = 0;
+    if (snippetNormalized === llmNormalized || fullNormalized === llmNormalized) {
+      score = 1;
+    } else if (
+      snippetNormalized.includes(llmNormalized) ||
+      llmNormalized.includes(snippetNormalized)
+    ) {
+      score = 0.96;
+    } else if (fullNormalized.includes(llmNormalized) || llmNormalized.includes(fullNormalized)) {
+      score = 0.92;
+    } else {
+      score = Math.max(
+        similarityScore(llmDescription, snippet),
+        similarityScore(llmDescription, description)
+      );
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestValue = description;
+    }
+  }
+
+  return bestScore >= 0.45 ? bestValue : undefined;
+};
+
+const resolveCoverFromProviders = (
+  candidates: ProviderCandidate[],
+  llmCoverPath: string | undefined
+): string | undefined => {
+  if (!hasText(llmCoverPath)) return undefined;
+  const llmCover = llmCoverPath.trim();
+
+  let bestValue: string | undefined;
+  let bestScore = 0;
+
+  for (const candidate of candidates) {
+    const coverPath = candidate.metadata.coverPath;
+    if (!hasText(coverPath)) continue;
+
+    if (coverPath.trim() === llmCover) {
+      return coverPath;
+    }
+
+    const normalizedCover = normalizeUrl(coverPath.trim());
+    if (normalizedCover === normalizeUrl(llmCover)) {
+      return coverPath;
+    }
+
+    const score = similarityScore(llmCover, coverPath);
+    if (score > bestScore) {
+      bestScore = score;
+      bestValue = coverPath;
+    }
+  }
+
+  return bestScore >= 0.75 ? bestValue : undefined;
+};
+
+const resolveWithLlm = async (
+  queryTitle: string,
+  queryAuthor: string | undefined,
+  candidates: ProviderCandidate[],
+  apiKey: string,
+  model: string
+): Promise<MetadataResult | null> => {
+  if (!hasText(apiKey) || !hasText(model) || candidates.length === 0) return null;
+
+  const systemMessage = `You are a book metadata resolver. You receive a search query (derived from a filename - this is the source of truth for what the user is looking for) and results from multiple metadata providers.
+
+Your job:
+1. The query title and author come from the filename. They define WHICH BOOK the user wants. If a provider returned metadata for the wrong book (e.g. a study guide, a different edition by a different author, or a completely different book), ignore that provider's data entirely.
+2. For each field, pick the best value from the providers that matched the correct book. If you believe a provider's value is wrong or inaccurate (e.g. wrong author, wrong series), return the correct value from your own knowledge instead.
+3. If NO provider has a field (especially series), fill it from your own knowledge if you are confident.
+4. Never fabricate a description or cover URL - only pick from providers or omit.
+
+Return a JSON object with exactly these fields (omit or null any field you cannot determine):
+{ "title", "author", "series", "description", "coverPath" }
+
+Rules:
+- title: The canonical title of the book. Fix casing/spelling if providers got it wrong.
+- author: The real author. If providers returned a study guide author or publisher, correct it.
+- series: Format as "Series Name #N" (e.g. "The Empyrean #1"). Include position number if known. If the book is standalone, omit or null.
+- description: Pick the most relevant and complete description from providers. Do not write your own.
+- coverPath: Pick the best cover URL from providers. Do not generate one.`;
+
+  const providerRows = candidates
+    .map((candidate, index) => {
+      const metadata = candidate.metadata;
+      const descriptionSnippet = hasText(metadata.description)
+        ? truncateForPrompt(cleanText(metadata.description), 200)
+        : "";
+      const coverFlag = hasText(metadata.coverPath) ? "yes" : "no";
+      const coverValue = hasText(metadata.coverPath) ? metadata.coverPath : "";
+
+      return `${index + 1}. [${candidate.provider}] title=${JSON.stringify(metadata.title ?? "")} author=${JSON.stringify(metadata.author ?? "")} series=${JSON.stringify(metadata.series ?? "")} description=${JSON.stringify(descriptionSnippet)} cover=${coverFlag} coverPath=${JSON.stringify(coverValue)}`;
+    })
+    .join("\n");
+
+  const userMessage = `Query: title=${JSON.stringify(queryTitle)}, author=${JSON.stringify(queryAuthor ?? "")}
+
+Provider results:
+${providerRows}`;
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`
+      },
+      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({
+        model,
+        response_format: { type: "json_object" },
+        temperature: 0,
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: userMessage }
+        ]
+      })
+    });
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as {
+      choices?: Array<{
+        message?: {
+          content?: string | Array<{ text?: string }>;
+        };
+      }>;
+    };
+
+    const rawContent = payload.choices?.[0]?.message?.content;
+    const content = Array.isArray(rawContent)
+      ? rawContent
+          .map((entry) => (typeof entry?.text === "string" ? entry.text : ""))
+          .filter((entry) => entry.length > 0)
+          .join("\n")
+      : rawContent;
+    if (!hasText(content)) return null;
+
+    const parsed = parseLlmJsonObject(content);
+    if (!parsed) return null;
+
+    const title = toOptionalText(parsed.title);
+    const author = toOptionalText(parsed.author);
+    const series = toOptionalText(parsed.series);
+    const description = resolveDescriptionFromProviders(
+      candidates,
+      toOptionalText(parsed.description)
+    );
+    const coverPath = resolveCoverFromProviders(candidates, toOptionalText(parsed.coverPath));
+
+    if (!hasText(title) && !hasText(author) && !hasText(series) && !description && !coverPath) {
+      return null;
+    }
+
+    return {
+      source: "NONE",
+      title,
+      author,
+      series,
+      description,
+      coverPath
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const fetchMetadataWithFallback = async (
   title: string,
   author?: string
@@ -1049,6 +1286,23 @@ export const fetchMetadataWithFallback = async (
 
   candidates.sort((a, b) => b.overallScore - a.overallScore);
   const bestSource = candidates[0].metadata.source;
+
+  if (settings.openrouterEnabled && hasText(settings.openrouterApiKey)) {
+    const llmResolved = await resolveWithLlm(
+      title,
+      author,
+      candidates,
+      settings.openrouterApiKey,
+      settings.openrouterModel
+    );
+
+    if (llmResolved) {
+      return {
+        ...llmResolved,
+        source: bestSource
+      };
+    }
+  }
 
   const mergedTitle = selectBestField(
     candidates,
