@@ -1629,7 +1629,7 @@ export const LibraryPage: React.FC = () => {
                 <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground/60">
                   <span className="font-medium uppercase bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground text-[11px]">{panelBook.fileExt.toUpperCase()}</span>
                   <span className="tabular-nums">{formatSize(panelBook.fileSize)}</span>
-                  {panelBook.koboSyncable === 1 && <Badge variant="default" className="text-[10px] px-1.5 py-0">Kobo</Badge>}
+                  {panelBook.koboSyncable === 1 && <span className="flex items-center gap-0.5 font-medium bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground text-[11px]"><RefreshCw className="size-2.5" />Kobo</span>}
                 </div>
               </div>
 
@@ -1984,10 +1984,10 @@ const GridCard: React.FC<{
               </button>
             )}
 
-            {/* Format */}
-            <span className="absolute top-1.5 right-1.5 text-[9px] font-medium bg-black/25 text-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded uppercase">
-              {book.fileExt}
-            </span>
+            {/* Format + Kobo */}
+            {book.koboSyncable === 1 && (
+              <span className="absolute top-1.5 right-1.5 flex items-center gap-0.5 text-[9px] font-medium bg-black/50 text-white backdrop-blur-sm px-1.5 py-0.5 rounded"><RefreshCw className="size-2" />Kobo</span>
+            )}
 
             {/* Actions */}
             <div className="absolute bottom-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2124,7 +2124,7 @@ const ListRow: React.FC<{
                   <Star className={cn("size-3.5", book.isFavorite ? "fill-yellow-400 text-yellow-500" : "text-muted-foreground/25")} />
                 </button>
               )}
-              <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded font-medium uppercase">{book.fileExt}</span>
+              {book.koboSyncable === 1 && <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded font-medium"><RefreshCw className="size-2.5" />Kobo</span>}
               <span className="text-[11px] text-muted-foreground/40 tabular-nums w-14 text-right">{formatSize(book.fileSize)}</span>
               <Badge variant={config.variant} className="text-[10px] gap-0.5 px-1.5 h-4">
                 <config.icon className="size-2.5" />
