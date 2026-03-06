@@ -3,7 +3,7 @@ import { db, getSetting, walCheckpoint } from "../db/client";
 import { books, collectionBooks, collections, importJobs } from "../db/schema";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "./metadata";
-import { filenameToBasicMetadata } from "./books";
+import { resolveFilenameMetadata } from "./filenameNormalizer";
 import { getFavoritesCollectionId } from "./systemCollections";
 
 let running = false;
@@ -49,7 +49,7 @@ const processUploadJob = async (job: {
     autoMetadata: payload.controls?.autoMetadata ?? true
   };
 
-  const defaults = filenameToBasicMetadata(payload.fileName);
+  const defaults = await resolveFilenameMetadata(payload.fileName);
   const timestamp = nowIso();
   const normalizedControlTitle = controls.title?.trim() || undefined;
   const normalizedControlAuthor = controls.author?.trim() || undefined;

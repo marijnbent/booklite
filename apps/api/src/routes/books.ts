@@ -7,7 +7,7 @@ import { bookProgress, books, collectionBooks, collections } from "../db/schema"
 import { requireAuth } from "../auth/guards";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "../services/metadata";
-import { filenameToBasicMetadata } from "../services/books";
+import { resolveFilenameMetadata } from "../services/filenameNormalizer";
 import {
   ensureSystemCollectionsForUser,
   getFavoritesCollectionId
@@ -88,7 +88,7 @@ const refreshBookMetadata = async (
   const metadata = await fetchMetadataWithFallback(target.title, target.author ?? undefined);
 
   if (metadata.source === "NONE") {
-    const fallback = filenameToBasicMetadata(path.basename(target.filePath));
+    const fallback = await resolveFilenameMetadata(path.basename(target.filePath));
     const title = fallback.title || target.title;
     const author =
       target.author && target.author.trim().length > 0 ? target.author : fallback.author;

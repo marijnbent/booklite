@@ -215,4 +215,34 @@ describe("metadata service fallback merge", () => {
     expect(result).toEqual({ source: "NONE" });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it("does not call OpenRouter when model is empty even if AI is enabled", async () => {
+    settings.set("metadata_openrouter_enabled", true);
+    settings.set("metadata_openrouter_api_key", "test-key");
+    settings.set("metadata_openrouter_model", "");
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("openrouter.ai")) {
+        throw new Error("OpenRouter should not be called when model is empty");
+      }
+
+      if (url.includes("openlibrary.org/search.json")) {
+        return mockJsonResponse({
+          docs: [{ title: "Some Title", author_name: ["Some Author"] }]
+        });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const result = await fetchMetadataWithFallback("Some Title", "Some Author");
+
+    expect(result).toEqual({
+      source: "OPEN_LIBRARY",
+      title: "Some Title",
+      author: "Some Author"
+    });
+  });
 });

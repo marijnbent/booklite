@@ -130,7 +130,7 @@ const resolveSettings = async (): Promise<{
   ),
   metadataOpenrouterModel: await getSetting<string>(
     "metadata_openrouter_model",
-    config.openrouterModel ?? "google/gemini-2.0-flash-lite-001"
+    ""
   ),
   metadataOpenrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false),
   uploadLimitMb: await getSetting<number>("upload_limit_mb", 100)

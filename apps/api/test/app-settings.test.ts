@@ -94,6 +94,7 @@ describe("app settings", () => {
       goodreads: true,
       douban: false
     });
+    expect(body.metadataOpenrouterModel).toBe("");
     expect(body).not.toHaveProperty("metadataProviderPrimary");
     expect(body).not.toHaveProperty("metadataProviderSecondary");
     expect(body).not.toHaveProperty("metadataProviderTertiary");

@@ -1,5 +1,6 @@
 import { config } from "../config";
 import { getSetting } from "../db/client";
+import { callOpenRouterJsonObject } from "./openrouter";
 
 export interface MetadataResult {
   title?: string;
@@ -252,10 +253,7 @@ const resolveMetadataProviderSettings = async (): Promise<{
       ""
     ).trim(),
     openrouterModel: (
-      (await getSetting<string>(
-        "metadata_openrouter_model",
-        config.openrouterModel ?? "google/gemini-2.0-flash-lite-001"
-      )) ?? ""
+      (await getSetting<string>("metadata_openrouter_model", "")) ?? ""
     ).trim(),
     openrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false)
   };
@@ -1038,26 +1036,6 @@ const toOptionalText = (value: unknown): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-const parseLlmJsonObject = (content: string): Record<string, unknown> | null => {
-  const trimmed = content.trim();
-  const strippedCodeFence = trimmed
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
-  const start = strippedCodeFence.indexOf("{");
-  const end = strippedCodeFence.lastIndexOf("}");
-  if (start < 0 || end < 0 || end <= start) return null;
-
-  try {
-    const parsed = JSON.parse(strippedCodeFence.slice(start, end + 1));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-};
-
 const resolveDescriptionFromProviders = (
   candidates: ProviderCandidate[],
   llmDescription: string | undefined
@@ -1184,44 +1162,13 @@ Provider results:
 ${providerRows}`;
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`
-      },
-      signal: AbortSignal.timeout(15000),
-      body: JSON.stringify({
-        model,
-        response_format: { type: "json_object" },
-        temperature: 0,
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: userMessage }
-        ]
-      })
+    const parsed = await callOpenRouterJsonObject({
+      apiKey,
+      model,
+      systemMessage,
+      userMessage,
+      timeoutMs: 15000
     });
-
-    if (!response.ok) return null;
-
-    const payload = (await response.json()) as {
-      choices?: Array<{
-        message?: {
-          content?: string | Array<{ text?: string }>;
-        };
-      }>;
-    };
-
-    const rawContent = payload.choices?.[0]?.message?.content;
-    const content = Array.isArray(rawContent)
-      ? rawContent
-          .map((entry) => (typeof entry?.text === "string" ? entry.text : ""))
-          .filter((entry) => entry.length > 0)
-          .join("\n")
-      : rawContent;
-    if (!hasText(content)) return null;
-
-    const parsed = parseLlmJsonObject(content);
     if (!parsed) return null;
 
     const title = toOptionalText(parsed.title);
@@ -1287,7 +1234,11 @@ export const fetchMetadataWithFallback = async (
   candidates.sort((a, b) => b.overallScore - a.overallScore);
   const bestSource = candidates[0].metadata.source;
 
-  if (settings.openrouterEnabled && hasText(settings.openrouterApiKey)) {
+  if (
+    settings.openrouterEnabled &&
+    hasText(settings.openrouterApiKey) &&
+    hasText(settings.openrouterModel)
+  ) {
     const llmResolved = await resolveWithLlm(
       title,
       author,
