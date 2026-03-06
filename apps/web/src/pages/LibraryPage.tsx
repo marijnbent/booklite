@@ -216,12 +216,11 @@ const GridSkeleton: React.FC = () => (
     {Array.from({ length: 12 }).map((_, i) => (
       <div key={i} className="space-y-3">
         <div
-          className="aspect-[2/3] rounded-2xl bg-muted/40 animate-pulse"
-          style={{ animationDelay: `${i * 60}ms` }}
+          className="aspect-[2/3] rounded-md bg-muted/40 animate-pulse"
         />
         <div className="space-y-2 px-1">
-          <div className="h-3.5 w-3/4 rounded-full bg-muted/40 animate-pulse" />
-          <div className="h-3 w-1/2 rounded-full bg-muted/30 animate-pulse" />
+          <div className="h-3.5 w-3/4 rounded bg-muted/40 animate-pulse" />
+          <div className="h-3 w-1/2 rounded bg-muted/30 animate-pulse" />
         </div>
       </div>
     ))}
@@ -233,10 +232,9 @@ const ListSkeleton: React.FC = () => (
     {Array.from({ length: 8 }).map((_, i) => (
       <div
         key={i}
-        className="flex items-center gap-4 rounded-xl p-3.5 animate-pulse"
-        style={{ animationDelay: `${i * 50}ms` }}
+        className="flex items-center gap-4 rounded-md p-3 animate-pulse"
       >
-        <div className="h-14 w-10 shrink-0 rounded-lg bg-muted/40" />
+        <div className="h-14 w-10 shrink-0 rounded bg-muted/40" />
         <div className="flex-1 space-y-2">
           <div className="h-3.5 w-2/5 rounded-full bg-muted/40" />
           <div className="h-3 w-1/4 rounded-full bg-muted/30" />
@@ -490,62 +488,36 @@ export const LibraryPage: React.FC = () => {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="space-y-8 animate-fade-in">
-        {/* ---- Header + Stats ----------------------------------------- */}
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        {/* ---- Header ------------------------------------------------- */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">Library</h1>
-            <p className="mt-2 text-sm text-muted-foreground/70">
+            <h1 className="text-3xl font-semibold tracking-tight">Library</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               {allBooks.length > 0
-                ? `${allBooks.length} book${allBooks.length !== 1 ? "s" : ""} in your collection`
+                ? `${allBooks.length} book${allBooks.length !== 1 ? "s" : ""}`
                 : "Your personal book collection"}
-              {booksQuery.hasNextPage && !isLoading && " (loading more...)"}
+              {statusCounts.READING > 0 && ` \u00b7 ${statusCounts.READING} reading`}
+              {statusCounts.DONE > 0 && ` \u00b7 ${statusCounts.DONE} finished`}
+              {booksQuery.hasNextPage && !isLoading && " \u00b7 loading more..."}
             </p>
           </div>
-
-          {/* Stat pills */}
-          {allBooks.length > 0 && (
-            <div className="flex items-center gap-2">
-              {statusCounts.READING > 0 && (
-                <div className="flex items-center gap-1.5 rounded-full bg-status-processing/10 px-3 py-1.5 border border-status-processing/15">
-                  <BookOpen className="size-3.5 text-status-processing" />
-                  <span className="text-xs font-semibold tabular-nums text-status-processing">
-                    {statusCounts.READING}
-                  </span>
-                  <span className="text-[11px] text-status-processing/70">
-                    reading
-                  </span>
-                </div>
-              )}
-              {statusCounts.DONE > 0 && (
-                <div className="flex items-center gap-1.5 rounded-full bg-status-completed/10 px-3 py-1.5 border border-status-completed/15">
-                  <CheckCircle2 className="size-3.5 text-status-completed" />
-                  <span className="text-xs font-semibold tabular-nums text-status-completed">
-                    {statusCounts.DONE}
-                  </span>
-                  <span className="text-[11px] text-status-completed/70">
-                    finished
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* ---- Toolbar ------------------------------------------------ */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search */}
-          <div className="relative flex-1 max-w-md group/search">
-            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40 transition-colors duration-200 group-focus-within/search:text-primary/70" />
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40" />
             <Input
               placeholder="Search books..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 pr-9 h-10 rounded-xl bg-secondary/40 border-border/40 shadow-sm shadow-primary/[0.02] transition-all duration-200 focus-visible:bg-card focus-visible:shadow-md focus-visible:shadow-primary/[0.06] focus-visible:border-primary/25 focus-visible:ring-primary/10"
+              className="pl-9 pr-8"
             />
             {searchInput && (
               <button
                 onClick={() => setSearchInput("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground/40 hover:text-foreground hover:bg-muted/60 transition-all duration-150"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground/40 hover:text-foreground transition-colors"
               >
                 <X className="size-3.5" />
               </button>
@@ -559,7 +531,7 @@ export const LibraryPage: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-xl text-muted-foreground hover:text-foreground"
+                  className="size-9 text-muted-foreground hover:text-foreground"
                   onClick={() => refreshAllMetadata.mutate()}
                   disabled={refreshAllMetadata.isPending}
                 >
@@ -581,7 +553,7 @@ export const LibraryPage: React.FC = () => {
               value={sort}
               onValueChange={(v) => setSort(v as SortOption)}
             >
-              <SelectTrigger className="h-9 w-auto gap-1.5 text-xs px-3 rounded-xl border-border/40 bg-transparent hover:bg-muted/40 transition-colors">
+              <SelectTrigger className="h-9 w-auto gap-1.5 text-xs px-3 bg-transparent hover:bg-accent transition-colors">
                 <ArrowDownAZ className="size-3.5 text-muted-foreground/60" />
                 <SelectValue />
               </SelectTrigger>
@@ -598,19 +570,19 @@ export const LibraryPage: React.FC = () => {
               onValueChange={(v) => {
                 if (v) setView(v as ViewMode);
               }}
-              className="bg-secondary/50 rounded-xl p-0.5"
+              className="bg-secondary/60 rounded-md p-0.5"
             >
               <ToggleGroupItem
                 value="grid"
                 aria-label="Grid view"
-                className="rounded-lg size-8 data-[state=on]:bg-card data-[state=on]:shadow-sm"
+                className="rounded size-8 data-[state=on]:bg-card data-[state=on]:shadow-sm"
               >
                 <Grid3X3 className="size-4" />
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="list"
                 aria-label="List view"
-                className="rounded-lg size-8 data-[state=on]:bg-card data-[state=on]:shadow-sm"
+                className="rounded size-8 data-[state=on]:bg-card data-[state=on]:shadow-sm"
               >
                 <List className="size-4" />
               </ToggleGroupItem>
@@ -632,10 +604,10 @@ export const LibraryPage: React.FC = () => {
                 key={status}
                 onClick={() => setStatusFilter(status)}
                 className={cn(
-                  "relative flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-all duration-200 whitespace-nowrap",
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors whitespace-nowrap",
                   active
-                    ? "bg-foreground/[0.07] text-foreground shadow-sm"
-                    : "text-muted-foreground/70 hover:text-foreground hover:bg-muted/40",
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
                 )}
               >
                 {config && (
@@ -667,19 +639,17 @@ export const LibraryPage: React.FC = () => {
 
         {/* ---- Error -------------------------------------------------- */}
         {isError && (
-          <div className="flex flex-col items-center justify-center py-24 animate-fade-up">
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-destructive/8 mb-5">
-              <AlertCircle className="size-7 text-destructive/50" />
-            </div>
-            <h3 className="text-lg font-semibold tracking-tight">
+          <div className="flex flex-col items-center justify-center py-24">
+            <AlertCircle className="size-8 text-destructive/40 mb-4" />
+            <h3 className="text-lg font-semibold">
               Something went wrong
             </h3>
-            <p className="mt-1.5 text-sm text-muted-foreground/70 max-w-xs text-center">
-              We could not load your library. Please try again.
+            <p className="mt-1.5 text-sm text-muted-foreground max-w-xs text-center">
+              Could not load your library. Please try again.
             </p>
             <Button
               variant="outline"
-              className="mt-5 gap-1.5 rounded-xl"
+              className="mt-5 gap-1.5"
               onClick={() => void booksQuery.refetch()}
             >
               <RotateCcw className="size-3.5" />
@@ -690,32 +660,24 @@ export const LibraryPage: React.FC = () => {
 
         {/* ---- Empty state -------------------------------------------- */}
         {isEmpty && (
-          <div className="flex flex-col items-center justify-center py-24 animate-fade-up">
-            <div className="relative mb-6">
-              <div className="absolute -left-3 -top-1 w-14 h-20 rounded-lg bg-primary/8 rotate-[-8deg]" />
-              <div className="absolute -right-2 -top-2 w-14 h-20 rounded-lg bg-primary/5 rotate-[5deg]" />
-              <div className="relative flex size-20 items-center justify-center rounded-2xl bg-primary/10">
-                <BookMarked className="size-9 text-primary/40" />
-              </div>
-            </div>
-            <h3 className="text-xl font-semibold tracking-tight">
+          <div className="flex flex-col items-center justify-center py-24">
+            <BookMarked className="size-10 text-muted-foreground/20 mb-4" />
+            <h3 className="text-lg font-semibold">
               {debouncedQuery ? "No results found" : "Your library is empty"}
             </h3>
-            <p className="mt-2 text-sm text-muted-foreground/60 max-w-sm text-center leading-relaxed">
+            <p className="mt-1.5 text-sm text-muted-foreground max-w-sm text-center">
               {debouncedQuery
                 ? `No books match "${debouncedQuery}". Try a different search.`
-                : "Upload your first book to start building your personal collection. We support EPUB, PDF, and more."}
+                : "Upload your first book to get started."}
             </p>
           </div>
         )}
 
         {/* ---- No filter results -------------------------------------- */}
         {noFilterResults && (
-          <div className="flex flex-col items-center justify-center py-20 animate-fade-up">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-muted/40 mb-4">
-              <Book className="size-6 text-muted-foreground/25" />
-            </div>
-            <p className="text-sm text-muted-foreground/70">
+          <div className="flex flex-col items-center justify-center py-20">
+            <Book className="size-8 text-muted-foreground/20 mb-4" />
+            <p className="text-sm text-muted-foreground">
               No{" "}
               <span className="font-medium text-foreground/60">
                 {statusFilter.toLowerCase()}
@@ -753,7 +715,7 @@ export const LibraryPage: React.FC = () => {
         {/* ---- List view ---------------------------------------------- */}
         {hasResults && view === "list" && (
           <div className="space-y-0.5 animate-fade-in">
-            <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/40 border-b border-border/30 mb-1">
+            <div className="hidden sm:flex items-center gap-3 px-3 py-2 text-[11px] uppercase tracking-wide font-medium text-muted-foreground border-b border-border mb-1">
               <div className="w-10 shrink-0" />
               <div className="flex-1">Title</div>
               <div className="w-8" />
@@ -805,7 +767,7 @@ export const LibraryPage: React.FC = () => {
           className={cn(
             "fixed inset-y-0 right-0 left-auto h-full w-full max-w-[440px]",
             "translate-x-0 translate-y-0 rounded-none",
-            "border-l border-border/30 bg-card/95 backdrop-blur-xl",
+            "border-l border-border bg-card",
             "overflow-y-auto p-0 gap-0",
             "data-[state=open]:animate-slide-in-right data-[state=open]:duration-300",
           )}
@@ -818,18 +780,9 @@ export const LibraryPage: React.FC = () => {
 
           {panelBook && (
             <>
-              {/* Hero header with ambient cover color */}
-              <div className="relative">
-                <div className="absolute inset-0 overflow-hidden">
-                  <BookCover
-                    book={panelBook}
-                    className="h-full w-full opacity-20 blur-2xl scale-110"
-                    showFallbackText={false}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-b from-card/40 via-card/70 to-card" />
-                </div>
-
-                <div className="relative p-6 pb-0">
+              {/* Header */}
+              <div>
+                <div className="p-6 pb-0">
                   <DialogHeader className="sr-only">
                     <DialogTitle>{panelBook.title}</DialogTitle>
                     <DialogDescription>
@@ -838,7 +791,7 @@ export const LibraryPage: React.FC = () => {
                   </DialogHeader>
 
                   <div className="flex gap-5">
-                    <div className="relative w-28 shrink-0 aspect-[2/3] overflow-hidden rounded-xl shadow-[0_8px_30px_-4px_rgba(0,0,0,0.15),0_2px_8px_-2px_rgba(0,0,0,0.1)] ring-1 ring-white/10">
+                    <div className="relative w-28 shrink-0 aspect-[2/3] overflow-hidden rounded-md shadow-md">
                       <BookCover
                         book={panelBook}
                         className="h-full w-full"
@@ -846,7 +799,7 @@ export const LibraryPage: React.FC = () => {
                       />
                       <Badge
                         variant="secondary"
-                        className="absolute bottom-2 right-2 text-[9px] bg-background/80 backdrop-blur-sm border-border/20 shadow-sm"
+                        className="absolute bottom-1.5 right-1.5 text-[9px]"
                       >
                         {panelBook.fileExt.toUpperCase()}
                       </Badge>
@@ -869,10 +822,10 @@ export const LibraryPage: React.FC = () => {
                       <div className="mt-3 flex items-center gap-2.5">
                         <button
                           className={cn(
-                            "flex items-center justify-center size-8 rounded-lg transition-all duration-200",
+                            "flex items-center justify-center size-7 rounded transition-colors",
                             panelBook.isFavorite
                               ? "bg-yellow-400/15 hover:bg-yellow-400/25"
-                              : "bg-muted/30 hover:bg-muted/60",
+                              : "bg-muted/40 hover:bg-muted/60",
                           )}
                           onClick={() =>
                             void toggleFavorite(
@@ -888,9 +841,9 @@ export const LibraryPage: React.FC = () => {
                         >
                           <Star
                             className={cn(
-                              "size-4 transition-all duration-200",
+                              "size-3.5",
                               panelBook.isFavorite
-                                ? "fill-yellow-400 text-yellow-500 scale-110"
+                                ? "fill-yellow-400 text-yellow-500"
                                 : "text-muted-foreground/40",
                             )}
                           />
@@ -916,7 +869,7 @@ export const LibraryPage: React.FC = () => {
               <div className="p-6 pt-5 space-y-6">
                 {/* Status selector */}
                 <div className="space-y-2.5">
-                  <Label className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/60">
+                  <Label className="text-[11px] uppercase tracking-wide font-semibold text-muted-foreground">
                     Reading Status
                   </Label>
                   <ToggleGroup
@@ -925,7 +878,7 @@ export const LibraryPage: React.FC = () => {
                     onValueChange={(v) => {
                       if (v) void changeStatus(panelBook.id, v);
                     }}
-                    className="w-full bg-secondary/30 rounded-xl p-1"
+                    className="w-full bg-secondary rounded-md p-0.5"
                   >
                     {(["UNREAD", "READING", "DONE"] as const).map((s) => {
                       const c = statusConfig[s];
@@ -933,7 +886,7 @@ export const LibraryPage: React.FC = () => {
                         <ToggleGroupItem
                           key={s}
                           value={s}
-                          className="flex-1 gap-1.5 text-xs rounded-lg data-[state=on]:bg-card data-[state=on]:shadow-sm"
+                          className="flex-1 gap-1.5 text-xs rounded data-[state=on]:bg-card data-[state=on]:shadow-sm"
                         >
                           <c.icon className="size-3.5" />
                           {c.label}
@@ -948,7 +901,7 @@ export const LibraryPage: React.FC = () => {
                   (panelBook.progress?.progressPercent ?? 0) > 0) && (
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <Label className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/60">
+                      <Label className="text-[11px] uppercase tracking-wide font-medium text-muted-foreground">
                         Progress
                       </Label>
                       <span className="text-xs font-semibold tabular-nums text-foreground/70">
@@ -965,7 +918,7 @@ export const LibraryPage: React.FC = () => {
                 {/* Description */}
                 {panelBook.description && !editMode && (
                   <div>
-                    <Label className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/60">
+                    <Label className="text-[11px] uppercase tracking-wide font-medium text-muted-foreground">
                       Description
                     </Label>
                     <p className="mt-2 text-[13px] leading-relaxed text-foreground/70 line-clamp-6">
@@ -998,7 +951,7 @@ export const LibraryPage: React.FC = () => {
                   </button>
 
                   {editMode && (
-                    <div className="space-y-4 rounded-xl border border-border/30 bg-secondary/20 p-4 animate-fade-in">
+                    <div className="space-y-4 rounded-md border border-border/50 bg-secondary/30 p-4 animate-fade-in">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground/60">
                           Title
@@ -1011,7 +964,7 @@ export const LibraryPage: React.FC = () => {
                               title: e.target.value,
                             }))
                           }
-                          className="rounded-lg bg-card/60 border-border/30 focus-visible:border-primary/30"
+                          className="bg-card"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -1026,7 +979,7 @@ export const LibraryPage: React.FC = () => {
                               author: e.target.value,
                             }))
                           }
-                          className="rounded-lg bg-card/60 border-border/30 focus-visible:border-primary/30"
+                          className="bg-card"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -1041,7 +994,7 @@ export const LibraryPage: React.FC = () => {
                               series: e.target.value,
                             }))
                           }
-                          className="rounded-lg bg-card/60 border-border/30 focus-visible:border-primary/30"
+                          className="bg-card"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -1057,7 +1010,7 @@ export const LibraryPage: React.FC = () => {
                               description: e.target.value,
                             }))
                           }
-                          className="rounded-lg bg-card/60 border-border/30 focus-visible:border-primary/30 resize-none"
+                          className="bg-card resize-none"
                         />
                       </div>
                       <div className="flex items-center gap-2 pt-1">
@@ -1065,7 +1018,7 @@ export const LibraryPage: React.FC = () => {
                           size="sm"
                           onClick={() => saveMetadata.mutate()}
                           disabled={saveMetadata.isPending}
-                          className="gap-1.5 rounded-lg shadow-sm shadow-primary/15"
+                          className="gap-1.5"
                         >
                           {saveMetadata.isPending ? (
                             <Loader2 className="size-3.5 animate-spin" />
@@ -1080,7 +1033,7 @@ export const LibraryPage: React.FC = () => {
                           onClick={() =>
                             void refreshMetadata(panelBook.id)
                           }
-                          className="gap-1.5 rounded-lg border-primary/20 text-primary hover:bg-primary/[0.06] hover:text-primary"
+                          className="gap-1.5"
                         >
                           <RefreshCw className="size-3.5" />
                           Fetch metadata
@@ -1111,10 +1064,10 @@ export const LibraryPage: React.FC = () => {
                       <div
                         key={collection.id}
                         className={cn(
-                          "flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 transition-colors duration-150",
+                          "flex items-center justify-between gap-3 rounded-md px-3 py-2.5 transition-colors",
                           collection.assigned
-                            ? "bg-primary/[0.05] border border-primary/15"
-                            : "bg-secondary/20 border border-border/20 hover:bg-secondary/40",
+                            ? "bg-primary/5 border border-primary/15"
+                            : "bg-secondary/30 border border-border/30 hover:bg-secondary/50",
                         )}
                       >
                         <div className="min-w-0">
@@ -1138,9 +1091,7 @@ export const LibraryPage: React.FC = () => {
                           }
                           size="sm"
                           className={cn(
-                            "h-7 text-xs shrink-0 rounded-lg",
-                            collection.assigned &&
-                              "shadow-sm shadow-primary/15",
+                            "h-7 text-xs shrink-0",
                           )}
                           onClick={() =>
                             void setCollectionAssigned(
@@ -1166,7 +1117,7 @@ export const LibraryPage: React.FC = () => {
                 {/* Download */}
                 <Button
                   variant="outline"
-                  className="w-full gap-2 rounded-xl h-11 border-border/30 hover:bg-muted/30"
+                  className="w-full gap-2 h-10"
                   onClick={() => handleDownload(panelBook.id)}
                 >
                   <Download className="size-4" />
@@ -1219,23 +1170,20 @@ const GridCard: React.FC<{
         }}
         onClick={() => onSelect(book.id)}
       >
-        {/* Cover -- the hero */}
-        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-muted/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_16px_-4px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.04] dark:ring-white/[0.06] transition-all duration-300 group-hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.12),0_4px_12px_-4px_rgba(0,0,0,0.08)] group-hover:-translate-y-1 group-hover:ring-primary/10">
+        {/* Cover */}
+        <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-muted/20 shadow-sm transition-shadow duration-200 group-hover:shadow-md">
           <BookCover
             book={book}
-            className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+            className="h-full w-full"
           />
-
-          {/* Hover scrim */}
-          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
           {/* Favorite */}
           <button
             className={cn(
-              "absolute top-2.5 left-2.5 flex items-center justify-center size-7 rounded-lg transition-all duration-200",
+              "absolute top-2 left-2 flex items-center justify-center size-7 rounded transition-all duration-150",
               book.isFavorite
-                ? "bg-yellow-400/20 backdrop-blur-md shadow-sm"
-                : "bg-black/30 backdrop-blur-md opacity-0 group-hover:opacity-100",
+                ? "bg-yellow-400/20 backdrop-blur-sm"
+                : "bg-black/30 backdrop-blur-sm opacity-0 group-hover:opacity-100",
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -1260,24 +1208,24 @@ const GridCard: React.FC<{
           {/* Format badge */}
           <Badge
             variant="secondary"
-            className="absolute top-2.5 right-2.5 text-[9px] bg-black/25 text-white/90 backdrop-blur-md border-white/10 font-semibold tracking-wider uppercase"
+            className="absolute top-2 right-2 text-[9px] bg-black/30 text-white/90 backdrop-blur-sm border-0 tracking-wider uppercase"
           >
             {book.fileExt.toUpperCase()}
           </Badge>
 
           {/* Actions */}
-          <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+          <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="flex items-center justify-center size-7 rounded-lg bg-black/30 backdrop-blur-md hover:bg-black/50 transition-colors"
+                  className="flex items-center justify-center size-7 rounded bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="size-3.5 text-white/90" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 rounded-xl">
-                <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground font-semibold">
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
                   Status
                 </DropdownMenuLabel>
                 {(["UNREAD", "READING", "DONE"] as const).map((s) => {
@@ -1290,7 +1238,7 @@ const GridCard: React.FC<{
                         void onStatusChange(book.id, s);
                       }}
                       className={cn(
-                        "gap-2 rounded-lg",
+                        "gap-2",
                         status === s && "bg-accent",
                       )}
                     >
@@ -1305,7 +1253,7 @@ const GridCard: React.FC<{
                     e.stopPropagation();
                     void onRefreshMetadata(book.id);
                   }}
-                  className="gap-2 rounded-lg"
+                  className="gap-2"
                 >
                   <RefreshCw className="size-3.5" />
                   Refresh metadata
@@ -1315,7 +1263,7 @@ const GridCard: React.FC<{
                     e.stopPropagation();
                     onDownload(book.id);
                   }}
-                  className="gap-2 rounded-lg"
+                  className="gap-2"
                 >
                   <Download className="size-3.5" />
                   Download
@@ -1326,9 +1274,9 @@ const GridCard: React.FC<{
 
           {/* Progress bar */}
           {status === "READING" && percent > 0 && (
-            <div className="absolute bottom-0 inset-x-0 h-1 bg-black/20 backdrop-blur-sm">
+            <div className="absolute bottom-0 inset-x-0 h-0.5 bg-black/20">
               <div
-                className="h-full bg-status-processing rounded-r-full transition-all duration-500"
+                className="h-full bg-status-processing transition-all duration-500"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -1336,11 +1284,11 @@ const GridCard: React.FC<{
         </div>
 
         {/* Info below cover */}
-        <div className="pt-3 pb-1 px-0.5 space-y-1">
-          <h3 className="font-semibold text-[13px] leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-200">
+        <div className="pt-2.5 pb-1 space-y-0.5">
+          <h3 className="font-medium text-[13px] leading-snug line-clamp-2 group-hover:text-primary transition-colors">
             {book.title}
           </h3>
-          <p className="text-xs text-muted-foreground/60 truncate">
+          <p className="text-xs text-muted-foreground truncate">
             {book.author ?? "Unknown author"}
           </p>
           <div className="flex items-center gap-1.5 pt-0.5">
@@ -1395,15 +1343,15 @@ const ListRow: React.FC<{
     return (
       <div
         className={cn(
-          "group cursor-pointer rounded-xl transition-all duration-200",
-          "hover:bg-muted/30 active:scale-[0.995]",
+          "group cursor-pointer rounded-md transition-colors",
+          "hover:bg-accent/50",
         )}
         style={{ animationDelay: `${Math.min(index * 20, 200)}ms` }}
         onClick={() => onSelect(book.id)}
       >
-        <div className="flex items-center gap-3.5 px-3.5 py-3">
+        <div className="flex items-center gap-3 px-3 py-2.5">
           {/* Thumbnail */}
-          <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg shadow-[0_2px_6px_-1px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.04] dark:ring-white/[0.06]">
+          <div className="h-14 w-10 shrink-0 overflow-hidden rounded shadow-sm">
             <BookCover
               book={book}
               className="h-full w-full"
@@ -1444,7 +1392,7 @@ const ListRow: React.FC<{
           <div className="hidden sm:flex items-center gap-2.5">
             <button
               className={cn(
-                "rounded-lg p-1.5 transition-all duration-150",
+                "rounded p-1.5 transition-colors",
                 book.isFavorite
                   ? "hover:bg-yellow-400/10"
                   : "hover:bg-muted/50",
@@ -1463,7 +1411,7 @@ const ListRow: React.FC<{
                 )}
               />
             </button>
-            <span className="text-[10px] text-muted-foreground/35 bg-muted/30 px-1.5 py-0.5 rounded font-medium uppercase tracking-wider">
+            <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded font-medium uppercase tracking-wide">
               {book.fileExt}
             </span>
             <span className="text-[11px] text-muted-foreground/40 tabular-nums w-14 text-right">
@@ -1483,14 +1431,14 @@ const ListRow: React.FC<{
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="flex items-center justify-center size-7 rounded-lg hover:bg-muted/60 transition-colors"
+                  className="flex items-center justify-center size-7 rounded hover:bg-muted/60 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="size-4 text-muted-foreground/50" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 rounded-xl">
-                <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground font-semibold">
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">
                   Status
                 </DropdownMenuLabel>
                 {(["UNREAD", "READING", "DONE"] as const).map((s) => {
@@ -1503,7 +1451,7 @@ const ListRow: React.FC<{
                         void onStatusChange(book.id, s);
                       }}
                       className={cn(
-                        "gap-2 rounded-lg",
+                        "gap-2",
                         status === s && "bg-accent",
                       )}
                     >
@@ -1518,7 +1466,7 @@ const ListRow: React.FC<{
                     e.stopPropagation();
                     void onRefreshMetadata(book.id);
                   }}
-                  className="gap-2 rounded-lg"
+                  className="gap-2"
                 >
                   <RefreshCw className="size-3.5" />
                   Refresh metadata
@@ -1528,7 +1476,7 @@ const ListRow: React.FC<{
                     e.stopPropagation();
                     onDownload(book.id);
                   }}
-                  className="gap-2 rounded-lg"
+                  className="gap-2"
                 >
                   <Download className="size-3.5" />
                   Download

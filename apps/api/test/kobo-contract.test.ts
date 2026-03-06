@@ -108,4 +108,102 @@ describe("kobo contract", () => {
     expect(JSON.stringify(payload).includes("Entitlement")).toBe(true);
     expect(JSON.stringify(fixture).includes("NewEntitlement")).toBe(true);
   });
+
+  it("returns full entitlements again when sync token header is missing", async () => {
+    const first = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(JSON.stringify(first.json()).includes("Entitlement")).toBe(true);
+
+    const second = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`
+    });
+
+    expect(second.statusCode).toBe(200);
+    expect(JSON.stringify(second.json()).includes("Entitlement")).toBe(true);
+  });
+
+  it("supports local affiliate, refresh and analytics endpoints", async () => {
+    const affiliate = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/affiliate?PlatformID=00000000-0000-0000-0000-000000000376&SerialNumber=test`
+    });
+    expect(affiliate.statusCode).toBe(200);
+
+    const refresh = await app.inject({
+      method: "POST",
+      url: `/api/kobo/${koboToken}/v1/auth/refresh`,
+      payload: {
+        UserKey: "booklite",
+        RefreshToken: "refresh-token"
+      }
+    });
+    expect(refresh.statusCode).toBe(200);
+    expect(refresh.json().AccessToken).toBeTruthy();
+
+    const analytics = await app.inject({
+      method: "POST",
+      url: `/api/kobo/${koboToken}/v1/analytics/event`,
+      payload: {}
+    });
+    expect(analytics.statusCode).toBe(200);
+  });
+
+  it("ignores unknown entitlement reading-state updates", async () => {
+    const timestamp = new Date().toISOString();
+    const response = await app.inject({
+      method: "PUT",
+      url: `/api/kobo/${koboToken}/v1/library/999999/state`,
+      payload: {
+        ReadingStates: [
+          {
+            EntitlementId: "999999",
+            LastModified: timestamp,
+            PriorityTimestamp: timestamp,
+            StatusInfo: {
+              LastModified: timestamp,
+              Status: "Reading"
+            },
+            CurrentBookmark: {
+              ProgressPercent: 14,
+              LastModified: timestamp,
+              Location: {
+                Value: "chapter-1",
+                Type: "Unknown",
+                Source: "booklite"
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().RequestResult).toBe("Success");
+  });
+
+  it("accepts empty json body on kobo delete passthrough", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response("{}", {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/kobo/${koboToken}/v1/library/50`,
+        headers: { "content-type": "application/json" }
+      });
+
+      expect(response.statusCode).toBe(200);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

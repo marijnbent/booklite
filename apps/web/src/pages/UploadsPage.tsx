@@ -111,17 +111,6 @@ const toErrorMessage = (error: unknown): string => {
   return error.message || "Upload failed";
 };
 
-/** Small indicator shown next to auto-filled fields */
-const AutoFilledHint: React.FC<{ visible: boolean }> = ({ visible }) => {
-  if (!visible) return null;
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-status-completed/8 px-2 py-0.5 text-[10px] font-medium text-status-completed/90 select-none">
-      <Sparkles className="size-2.5" />
-      auto-filled
-    </span>
-  );
-};
-
 export const UploadsPage: React.FC = () => {
   const [drafts, setDrafts] = useState<UploadDraft[]>([]);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
@@ -325,71 +314,14 @@ export const UploadsPage: React.FC = () => {
     (draft) => draft.selected && draft.metadataState === "loading"
   );
 
-  // Determine which "step" the user is on for visual guidance
-  const currentStep = drafts.length === 0 ? 1 : 2;
-
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       {/* Page header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Add Books</h1>
-        <p className="mt-2 text-[13px] text-muted-foreground/70 leading-relaxed max-w-md">
-          Drop your files, review the auto-filled details, and add to your library.
+        <h1 className="text-2xl font-semibold tracking-tight">Add Books</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Drop your files, review the details, and add to your library.
         </p>
-      </div>
-
-      {/* Step indicators -- connected line design */}
-      <div className="flex items-center gap-0">
-        {/* Step 1 */}
-        <div className={cn(
-          "flex items-center gap-2 transition-colors duration-200",
-          currentStep === 1 ? "text-primary" : "text-muted-foreground/50"
-        )}>
-          <span className={cn(
-            "flex size-7 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-300",
-            currentStep === 1
-              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
-              : drafts.length > 0
-                ? "bg-status-completed/15 text-status-completed ring-2 ring-status-completed/10"
-                : "bg-muted text-muted-foreground/60"
-          )}>
-            {drafts.length > 0 ? <CheckCircle2 className="size-3.5" /> : "1"}
-          </span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">Select files</span>
-        </div>
-
-        {/* Connector line */}
-        <div className={cn(
-          "mx-3 h-px flex-1 max-w-16 transition-colors duration-300",
-          drafts.length > 0 ? "bg-status-completed/30" : "bg-border/50"
-        )} />
-
-        {/* Step 2 */}
-        <div className={cn(
-          "flex items-center gap-2 transition-colors duration-200",
-          currentStep === 2 ? "text-primary" : "text-muted-foreground/40"
-        )}>
-          <span className={cn(
-            "flex size-7 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-300",
-            currentStep === 2
-              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
-              : "bg-muted text-muted-foreground/60"
-          )}>
-            2
-          </span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">Review metadata</span>
-        </div>
-
-        {/* Connector line */}
-        <div className="mx-3 h-px flex-1 max-w-16 bg-border/50" />
-
-        {/* Step 3 */}
-        <div className="flex items-center gap-2 text-muted-foreground/40">
-          <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground/60">
-            3
-          </span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">Add to library</span>
-        </div>
       </div>
 
       {/* Drop zone */}
@@ -399,40 +331,19 @@ export const UploadsPage: React.FC = () => {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={cn(
-          "group relative flex flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-16 transition-all duration-300 cursor-pointer overflow-hidden",
+          "flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed p-12 transition-colors duration-200 cursor-pointer",
           dragOver
-            ? "border-primary/60 bg-primary/[0.06] shadow-[inset_0_0_60px_-12px] shadow-primary/10 scale-[1.005]"
-            : "border-border/40 bg-gradient-to-b from-muted/30 via-transparent to-transparent hover:border-primary/30 hover:from-primary/[0.03]"
+            ? "border-primary bg-accent/50"
+            : "border-border hover:border-muted-foreground/30"
         )}
       >
-        {/* Decorative background glow on drag -- multiple layers for richness */}
-        <div className={cn(
-          "pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-500",
-          dragOver ? "opacity-100" : "opacity-0"
-        )} style={{
-          background: "radial-gradient(ellipse 60% 50% at 50% 50%, oklch(0.52 0.15 50 / 0.1), transparent 70%)"
-        }} />
-        <div className={cn(
-          "pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-700",
-          dragOver ? "opacity-100" : "opacity-0"
-        )} style={{
-          background: "radial-gradient(circle at 30% 40%, oklch(0.60 0.18 148 / 0.04), transparent 50%), radial-gradient(circle at 70% 60%, oklch(0.62 0.16 250 / 0.04), transparent 50%)"
-        }} />
-
-        <div className={cn(
-          "relative flex size-20 items-center justify-center rounded-[1.25rem] transition-all duration-300",
-          dragOver
-            ? "bg-primary/15 scale-110 shadow-lg shadow-primary/10"
-            : "bg-muted/30 group-hover:bg-primary/8 group-hover:scale-105"
-        )}>
-          <FileUp className={cn(
-            "size-9 transition-all duration-300",
-            dragOver ? "text-primary -translate-y-1.5" : "text-muted-foreground/30 group-hover:text-primary/50"
-          )} />
-        </div>
-        <div className="relative text-center space-y-1.5">
-          <p className="text-sm font-semibold tracking-tight">Drop EPUB or PDF files here</p>
-          <p className="text-xs text-muted-foreground/50">
+        <FileUp className={cn(
+          "size-8 transition-colors duration-200",
+          dragOver ? "text-primary" : "text-muted-foreground/40"
+        )} />
+        <div className="text-center">
+          <p className="text-sm font-medium">Drop EPUB or PDF files here</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             or click to browse -- metadata is looked up automatically
           </p>
         </div>
@@ -452,14 +363,11 @@ export const UploadsPage: React.FC = () => {
 
       {/* Draft cards */}
       {drafts.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {/* Toolbar */}
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
-                <BookOpen className="size-3.5 text-primary" />
-              </div>
-              <h2 className="text-base font-semibold tracking-tight">Review & Edit</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold tracking-tight">Review & Edit</h2>
               <Badge variant="secondary" className="text-[10px] tabular-nums">
                 {drafts.length} {drafts.length === 1 ? "file" : "files"}
               </Badge>
@@ -469,7 +377,7 @@ export const UploadsPage: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-xs text-muted-foreground hover:text-foreground"
+                  className="text-xs text-muted-foreground"
                   onClick={() => {
                     const nextSelected = selectedCount !== drafts.length;
                     setDrafts((prev) => prev.map((draft) => ({ ...draft, selected: nextSelected })));
@@ -482,7 +390,6 @@ export const UploadsPage: React.FC = () => {
                 onClick={() => void handleAddSelected()}
                 disabled={selectedCount === 0 || uploadingAny || selectedLoadingMetadata}
                 size="sm"
-                className="shadow-sm shadow-primary/20 active:scale-[0.97] transition-all duration-200"
               >
                 {uploadingAny ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -495,8 +402,8 @@ export const UploadsPage: React.FC = () => {
           </div>
 
           {/* Draft list */}
-          <div className="space-y-4">
-            {drafts.map((draft, i) => {
+          <div className="space-y-3">
+            {drafts.map((draft) => {
               const isUploading = uploadingIds.includes(draft.id);
               const isLoading = draft.metadataState === "loading";
               const isEnriched = draft.metadataState === "enriched";
@@ -509,201 +416,183 @@ export const UploadsPage: React.FC = () => {
                 <div
                   key={draft.id}
                   className={cn(
-                    "group/card relative rounded-2xl border bg-card transition-all duration-300 animate-fade-up overflow-hidden",
+                    "rounded-lg border bg-card transition-colors duration-200",
                     draft.selected
-                      ? "border-primary/25 shadow-sm shadow-primary/[0.04] ring-1 ring-primary/10"
-                      : "border-border/40 hover:border-border/60",
+                      ? "border-primary/30"
+                      : "border-border/60",
                     isUploading && "opacity-60 pointer-events-none"
                   )}
-                  style={{ animationDelay: `${i * 60}ms`, animationFillMode: "backwards" }}
                 >
-                  {/* Loading shimmer bar at top of card -- refined gradient */}
-                  {isLoading && (
-                    <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-shimmer" style={{ backgroundSize: "200% 100%" }} />
-                  )}
-
-                  <div className="p-6">
-                    {/* Top row: file info + metadata status + actions */}
-                    <div className="flex items-start gap-4">
-                      {/* Checkbox -- refined with subtle animation */}
+                  <div className="p-5">
+                    {/* Top row: checkbox, file info, metadata status */}
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox */}
                       <div className="pt-0.5">
                         <button
                           type="button"
                           onClick={() => updateDraft(draft.id, { selected: !draft.selected })}
                           className={cn(
-                            "flex size-5 items-center justify-center rounded-md border-2 transition-all duration-200",
+                            "flex size-4.5 items-center justify-center rounded border transition-colors duration-150",
                             draft.selected
-                              ? "border-primary bg-primary text-primary-foreground scale-100"
-                              : "border-border/60 hover:border-primary/40 hover:scale-105"
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border hover:border-muted-foreground/50"
                           )}
                         >
                           {draft.selected && <CheckCircle2 className="size-3" />}
                         </button>
                       </div>
 
-                      {/* File type badge + name */}
+                      {/* Content */}
                       <div className="flex-1 min-w-0 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className={cn(
-                              "shrink-0 inline-flex items-center rounded-lg px-2 py-1 text-[10px] font-bold tracking-wider",
-                              fileExt === "EPUB"
-                                ? "bg-status-processing/10 text-status-processing"
-                                : "bg-status-queued/12 text-status-queued"
-                            )}>
-                              {fileExt}
-                            </span>
-                            <p className="text-sm font-semibold truncate">{draft.file.name}</p>
-                            <span className="shrink-0 text-[11px] text-muted-foreground/40 tabular-nums">{fileSizeMB} MB</span>
-                          </div>
+                        {/* File info row */}
+                        <div className="flex items-center gap-2.5">
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {fileExt}
+                          </span>
+                          <p className="text-sm font-medium truncate">{draft.file.name}</p>
+                          <span className="shrink-0 text-[11px] text-muted-foreground/50 tabular-nums">{fileSizeMB} MB</span>
 
-                          {/* Metadata status indicator */}
+                          {/* Metadata status */}
                           <div className="ml-auto shrink-0 flex items-center gap-2">
                             {isLoading && (
-                              <div className="flex items-center gap-1.5 text-primary/80 animate-pulse-soft">
-                                <Search className="size-3.5" />
-                                <span className="text-[11px] font-medium">Looking up metadata...</span>
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Loader2 className="size-3 animate-spin" />
+                                <span className="text-[11px]">Looking up metadata...</span>
                               </div>
                             )}
                             {isEnriched && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-status-completed/8 px-2.5 py-1 text-[10px] font-semibold text-status-completed">
-                                <Sparkles className="size-2.5" />
+                              <span className="text-[11px] text-status-completed">
                                 {sourceLabel(draft.metadataSource)}
                               </span>
                             )}
                             {isNoMatch && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground/50">
-                                <AlertCircle className="size-3.5" />
-                                <span className="text-[11px] font-medium">No metadata found</span>
-                              </div>
+                              <span className="text-[11px] text-muted-foreground/50">
+                                No metadata found
+                              </span>
                             )}
                             {isError && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/8 px-2.5 py-1 text-[10px] font-semibold text-destructive">
-                                <XCircle className="size-2.5" />
+                              <span className="text-[11px] text-destructive">
                                 Lookup failed
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Metadata loading skeleton -- refined with better shimmer */}
+                        {/* Loading state */}
                         {isLoading && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {["Title", "Author", "Series"].map((label) => (
-                              <div key={label} className="space-y-2">
-                                <span className="text-[11px] font-medium text-muted-foreground/40 uppercase tracking-[0.06em]">{label}</span>
-                                <div className="h-9 rounded-xl bg-muted/30 animate-shimmer" style={{ backgroundSize: "200% 100%", backgroundImage: "linear-gradient(90deg, transparent 0%, oklch(0.52 0.15 50 / 0.05) 50%, transparent 100%)" }} />
+                              <div key={label} className="space-y-1.5">
+                                <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wide">{label}</span>
+                                <div className="h-9 rounded-md bg-muted/50 flex items-center justify-center">
+                                  <span className="text-xs text-muted-foreground/40">Loading...</span>
+                                </div>
                               </div>
                             ))}
                           </div>
                         )}
 
-                        {/* Metadata fields -- shown once loading is done */}
+                        {/* Metadata fields */}
                         {!isLoading && (
                           <div className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Title</Label>
-                                  <AutoFilledHint visible={isEnriched && !draft.titleTouched && !!draft.title} />
-                                </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] text-muted-foreground">
+                                  Title
+                                  {isEnriched && !draft.titleTouched && draft.title && (
+                                    <span className="ml-1 text-muted-foreground/50">(auto)</span>
+                                  )}
+                                </Label>
                                 <Input
                                   value={draft.title}
                                   onChange={(e) => updateDraft(draft.id, { title: e.target.value, titleTouched: true })}
-                                  className={cn(
-                                    "h-9 rounded-xl",
-                                    isEnriched && !draft.titleTouched && draft.title && "border-status-completed/20 bg-status-completed/[0.03]"
-                                  )}
+                                  className="h-9"
                                 />
                               </div>
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Author</Label>
-                                  <AutoFilledHint visible={isEnriched && !draft.authorTouched && !!draft.author} />
-                                </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] text-muted-foreground">
+                                  Author
+                                  {isEnriched && !draft.authorTouched && draft.author && (
+                                    <span className="ml-1 text-muted-foreground/50">(auto)</span>
+                                  )}
+                                </Label>
                                 <Input
                                   value={draft.author}
                                   onChange={(e) => updateDraft(draft.id, { author: e.target.value, authorTouched: true })}
-                                  className={cn(
-                                    "h-9 rounded-xl",
-                                    isEnriched && !draft.authorTouched && draft.author && "border-status-completed/20 bg-status-completed/[0.03]"
-                                  )}
+                                  className="h-9"
                                 />
                               </div>
-                              <div className="space-y-2">
-                                <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Series</Label>
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] text-muted-foreground">Series</Label>
                                 <Input
                                   value={draft.series}
                                   onChange={(e) => updateDraft(draft.id, { series: e.target.value })}
-                                  className="h-9 rounded-xl"
+                                  className="h-9"
                                 />
                               </div>
                             </div>
 
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Description</Label>
-                                <AutoFilledHint visible={isEnriched && !draft.descriptionTouched && !!draft.description} />
-                              </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-[11px] text-muted-foreground">
+                                Description
+                                {isEnriched && !draft.descriptionTouched && draft.description && (
+                                  <span className="ml-1 text-muted-foreground/50">(auto)</span>
+                                )}
+                              </Label>
                               <Textarea
                                 rows={2}
                                 value={draft.description}
                                 onChange={(e) => updateDraft(draft.id, { description: e.target.value, descriptionTouched: true })}
-                                className={cn(
-                                  "text-sm resize-none rounded-xl",
-                                  isEnriched && !draft.descriptionTouched && draft.description && "border-status-completed/20 bg-status-completed/[0.03]"
-                                )}
+                                className="text-sm resize-none"
                               />
                             </div>
 
-                            {/* Bottom row: collections, favorite, quick add */}
-                            <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/20">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {/* Collections as pill-shaped tags */}
+                            {/* Bottom row: collections, favorite, actions */}
+                            <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/40">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                {/* Collections as checkboxes */}
                                 {(collections.data ?? []).length > 0 && (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/40 mr-1">
-                                      Collections
-                                    </span>
+                                  <div className="flex items-center gap-3 flex-wrap">
                                     {(collections.data ?? []).map((collection) => {
                                       const selected = draft.collectionIds.includes(collection.id);
                                       return (
-                                        <button
+                                        <label
                                           key={collection.id}
-                                          type="button"
-                                          onClick={() => {
-                                            const next = selected
-                                              ? draft.collectionIds.filter((id) => id !== collection.id)
-                                              : [...draft.collectionIds, collection.id];
-                                            updateDraft(draft.id, { collectionIds: next });
-                                          }}
-                                          className={cn(
-                                            "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-200",
-                                            selected
-                                              ? "bg-primary/12 text-primary ring-1 ring-primary/20"
-                                              : "bg-muted/30 text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground/70"
-                                          )}
+                                          className="flex items-center gap-1.5 text-[12px] cursor-pointer select-none"
                                         >
-                                          {collection.icon && <span className="mr-1">{collection.icon}</span>}
-                                          {collection.name}
-                                        </button>
+                                          <input
+                                            type="checkbox"
+                                            checked={selected}
+                                            onChange={() => {
+                                              const next = selected
+                                                ? draft.collectionIds.filter((id) => id !== collection.id)
+                                                : [...draft.collectionIds, collection.id];
+                                              updateDraft(draft.id, { collectionIds: next });
+                                            }}
+                                            className="rounded border-border accent-primary size-3.5"
+                                          />
+                                          <span className="text-muted-foreground">
+                                            {collection.icon && <span className="mr-0.5">{collection.icon}</span>}
+                                            {collection.name}
+                                          </span>
+                                        </label>
                                       );
                                     })}
                                   </div>
                                 )}
 
-                                {/* Favorite toggle -- pill-shaped */}
+                                {/* Favorite toggle */}
                                 <button
                                   type="button"
                                   onClick={() => updateDraft(draft.id, { favorite: !draft.favorite })}
                                   className={cn(
-                                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-200",
+                                    "inline-flex items-center gap-1 text-[12px] transition-colors duration-150",
                                     draft.favorite
-                                      ? "bg-status-queued/12 text-status-queued ring-1 ring-status-queued/20"
-                                      : "bg-muted/30 text-muted-foreground/40 hover:bg-muted/50 hover:text-status-queued/60"
+                                      ? "text-status-queued"
+                                      : "text-muted-foreground/40 hover:text-muted-foreground"
                                   )}
                                 >
-                                  <Star className={cn("size-3", draft.favorite && "fill-current")} />
+                                  <Star className={cn("size-3.5", draft.favorite && "fill-current")} />
                                   Favorite
                                 </button>
                               </div>
@@ -712,7 +601,7 @@ export const UploadsPage: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="size-8 text-muted-foreground/30 hover:text-destructive transition-colors duration-200"
+                                  className="size-8 text-muted-foreground/40 hover:text-destructive"
                                   onClick={() => removeDraft(draft.id)}
                                   disabled={isUploading}
                                 >
@@ -720,9 +609,9 @@ export const UploadsPage: React.FC = () => {
                                 </Button>
                                 <Button
                                   size="sm"
+                                  variant="secondary"
                                   onClick={() => void uploadDraft(draft)}
                                   disabled={isUploading || isLoading}
-                                  className="shadow-sm shadow-primary/15 active:scale-[0.97] transition-all duration-200"
                                 >
                                   {isUploading ? (
                                     <Loader2 className="size-3.5 animate-spin" />
@@ -738,7 +627,7 @@ export const UploadsPage: React.FC = () => {
 
                         {/* Error message */}
                         {draft.error && (
-                          <div className="flex items-center gap-2 rounded-xl bg-destructive/6 border border-destructive/12 px-4 py-3 mt-2">
+                          <div className="flex items-center gap-2 rounded-md bg-destructive/5 px-3 py-2.5 mt-1">
                             <XCircle className="size-3.5 text-destructive shrink-0" />
                             <p className="text-xs text-destructive">{draft.error}</p>
                           </div>
@@ -753,78 +642,44 @@ export const UploadsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Upload jobs -- timeline-style feed */}
+      {/* Import progress */}
       {jobs.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
-              <Upload className="size-3.5 text-primary" />
-            </div>
-            <h2 className="text-base font-semibold tracking-tight">Import Progress</h2>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">Import Progress</h2>
             <Badge variant="secondary" className="text-[10px] tabular-nums">
               {jobs.filter((j) => j.status === "COMPLETED").length}/{jobs.length} done
             </Badge>
           </div>
 
-          {/* Timeline container with vertical line */}
-          <div className="relative pl-4">
-            {/* Vertical connector line */}
-            <div className="absolute left-[1.1rem] top-2 bottom-2 w-px bg-border/40" />
-
-            <div className="space-y-2">
-              {jobs.map((job, i) => {
-                const display = statusDisplay[job.status];
-                return (
-                  <div
-                    key={job.id}
-                    className={cn(
-                      "relative flex items-center gap-3 rounded-xl border px-4 py-3 ml-4 transition-all duration-200 animate-fade-up",
-                      job.status === "COMPLETED" && "border-status-completed/15 bg-status-completed/[0.03]",
-                      job.status === "FAILED" && "border-destructive/15 bg-destructive/[0.03]",
-                      job.status === "PROCESSING" && "border-status-processing/15 bg-status-processing/[0.03]",
-                      job.status === "QUEUED" && "border-border/30 bg-muted/5"
+          <div className="space-y-1.5">
+            {jobs.map((job) => {
+              const display = statusDisplay[job.status];
+              return (
+                <div
+                  key={job.id}
+                  className="flex items-center gap-3 rounded-md border border-border/40 px-4 py-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {job.status === "COMPLETED" ? "Book imported" : `Job ${job.id.slice(0, 8)}`}
+                    </p>
+                    {job.error && (
+                      <p className="text-xs text-destructive mt-0.5 truncate">{job.error}</p>
                     )}
-                    style={{ animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
-                  >
-                    {/* Timeline dot */}
-                    <div className={cn(
-                      "absolute -left-[1.65rem] flex size-3 items-center justify-center rounded-full ring-2 ring-background",
-                      job.status === "COMPLETED" && "bg-status-completed",
-                      job.status === "FAILED" && "bg-destructive",
-                      job.status === "PROCESSING" && "bg-status-processing",
-                      job.status === "QUEUED" && "bg-muted-foreground/30"
-                    )} />
-
-                    <div className={cn(
-                      "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                      job.status === "COMPLETED" && "bg-status-completed/10 text-status-completed",
-                      job.status === "FAILED" && "bg-destructive/10 text-destructive",
-                      job.status === "PROCESSING" && "bg-status-processing/10 text-status-processing",
-                      job.status === "QUEUED" && "bg-status-queued/10 text-status-queued"
-                    )}>
-                      {display.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {job.status === "COMPLETED" ? "Book imported" : `Job ${job.id.slice(0, 8)}`}
+                    {job.result?.bookId && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Book #{job.result.bookId}
                       </p>
-                      {job.error && (
-                        <p className="text-xs text-destructive mt-0.5 truncate">{job.error}</p>
-                      )}
-                      {job.result?.bookId && (
-                        <p className="text-xs text-muted-foreground/50 mt-0.5">
-                          Book #{job.result.bookId}
-                        </p>
-                      )}
-                    </div>
-                    <Badge variant={display.variant} className="shrink-0 gap-1">
-                      {display.icon}
-                      {display.label}
-                    </Badge>
+                    )}
                   </div>
-                );
-              })}
-            </div>
+                  <Badge variant={display.variant} className="shrink-0 gap-1">
+                    {display.icon}
+                    {display.label}
+                  </Badge>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

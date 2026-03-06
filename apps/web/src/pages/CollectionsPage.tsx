@@ -86,12 +86,12 @@ interface CollectionBookItem extends BookItem {
 // ---------------------------------------------------------------------------
 
 const EMOJI_OPTIONS = [
-  "📚", "📖", "📕", "📗", "📘", "📙", "📓", "📔",
-  "🎯", "💡", "🔥", "⭐", "💎", "🏆", "🎨", "🎭",
-  "🌟", "🌈", "🍀", "🌊", "🏔️", "🌙", "☀️", "🌸",
-  "❤️", "💜", "💙", "💚", "🧡", "💛", "🖤", "🤍",
-  "🚀", "✈️", "🎵", "🎮", "🔬", "📐", "🧪", "💻",
-  "🍕", "☕", "🍷", "🎂", "🌮", "🍦", "🥐", "🍩",
+  "\u{1F4DA}", "\u{1F4D6}", "\u{1F4D5}", "\u{1F4D7}", "\u{1F4D8}", "\u{1F4D9}", "\u{1F4D3}", "\u{1F4D4}",
+  "\u{1F3AF}", "\u{1F4A1}", "\u{1F525}", "\u2B50", "\u{1F48E}", "\u{1F3C6}", "\u{1F3A8}", "\u{1F3AD}",
+  "\u{1F31F}", "\u{1F308}", "\u{1F340}", "\u{1F30A}", "\u{1F3D4}\uFE0F", "\u{1F319}", "\u2600\uFE0F", "\u{1F338}",
+  "\u2764\uFE0F", "\u{1F49C}", "\u{1F499}", "\u{1F49A}", "\u{1F9E1}", "\u{1F49B}", "\u{1F5A4}", "\u{1F90D}",
+  "\u{1F680}", "\u2708\uFE0F", "\u{1F3B5}", "\u{1F3AE}", "\u{1F52C}", "\u{1F4D0}", "\u{1F9EA}", "\u{1F4BB}",
+  "\u{1F355}", "\u2615", "\u{1F377}", "\u{1F382}", "\u{1F32E}", "\u{1F366}", "\u{1F950}", "\u{1F369}",
 ];
 
 const EmojiPicker: React.FC<{
@@ -99,32 +99,30 @@ const EmojiPicker: React.FC<{
   onChange: (emoji: string | null) => void;
 }> = ({ value, onChange }) => {
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/60">
+        <label className="text-xs font-medium text-muted-foreground">
           Icon
         </label>
         {value && (
           <button
             onClick={() => onChange(null)}
-            className="text-[11px] text-muted-foreground/40 hover:text-foreground transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Remove
           </button>
         )}
       </div>
-      <div className="grid grid-cols-8 gap-1.5">
+      <div className="grid grid-cols-8 gap-1">
         {EMOJI_OPTIONS.map((emoji) => (
           <button
             key={emoji}
             onClick={() => onChange(emoji)}
             className={cn(
-              "flex items-center justify-center size-9 rounded-xl text-lg transition-all duration-150",
-              "hover:bg-primary/10 hover:scale-110",
-              "active:scale-95",
+              "flex items-center justify-center size-8 rounded-md text-base transition-colors",
               value === emoji
-                ? "bg-primary/12 ring-2 ring-primary/25 shadow-sm shadow-primary/10"
-                : "bg-muted/20 hover:bg-muted/40",
+                ? "bg-primary/10 ring-1 ring-primary/30"
+                : "hover:bg-muted",
             )}
           >
             {emoji}
@@ -150,7 +148,7 @@ const MiniCover: React.FC<{
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-lg w-8 h-11 shrink-0 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]",
+        "relative overflow-hidden rounded w-7 h-10 shrink-0 bg-muted",
         className,
       )}
     >
@@ -177,64 +175,6 @@ const MiniCover: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
-// Cover stack
-// ---------------------------------------------------------------------------
-
-const CoverStack: React.FC<{
-  books: BookItem[];
-}> = ({ books }) => {
-  const display = books.slice(0, 4);
-
-  if (display.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-28 text-muted-foreground/15">
-        <FolderOpen className="size-10" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative h-28 flex items-end justify-center">
-      {display.map((book, i) => {
-        const hue = (book.id * 137) % 360;
-        const offset = (i - (display.length - 1) / 2) * 22;
-        const rotation = (i - (display.length - 1) / 2) * 5;
-        const zIndex = i;
-
-        return (
-          <div
-            key={book.id}
-            className="absolute w-14 h-[72px] rounded-lg overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.12)] ring-1 ring-white/15 dark:ring-white/8 transition-transform duration-300 group-hover:scale-105"
-            style={{
-              transform: `translateX(${offset}px) rotate(${rotation}deg)`,
-              zIndex,
-            }}
-          >
-            {book.coverPath ? (
-              <img
-                src={book.coverPath}
-                alt=""
-                loading="lazy"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center"
-                style={{
-                  background: `linear-gradient(135deg, oklch(0.35 0.08 ${hue}), oklch(0.25 0.05 ${(hue + 40) % 360}))`,
-                }}
-              >
-                <Book className="size-4 text-white/20" />
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
 // Create collection dialog
 // ---------------------------------------------------------------------------
 
@@ -243,7 +183,7 @@ const CreateCollectionDialog: React.FC<{
   onOpenChange: (open: boolean) => void;
 }> = ({ open, onOpenChange }) => {
   const [name, setName] = useState("");
-  const [icon, setIcon] = useState<string | null>("📚");
+  const [icon, setIcon] = useState<string | null>("\u{1F4DA}");
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
@@ -257,26 +197,24 @@ const CreateCollectionDialog: React.FC<{
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["collections"] });
       setName("");
-      setIcon("📚");
+      setIcon("\u{1F4DA}");
       onOpenChange(false);
     },
   });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md rounded-2xl border-border/30 shadow-2xl">
+      <DialogContent className="sm:max-w-md rounded-lg">
         <DialogHeader>
-          <DialogTitle className="text-lg tracking-tight">
-            Create collection
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground/60">
+          <DialogTitle>Create collection</DialogTitle>
+          <DialogDescription>
             Group related books together for easy access.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-3">
-          <div className="space-y-2">
-            <label className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/60">
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
               Name
             </label>
             <Input
@@ -289,7 +227,6 @@ const CreateCollectionDialog: React.FC<{
                 }
               }}
               autoFocus
-              className="rounded-xl bg-secondary/30 border-border/30 focus-visible:border-primary/30 focus-visible:ring-primary/10"
             />
           </div>
 
@@ -301,7 +238,6 @@ const CreateCollectionDialog: React.FC<{
             variant="outline"
             onClick={() => onOpenChange(false)}
             size="sm"
-            className="rounded-lg"
           >
             Cancel
           </Button>
@@ -309,7 +245,7 @@ const CreateCollectionDialog: React.FC<{
             onClick={() => createMutation.mutate()}
             disabled={!name.trim() || createMutation.isPending}
             size="sm"
-            className="rounded-lg gap-1.5 shadow-sm shadow-primary/15"
+            className="gap-1.5"
           >
             {createMutation.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -360,19 +296,17 @@ const EditCollectionDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md rounded-2xl border-border/30 shadow-2xl">
+      <DialogContent className="sm:max-w-md rounded-lg">
         <DialogHeader>
-          <DialogTitle className="text-lg tracking-tight">
-            Edit collection
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground/60">
+          <DialogTitle>Edit collection</DialogTitle>
+          <DialogDescription>
             Update the name or icon for this collection.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-3">
-          <div className="space-y-2">
-            <label className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/60">
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
               Name
             </label>
             <Input
@@ -384,7 +318,6 @@ const EditCollectionDialog: React.FC<{
                 }
               }}
               autoFocus
-              className="rounded-xl bg-secondary/30 border-border/30 focus-visible:border-primary/30 focus-visible:ring-primary/10"
             />
           </div>
 
@@ -396,7 +329,6 @@ const EditCollectionDialog: React.FC<{
             variant="outline"
             onClick={() => onOpenChange(false)}
             size="sm"
-            className="rounded-lg"
           >
             Cancel
           </Button>
@@ -404,7 +336,7 @@ const EditCollectionDialog: React.FC<{
             onClick={() => updateMutation.mutate()}
             disabled={!name.trim() || updateMutation.isPending}
             size="sm"
-            className="rounded-lg gap-1.5 shadow-sm shadow-primary/15"
+            className="gap-1.5"
           >
             {updateMutation.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -475,27 +407,27 @@ const AddBooksDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col rounded-2xl border-border/30 shadow-2xl">
+      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col rounded-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2.5 text-lg tracking-tight">
+          <DialogTitle className="flex items-center gap-2">
             {collection.icon && (
-              <span className="text-xl">{collection.icon}</span>
+              <span className="text-lg">{collection.icon}</span>
             )}
             Add books to {collection.name}
           </DialogTitle>
-          <DialogDescription className="text-muted-foreground/60">
+          <DialogDescription>
             Search your library and click to add books.
           </DialogDescription>
         </DialogHeader>
 
         {/* Search */}
-        <div className="relative group/search">
-          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/35 transition-colors group-focus-within/search:text-primary/60" />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />
           <Input
             placeholder="Search your library..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-10 rounded-xl bg-secondary/30 border-border/30 focus-visible:border-primary/25 focus-visible:ring-primary/10"
+            className="pl-9"
             autoFocus
           />
         </div>
@@ -503,7 +435,7 @@ const AddBooksDialog: React.FC<{
         {/* Book list */}
         <div className="flex-1 overflow-y-auto -mx-6 px-6 min-h-0 max-h-[400px]">
           {booksQuery.isLoading && (
-            <div className="flex items-center justify-center py-12 text-sm text-muted-foreground/50">
+            <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin mr-2" />
               Loading...
             </div>
@@ -511,10 +443,8 @@ const AddBooksDialog: React.FC<{
 
           {!booksQuery.isLoading && availableBooks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-14">
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-muted/30 mb-3">
-                <Book className="size-5 text-muted-foreground/20" />
-              </div>
-              <p className="text-sm text-muted-foreground/50">
+              <Book className="size-5 text-muted-foreground/30 mb-2" />
+              <p className="text-sm text-muted-foreground">
                 {search
                   ? "No matching books found."
                   : "All books are already in this collection."}
@@ -522,34 +452,31 @@ const AddBooksDialog: React.FC<{
             </div>
           )}
 
-          <div className="space-y-0.5 py-2">
+          <div className="py-1">
             {availableBooks.map((book) => (
               <button
                 key={book.id}
                 onClick={() => addMutation.mutate(book.id)}
                 disabled={addMutation.isPending}
                 className={cn(
-                  "w-full flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-left",
-                  "transition-all duration-150",
-                  "hover:bg-primary/[0.05] active:scale-[0.99]",
-                  "group",
+                  "w-full flex items-center gap-3 px-2 py-2 rounded-md text-left",
+                  "transition-colors duration-150",
+                  "hover:bg-muted",
                 )}
               >
                 <MiniCover book={book} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate group-hover:text-primary transition-colors duration-150">
+                  <p className="text-sm font-medium truncate">
                     {book.title}
                   </p>
-                  <p className="text-xs text-muted-foreground/50 truncate">
+                  <p className="text-xs text-muted-foreground truncate">
                     {book.author ?? "Unknown author"}
                   </p>
                 </div>
-                <span className="text-[10px] text-muted-foreground/30 bg-muted/20 px-1.5 py-0.5 rounded font-medium uppercase tracking-wider shrink-0">
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium uppercase tracking-wider shrink-0">
                   {book.fileExt}
                 </span>
-                <div className="flex size-6 items-center justify-center rounded-lg bg-primary/8 text-primary/50 group-hover:bg-primary/15 group-hover:text-primary transition-all duration-150 shrink-0">
-                  <Plus className="size-3.5" />
-                </div>
+                <Plus className="size-4 text-muted-foreground shrink-0" />
               </button>
             ))}
           </div>
@@ -600,34 +527,24 @@ const CollectionExpanded: React.FC<{
   );
 
   return (
-    <div
-      className={cn(
-        "col-span-full rounded-2xl border border-border/40 bg-card/60 backdrop-blur-sm",
-        "overflow-hidden animate-scale-in",
-        "shadow-lg shadow-primary/[0.03]",
-      )}
-    >
+    <div className="border border-border rounded-md bg-card overflow-hidden animate-scale-in">
       {/* Header */}
-      <div className="flex items-center gap-3.5 px-5 py-4 border-b border-border/30">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
-          {collection.icon ? (
-            <span className="text-xl">{collection.icon}</span>
-          ) : (
-            <FolderOpen className="size-4.5 text-primary" />
-          )}
-        </div>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30">
+        <span className="text-lg shrink-0">
+          {collection.icon ?? ""}
+        </span>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm tracking-tight">
+          <h3 className="font-medium text-sm">
             {collection.name}
           </h3>
-          <p className="text-[11px] text-muted-foreground/50">
+          <p className="text-xs text-muted-foreground">
             {books.length} book{books.length !== 1 ? "s" : ""}
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 text-xs rounded-lg border-primary/20 text-primary hover:bg-primary/[0.06]"
+          className="gap-1.5 text-xs"
           onClick={() => setAddDialogOpen(true)}
         >
           <Plus className="size-3.5" />
@@ -636,7 +553,7 @@ const CollectionExpanded: React.FC<{
         <Button
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0 rounded-lg text-muted-foreground/40 hover:text-foreground"
+          className="size-7 shrink-0 text-muted-foreground"
           onClick={onClose}
         >
           <X className="size-4" />
@@ -644,9 +561,9 @@ const CollectionExpanded: React.FC<{
       </div>
 
       {/* Books list */}
-      <div className="p-3 max-h-[400px] overflow-y-auto">
+      <div className="max-h-[400px] overflow-y-auto">
         {booksQuery.isLoading && (
-          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground/40">
+          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin mr-2" />
             Loading...
           </div>
@@ -654,17 +571,15 @@ const CollectionExpanded: React.FC<{
 
         {!booksQuery.isLoading && books.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-muted/30 mb-3">
-              <BookOpen className="size-6 text-muted-foreground/20" />
-            </div>
-            <p className="text-sm text-muted-foreground/50 mb-4">
+            <BookOpen className="size-5 text-muted-foreground/30 mb-2" />
+            <p className="text-sm text-muted-foreground mb-3">
               This collection is empty.
             </p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setAddDialogOpen(true)}
-              className="gap-1.5 text-xs rounded-lg border-primary/20 text-primary hover:bg-primary/[0.06]"
+              className="gap-1.5 text-xs"
             >
               <Plus className="size-3.5" />
               Add your first book
@@ -673,25 +588,18 @@ const CollectionExpanded: React.FC<{
         )}
 
         {books.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
-            {books.map((book, i) => (
+          <div className="divide-y divide-border/50">
+            {books.map((book) => (
               <div
                 key={book.id}
-                className={cn(
-                  "group flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl",
-                  "hover:bg-muted/30 transition-colors duration-150",
-                )}
-                style={{
-                  animationDelay: `${i * 30}ms`,
-                  animationFillMode: "backwards",
-                }}
+                className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors duration-150"
               >
                 <MiniCover book={book} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
                     {book.title}
                   </p>
-                  <p className="text-xs text-muted-foreground/50 truncate">
+                  <p className="text-xs text-muted-foreground truncate">
                     {book.author ?? "Unknown author"}
                   </p>
                 </div>
@@ -699,9 +607,9 @@ const CollectionExpanded: React.FC<{
                   onClick={() => removeMutation.mutate(book.id)}
                   disabled={removeMutation.isPending}
                   className={cn(
-                    "opacity-0 group-hover:opacity-100 transition-all duration-150",
-                    "flex size-7 items-center justify-center rounded-lg",
-                    "text-muted-foreground/40 hover:text-destructive hover:bg-destructive/8",
+                    "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+                    "flex size-6 items-center justify-center rounded-md",
+                    "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
                   )}
                   title="Remove from collection"
                 >
@@ -724,19 +632,17 @@ const CollectionExpanded: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
-// Collection card
+// Collection row
 // ---------------------------------------------------------------------------
 
-const CollectionCard: React.FC<{
+const CollectionRow: React.FC<{
   collection: CollectionItem;
-  coverBooks: BookItem[];
   isExpanded: boolean;
   onToggleExpand: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }> = ({
   collection,
-  coverBooks,
   isExpanded,
   onToggleExpand,
   onEdit,
@@ -745,91 +651,67 @@ const CollectionCard: React.FC<{
   return (
     <div
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl cursor-pointer",
-        "bg-card/80 backdrop-blur-sm",
-        "transition-all duration-300",
+        "group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-150",
         isExpanded
-          ? "border border-primary/25 shadow-lg shadow-primary/[0.06] ring-1 ring-primary/10"
-          : "border border-border/40 shadow-sm hover:shadow-md hover:shadow-primary/[0.04] hover:-translate-y-0.5 hover:border-border/60",
+          ? "bg-muted/50"
+          : "hover:bg-muted/30",
       )}
       onClick={onToggleExpand}
     >
-      {/* Cover thumbnails area */}
-      <div className="relative px-5 pt-5 pb-2">
-        <CoverStack books={coverBooks} />
+      {/* Icon */}
+      <span className="text-lg w-7 text-center shrink-0">
+        {collection.icon ?? <FolderOpen className="size-4 text-muted-foreground mx-auto" />}
+      </span>
 
-        {/* Actions dropdown */}
-        <div
-          className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="secondary"
-                size="icon"
-                className="size-7 bg-card/90 backdrop-blur-md border border-border/40 shadow-sm rounded-lg hover:bg-card"
-              >
-                <MoreHorizontal className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40 rounded-xl">
-              <DropdownMenuItem onClick={onEdit} className="gap-2 rounded-lg">
-                <Pencil className="size-3.5" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={onDelete}
-                className="text-destructive focus:text-destructive gap-2 rounded-lg"
-              >
-                <Trash2 className="size-3.5" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      {/* Name */}
+      <span className="flex-1 min-w-0 text-sm font-medium truncate">
+        {collection.name}
+      </span>
+
+      {/* Book count */}
+      <Badge variant="secondary" className="rounded-full text-xs font-normal tabular-nums">
+        {collection.book_count}
+      </Badge>
+
+      {/* Expand chevron */}
+      <div className="text-muted-foreground">
+        {isExpanded ? (
+          <ChevronUp className="size-4" />
+        ) : (
+          <ChevronDown className="size-4" />
+        )}
       </div>
 
-      {/* Info */}
-      <div className="flex items-center gap-3 px-5 pb-5 pt-2">
-        <div
-          className={cn(
-            "flex size-9 items-center justify-center rounded-xl shrink-0 transition-all duration-200",
-            isExpanded
-              ? "bg-primary/12 shadow-sm shadow-primary/10"
-              : "bg-secondary/60 group-hover:bg-secondary",
-          )}
-        >
-          {collection.icon ? (
-            <span className="text-lg">{collection.icon}</span>
-          ) : (
-            <FolderOpen className="size-4 text-muted-foreground" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate tracking-tight">
-            {collection.name}
-          </p>
-          <p className="text-[11px] text-muted-foreground/50">
-            {collection.book_count}{" "}
-            {collection.book_count === 1 ? "book" : "books"}
-          </p>
-        </div>
-        <div
-          className={cn(
-            "flex size-6 items-center justify-center rounded-lg transition-all duration-200",
-            isExpanded
-              ? "text-primary bg-primary/10"
-              : "text-muted-foreground/30 group-hover:text-muted-foreground/60",
-          )}
-        >
-          {isExpanded ? (
-            <ChevronUp className="size-4" />
-          ) : (
-            <ChevronDown className="size-4" />
-          )}
-        </div>
+      {/* Actions dropdown */}
+      <div
+        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+            >
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36 rounded-md">
+            <DropdownMenuItem onClick={onEdit} className="gap-2">
+              <Pencil className="size-3.5" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive gap-2"
+            >
+              <Trash2 className="size-3.5" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -887,29 +769,20 @@ export const CollectionsPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Page header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Collections</h1>
-          <p className="mt-2 text-sm text-muted-foreground/60">
-            {collections.length > 0 ? (
-              <>
-                <span className="tabular-nums font-semibold text-foreground/70">
-                  {collections.length}
-                </span>{" "}
-                collection{collections.length !== 1 ? "s" : ""}
-              </>
-            ) : (
-              "Organize your books into collections"
-            )}
+          <h1 className="text-3xl font-semibold tracking-tight">Collections</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Organize your books into groups.
           </p>
         </div>
 
         <Button
           onClick={() => setCreateOpen(true)}
           size="sm"
-          className="gap-1.5 self-start sm:self-auto rounded-xl shadow-sm shadow-primary/15"
+          className="gap-1.5 self-start sm:self-auto"
         >
           <Plus className="size-3.5" />
           New collection
@@ -918,17 +791,20 @@ export const CollectionsPage: React.FC = () => {
 
       {/* Loading */}
       {collectionsQuery.isLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="border border-border rounded-md bg-card overflow-hidden">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-2xl bg-card border border-border/20 overflow-hidden"
+              className={cn(
+                "flex items-center gap-3 px-4 py-3",
+                i < 3 && "border-b border-border",
+              )}
             >
-              <div className="h-32 bg-muted/20 animate-pulse" />
-              <div className="p-5 space-y-2.5">
-                <div className="h-4 bg-muted/30 rounded-full animate-pulse w-2/3" />
-                <div className="h-3 bg-muted/20 rounded-full animate-pulse w-1/3" />
+              <div className="size-7 rounded bg-muted animate-pulse" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 bg-muted rounded animate-pulse w-1/3" />
               </div>
+              <div className="h-5 w-8 bg-muted rounded-full animate-pulse" />
             </div>
           ))}
         </div>
@@ -936,17 +812,12 @@ export const CollectionsPage: React.FC = () => {
 
       {/* Empty state */}
       {!collectionsQuery.isLoading && collections.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 animate-fade-up">
-          <div className="relative mb-6">
-            <div className="absolute -left-2 -top-1 w-16 h-16 rounded-2xl bg-primary/6 rotate-[-6deg]" />
-            <div className="relative flex size-20 items-center justify-center rounded-2xl bg-primary/10">
-              <FolderPlus className="size-9 text-primary/35" />
-            </div>
-          </div>
-          <h3 className="text-xl font-semibold tracking-tight">
+        <div className="flex flex-col items-center justify-center py-20">
+          <FolderPlus className="size-8 text-muted-foreground/30 mb-3" />
+          <h3 className="text-lg font-medium">
             No collections yet
           </h3>
-          <p className="mt-2 text-sm text-muted-foreground/50 max-w-sm text-center leading-relaxed">
+          <p className="mt-1 text-sm text-muted-foreground max-w-sm text-center">
             Create your first collection to start organizing your books into
             groups. Use collections for genres, reading lists, or any grouping
             you like.
@@ -954,7 +825,7 @@ export const CollectionsPage: React.FC = () => {
           <Button
             onClick={() => setCreateOpen(true)}
             size="sm"
-            className="mt-6 gap-1.5 rounded-xl shadow-sm shadow-primary/15"
+            className="mt-5 gap-1.5"
           >
             <Plus className="size-3.5" />
             Create collection
@@ -962,41 +833,34 @@ export const CollectionsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Collections grid */}
+      {/* Collections list */}
       {!collectionsQuery.isLoading && collections.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {collections.map((collection, i) => (
+        <div className="border border-border rounded-md bg-card overflow-hidden divide-y divide-border">
+          {collections.map((collection) => (
             <React.Fragment key={collection.id}>
-              <div
-                className="animate-fade-up"
-                style={{
-                  animationDelay: `${i * 50}ms`,
-                  animationFillMode: "backwards",
+              <CollectionRow
+                collection={collection}
+                isExpanded={expandedId === collection.id}
+                onToggleExpand={() => handleToggleExpand(collection.id)}
+                onEdit={() => setEditingCollection(collection)}
+                onDelete={() => {
+                  if (
+                    window.confirm(
+                      `Delete "${collection.name}"? Books won't be removed from your library.`,
+                    )
+                  ) {
+                    deleteMutation.mutate(collection.id);
+                  }
                 }}
-              >
-                <CollectionCard
-                  collection={collection}
-                  coverBooks={getPreviewBooks(collection.id)}
-                  isExpanded={expandedId === collection.id}
-                  onToggleExpand={() => handleToggleExpand(collection.id)}
-                  onEdit={() => setEditingCollection(collection)}
-                  onDelete={() => {
-                    if (
-                      window.confirm(
-                        `Delete "${collection.name}"? Books won't be removed from your library.`,
-                      )
-                    ) {
-                      deleteMutation.mutate(collection.id);
-                    }
-                  }}
-                />
-              </div>
+              />
 
               {expandedId === collection.id && (
-                <CollectionExpanded
-                  collection={collection}
-                  onClose={() => setExpandedId(null)}
-                />
+                <div className="border-t border-border">
+                  <CollectionExpanded
+                    collection={collection}
+                    onClose={() => setExpandedId(null)}
+                  />
+                </div>
               )}
             </React.Fragment>
           ))}

@@ -147,56 +147,6 @@ const providerMeta: Record<
 };
 
 // ---------------------------------------------------------------------------
-// Reusable sub-components
-// ---------------------------------------------------------------------------
-
-/** Section heading with icon block, matching the ProfilePage pattern */
-function SectionHeader({
-  icon,
-  title,
-  description,
-  badge,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description?: string;
-  badge?: React.ReactNode;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-start gap-3 min-w-0">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted/25 ring-1 ring-border/[0.06]">
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold tracking-tight">{title}</h2>
-            {badge}
-          </div>
-          {description && (
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground/60">
-              {description}
-            </p>
-          )}
-        </div>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-/** Small uppercase label used for field groups */
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
-      {children}
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -295,63 +245,53 @@ export const AdminUsersPage: React.FC = () => {
             ================================================================ */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Administration</h1>
-          <p className="mt-2 text-[13px] text-muted-foreground/70 leading-relaxed">
-            Manage users, metadata providers, and system configuration
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Manage users, metadata providers, and system configuration.
           </p>
         </div>
 
         {/* ================================================================
             USERS SECTION
             ================================================================ */}
-        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden">
-          {/* Gradient banner like ProfilePage */}
-          <div className="h-[2px] bg-gradient-to-r from-primary/50 via-primary/15 to-transparent" />
-
-          <CardHeader className="pb-5 pt-6 px-6">
-            <SectionHeader
-              icon={<Users className="size-4 text-muted-foreground" />}
-              title="Users"
-              description="Manage who has access to your BookLite instance"
-              badge={
-                users.data ? (
-                  <Badge variant="secondary" className="text-[10px] tabular-nums">
+        <Card className="rounded-lg border-border overflow-hidden">
+          <CardHeader className="pb-4 pt-5 px-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-lg font-semibold tracking-tight">Users</h2>
+                {users.data && (
+                  <Badge variant="secondary" className="text-[11px] tabular-nums">
                     {users.data.length}
                   </Badge>
-                ) : undefined
-              }
-              action={
-                <Button
-                  onClick={() => setShowCreateForm(!showCreateForm)}
-                  size="sm"
-                  variant={showCreateForm ? "secondary" : "default"}
-                  className="shrink-0 shadow-sm shadow-primary/10 active:scale-[0.97] transition-all duration-200"
-                >
-                  {showCreateForm ? (
-                    <>
-                      <ChevronUp className="size-4" />
-                      Cancel
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="size-4" />
-                      Create User
-                    </>
-                  )}
-                </Button>
-              }
-            />
+                )}
+              </div>
+              <Button
+                onClick={() => setShowCreateForm(!showCreateForm)}
+                size="sm"
+                variant={showCreateForm ? "secondary" : "default"}
+              >
+                {showCreateForm ? (
+                  <>
+                    <ChevronUp className="size-4" />
+                    Cancel
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="size-4" />
+                    Create User
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Manage who has access to your BookLite instance.
+            </p>
           </CardHeader>
 
           <CardContent className="space-y-5 px-6 pb-6">
             {/* Create user form (collapsible) */}
             {showCreateForm && (
-              <div className="animate-scale-in rounded-xl border border-primary/12 bg-gradient-to-br from-primary/[0.04] via-primary/[0.015] to-transparent p-6">
-                <div className="mb-5 flex items-center gap-2.5">
-                  <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
-                    <UserPlus className="size-3.5 text-primary" />
-                  </div>
-                  <span className="text-sm font-semibold tracking-tight">New User</span>
-                </div>
+              <div className="rounded-md border border-border bg-muted/30 p-5">
+                <p className="text-sm font-semibold mb-4">New User</p>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -360,7 +300,7 @@ export const AdminUsersPage: React.FC = () => {
                   className="grid grid-cols-1 gap-4 sm:grid-cols-2"
                 >
                   <div className="space-y-1.5">
-                    <FieldLabel>Email</FieldLabel>
+                    <Label className="text-xs text-muted-foreground">Email</Label>
                     <Input
                       type="email"
                       placeholder="user@example.com"
@@ -370,7 +310,7 @@ export const AdminUsersPage: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <FieldLabel>Username</FieldLabel>
+                    <Label className="text-xs text-muted-foreground">Username</Label>
                     <Input
                       type="text"
                       placeholder="username"
@@ -380,7 +320,7 @@ export const AdminUsersPage: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <FieldLabel>Password</FieldLabel>
+                    <Label className="text-xs text-muted-foreground">Password</Label>
                     <Input
                       type="password"
                       placeholder="Strong password"
@@ -390,7 +330,7 @@ export const AdminUsersPage: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <FieldLabel>Role</FieldLabel>
+                    <Label className="text-xs text-muted-foreground">Role</Label>
                     <Select
                       value={role}
                       onValueChange={(v) => setRole(v as "OWNER" | "MEMBER")}
@@ -405,11 +345,7 @@ export const AdminUsersPage: React.FC = () => {
                     </Select>
                   </div>
                   <div className="sm:col-span-2 flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={createUser.isPending}
-                      className="shadow-sm shadow-primary/10 active:scale-[0.97] transition-all duration-200"
-                    >
+                    <Button type="submit" disabled={createUser.isPending}>
                       {createUser.isPending ? (
                         <>
                           <Loader2 className="size-4 animate-spin" />
@@ -430,56 +366,49 @@ export const AdminUsersPage: React.FC = () => {
             {/* Users table */}
             {users.isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="size-5 text-primary animate-spin" />
+                <Loader2 className="size-5 text-muted-foreground animate-spin" />
               </div>
             ) : (users.data ?? []).length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted/50 mb-3">
-                  <Users className="size-5 text-muted-foreground/50" />
-                </div>
+                <Users className="size-8 text-muted-foreground/30 mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">No users yet</p>
                 <p className="text-xs text-muted-foreground/60 mt-1">
-                  Create your first user to get started
+                  Create your first user to get started.
                 </p>
               </div>
             ) : (
-              <div className="rounded-xl border border-border/30 overflow-hidden">
+              <div className="rounded-md border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/15 hover:bg-muted/15 border-border/15">
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead className="text-xs font-medium text-muted-foreground">
                         User
                       </TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
+                      <TableHead className="text-xs font-medium text-muted-foreground">
                         Role
                       </TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
+                      <TableHead className="text-xs font-medium text-muted-foreground">
                         Status
                       </TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50 text-right">
+                      <TableHead className="text-xs font-medium text-muted-foreground text-right">
                         Actions
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(users.data ?? []).map((user, i) => (
+                    {(users.data ?? []).map((user) => (
                       <TableRow
                         key={user.id}
-                        className="group transition-colors duration-150 border-border/12 hover:bg-muted/8"
-                        style={{
-                          animationDelay: `${i * 40}ms`,
-                          animation: "fade-up 0.3s ease-out both",
-                        }}
+                        className="hover:bg-muted/20"
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {/* Avatar circle with initials */}
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/12 to-primary/6 text-[11px] font-bold text-primary uppercase ring-1 ring-primary/8">
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold uppercase text-muted-foreground">
                               {user.username.slice(0, 2)}
                             </div>
                             <div>
                               <p className="font-medium text-sm">{user.username}</p>
-                              <p className="text-[11px] text-muted-foreground/50">{user.email}</p>
+                              <p className="text-xs text-muted-foreground">{user.email}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -490,9 +419,9 @@ export const AdminUsersPage: React.FC = () => {
                               patchUser.mutate({ id: user.id, payload: { role: v } })
                             }
                           >
-                            <SelectTrigger className="h-7 w-[6.5rem] text-xs rounded-lg">
+                            <SelectTrigger className="h-7 w-[6.5rem] text-xs">
                               <div className="flex items-center gap-1.5">
-                                <Shield className="size-3 text-muted-foreground/50" />
+                                <Shield className="size-3 text-muted-foreground" />
                                 <SelectValue />
                               </div>
                             </SelectTrigger>
@@ -504,20 +433,20 @@ export const AdminUsersPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           {user.disabledAt ? (
-                            <span className="inline-flex items-center rounded-full bg-destructive/8 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                            <Badge variant="destructive" className="text-[11px]">
                               Disabled
-                            </span>
+                            </Badge>
                           ) : (
-                            <span className="inline-flex items-center rounded-full bg-status-completed/8 px-2 py-0.5 text-[10px] font-semibold text-status-completed">
+                            <Badge variant="secondary" className="text-[11px] bg-status-completed/10 text-status-completed">
                               Active
-                            </span>
+                            </Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant={user.disabledAt ? "outline" : "secondary"}
                             size="sm"
-                            className="h-7 text-xs active:scale-[0.97] transition-all duration-200"
+                            className="h-7 text-xs"
                             onClick={() =>
                               patchUser.mutate({
                                 id: user.id,
@@ -540,108 +469,71 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             METADATA PROVIDERS SECTION
             ================================================================ */}
-        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden">
-          <div className="h-[2px] bg-gradient-to-r from-status-processing/40 via-status-processing/12 to-transparent" />
-
-          <CardHeader className="pb-4 pt-6 px-6">
-            <SectionHeader
-              icon={<Library className="size-4 text-muted-foreground/70" />}
-              title="Metadata Providers"
-              description="BookLite fetches book data from multiple sources and intelligently merges the best result for each field. Enable the providers you want to use."
-              badge={
-                settings.data ? (
-                  <Badge variant="info" className="text-[10px] tabular-nums">
-                    {enabledCount} active
-                  </Badge>
-                ) : undefined
-              }
-            />
+        <Card className="rounded-lg border-border overflow-hidden">
+          <CardHeader className="pb-4 pt-5 px-6">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-lg font-semibold tracking-tight">Metadata Providers</h2>
+              {settings.data && (
+                <Badge variant="secondary" className="text-[11px] tabular-nums">
+                  {enabledCount} active
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              BookLite fetches book data from multiple sources and merges the best result for each field.
+            </p>
           </CardHeader>
 
           <CardContent className="px-6 pb-6">
             {settings.isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="size-5 text-primary animate-spin" />
+                <Loader2 className="size-5 text-muted-foreground animate-spin" />
               </div>
             ) : settings.data ? (
-              <div className="space-y-2">
+              <div className="divide-y divide-border">
                 {(Object.keys(providerMeta) as EnabledMetadataProvider[]).map(
-                  (key, i) => {
+                  (key) => {
                     const meta = providerMeta[key];
                     const enabled = settings.data.metadataProviderEnabled[key];
                     const hasSettings = providerHasSettings(key);
-                    const isExpanded = expandedProviders.has(key);
 
                     return (
-                      <div
-                        key={key}
-                        className={`
-                          rounded-xl border transition-all duration-200
-                          ${enabled
-                            ? "border-border/40 bg-card hover:border-border/60"
-                            : "border-border/20 bg-muted/10"
-                          }
-                        `}
-                        style={{
-                          animationDelay: `${i * 50}ms`,
-                          animation: "fade-up 0.35s ease-out both",
-                        }}
-                      >
+                      <div key={key}>
                         {/* Provider row */}
-                        <div className="flex items-center gap-3 px-4 py-3.5">
-                          {/* Icon */}
-                          <div
-                            className={`
-                              flex size-9 shrink-0 items-center justify-center rounded-xl
-                              transition-all duration-200
-                              ${enabled ? "bg-primary/6" : "bg-muted/40"}
-                            `}
-                          >
-                            <span className={enabled ? meta.color : "text-muted-foreground/40"}>
-                              {meta.icon}
-                            </span>
-                          </div>
-
-                          {/* Text */}
+                        <div className="flex items-center gap-3 py-3.5">
+                          <span className={enabled ? meta.color : "text-muted-foreground/40"}>
+                            {meta.icon}
+                          </span>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`text-sm font-medium transition-colors duration-200 ${
-                                  enabled ? "text-foreground" : "text-muted-foreground"
-                                }`}
-                              >
-                                {meta.label}
-                              </span>
-                            </div>
-                            <p className="text-[11px] leading-relaxed text-muted-foreground/50 hidden sm:block">
+                            <span
+                              className={`text-sm font-medium ${
+                                enabled ? "text-foreground" : "text-muted-foreground"
+                              }`}
+                            >
+                              {meta.label}
+                            </span>
+                            <p className="text-xs text-muted-foreground hidden sm:block">
                               {meta.description}
                             </p>
                           </div>
 
-                          {/* Expand button (only if has settings) */}
+                          {/* Settings toggle (only if has settings and enabled) */}
                           {hasSettings && enabled && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                                  onClick={() => toggleProviderExpanded(key)}
-                                >
-                                  {isExpanded ? (
-                                    <ChevronUp className="size-3.5" />
-                                  ) : (
-                                    <ChevronDown className="size-3.5" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {isExpanded ? "Hide settings" : "Configure"}
-                              </TooltipContent>
-                            </Tooltip>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-muted-foreground"
+                              onClick={() => toggleProviderExpanded(key)}
+                            >
+                              Settings
+                              {expandedProviders.has(key) ? (
+                                <ChevronUp className="size-3 ml-1" />
+                              ) : (
+                                <ChevronDown className="size-3 ml-1" />
+                              )}
+                            </Button>
                           )}
 
-                          {/* Toggle */}
                           <Switch
                             checked={enabled}
                             onCheckedChange={(checked) =>
@@ -650,16 +542,13 @@ export const AdminUsersPage: React.FC = () => {
                           />
                         </div>
 
-                        {/* Expandable settings per provider */}
-                        {hasSettings && enabled && isExpanded && (
-                          <div className="animate-scale-in border-t border-border/15 bg-muted/8 px-4 py-4 rounded-b-xl">
+                        {/* Inline settings per provider */}
+                        {hasSettings && enabled && expandedProviders.has(key) && (
+                          <div className="pb-4 pl-7">
                             {key === "amazon" && (
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-md border border-border bg-muted/20 p-4">
                                 <div className="space-y-1.5">
-                                  <div className="flex items-center gap-1.5">
-                                    <MapPin className="size-3 text-muted-foreground" />
-                                    <FieldLabel>Region</FieldLabel>
-                                  </div>
+                                  <Label className="text-xs text-muted-foreground">Region</Label>
                                   <Select
                                     value={settings.data.metadataAmazonDomain}
                                     onValueChange={(v) =>
@@ -682,15 +571,14 @@ export const AdminUsersPage: React.FC = () => {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  <p className="text-[11px] text-muted-foreground/60">
-                                    Choose the Amazon store closest to your region
+                                  <p className="text-xs text-muted-foreground">
+                                    Choose the Amazon store closest to your region.
                                   </p>
                                 </div>
                                 <div className="space-y-1.5">
                                   <div className="flex items-center gap-1.5">
-                                    <Cookie className="size-3 text-muted-foreground" />
-                                    <FieldLabel>Session Cookie</FieldLabel>
-                                    <Badge variant="secondary" className="text-[9px] py-0 px-1">
+                                    <Label className="text-xs text-muted-foreground">Session Cookie</Label>
+                                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
                                       Optional
                                     </Badge>
                                   </div>
@@ -704,20 +592,19 @@ export const AdminUsersPage: React.FC = () => {
                                       })
                                     }
                                   />
-                                  <p className="text-[11px] text-muted-foreground/60">
-                                    Helps avoid rate limiting and CAPTCHAs
+                                  <p className="text-xs text-muted-foreground">
+                                    Helps avoid rate limiting and CAPTCHAs.
                                   </p>
                                 </div>
                               </div>
                             )}
 
                             {key === "google" && (
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-md border border-border bg-muted/20 p-4">
                                 <div className="space-y-1.5">
                                   <div className="flex items-center gap-1.5">
-                                    <Languages className="size-3 text-muted-foreground" />
-                                    <FieldLabel>Preferred Language</FieldLabel>
-                                    <Badge variant="secondary" className="text-[9px] py-0 px-1">
+                                    <Label className="text-xs text-muted-foreground">Preferred Language</Label>
+                                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
                                       Optional
                                     </Badge>
                                   </div>
@@ -731,15 +618,14 @@ export const AdminUsersPage: React.FC = () => {
                                       })
                                     }
                                   />
-                                  <p className="text-[11px] text-muted-foreground/60">
-                                    ISO 639-1 language code for result preference
+                                  <p className="text-xs text-muted-foreground">
+                                    ISO 639-1 language code for result preference.
                                   </p>
                                 </div>
                                 <div className="space-y-1.5">
                                   <div className="flex items-center gap-1.5">
-                                    <Key className="size-3 text-muted-foreground" />
-                                    <FieldLabel>API Key</FieldLabel>
-                                    <Badge variant="secondary" className="text-[9px] py-0 px-1">
+                                    <Label className="text-xs text-muted-foreground">API Key</Label>
+                                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
                                       Optional
                                     </Badge>
                                   </div>
@@ -753,35 +639,36 @@ export const AdminUsersPage: React.FC = () => {
                                       })
                                     }
                                   />
-                                  <p className="text-[11px] text-muted-foreground/60">
-                                    Increases rate limits for Google Books API
+                                  <p className="text-xs text-muted-foreground">
+                                    Increases rate limits for Google Books API.
                                   </p>
                                 </div>
                               </div>
                             )}
 
                             {key === "hardcover" && (
-                              <div className="max-w-sm space-y-1.5">
-                                <div className="flex items-center gap-1.5">
-                                  <Key className="size-3 text-muted-foreground" />
-                                  <FieldLabel>API Token</FieldLabel>
-                                  <Badge variant="secondary" className="text-[9px] py-0 px-1">
-                                    Optional
-                                  </Badge>
+                              <div className="max-w-sm rounded-md border border-border bg-muted/20 p-4">
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <Label className="text-xs text-muted-foreground">API Token</Label>
+                                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                                      Optional
+                                    </Badge>
+                                  </div>
+                                  <Input
+                                    type="password"
+                                    defaultValue={settings.data.metadataHardcoverApiKey}
+                                    placeholder="Hardcover API token"
+                                    onBlur={(e) =>
+                                      patchSettings.mutate({
+                                        metadataHardcoverApiKey: e.target.value,
+                                      })
+                                    }
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    Get your token from hardcover.app/account/api
+                                  </p>
                                 </div>
-                                <Input
-                                  type="password"
-                                  defaultValue={settings.data.metadataHardcoverApiKey}
-                                  placeholder="Hardcover API token"
-                                  onBlur={(e) =>
-                                    patchSettings.mutate({
-                                      metadataHardcoverApiKey: e.target.value,
-                                    })
-                                  }
-                                />
-                                <p className="text-[11px] text-muted-foreground/60">
-                                  Get your token from hardcover.app/account/api
-                                </p>
                               </div>
                             )}
                           </div>
@@ -798,70 +685,40 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             AI METADATA RESOLVER
             ================================================================ */}
-        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden relative">
-          {/* Refined multi-color accent line */}
-          <div className="h-[2px] bg-gradient-to-r from-purple-500/25 via-pink-500/15 to-amber-500/8" />
-
-          <CardHeader className="pb-4 pt-6 px-6">
-            <SectionHeader
-              icon={<Sparkles className="size-4 text-muted-foreground/70" />}
-              title="AI Metadata Resolver"
-              description="Uses a large language model via OpenRouter to intelligently merge results from all providers, correct mismatched metadata, and fill in missing series information."
-              badge={
-                settings.data?.metadataOpenrouterEnabled ? (
-                  <Badge variant="success" className="text-[10px]">
-                    Enabled
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="text-[10px]">
-                    Disabled
-                  </Badge>
-                )
-              }
-            />
+        <Card className="rounded-lg border-border overflow-hidden">
+          <CardHeader className="pb-4 pt-5 px-6">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-lg font-semibold tracking-tight">AI Metadata Resolver</h2>
+              {settings.data?.metadataOpenrouterEnabled ? (
+                <Badge variant="secondary" className="text-[11px] bg-status-completed/10 text-status-completed">
+                  Enabled
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[11px]">
+                  Disabled
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Uses a large language model via OpenRouter to merge results from all providers,
+              correct mismatched metadata, and fill in missing series information.
+            </p>
           </CardHeader>
 
           <CardContent className="px-6 pb-6">
             {settings.isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="size-5 text-primary animate-spin" />
+                <Loader2 className="size-5 text-muted-foreground animate-spin" />
               </div>
             ) : settings.data ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {/* Toggle row */}
-                <div
-                  className={`
-                    flex items-center justify-between gap-3 rounded-xl border px-4 py-3.5 transition-all duration-200
-                    ${settings.data.metadataOpenrouterEnabled
-                      ? "border-purple-500/15 bg-purple-500/[0.02]"
-                      : "border-border/30"
-                    }
-                  `}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`
-                        flex size-9 items-center justify-center rounded-xl transition-all duration-200
-                        ${settings.data.metadataOpenrouterEnabled
-                          ? "bg-purple-500/8"
-                          : "bg-muted/30"
-                        }
-                      `}
-                    >
-                      <Brain
-                        className={`size-4 transition-colors duration-200 ${
-                          settings.data.metadataOpenrouterEnabled
-                            ? "text-purple-600 dark:text-purple-400"
-                            : "text-muted-foreground/50"
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium">Enable AI resolver</span>
-                      <p className="text-[11px] text-muted-foreground/50">
-                        Requires an OpenRouter API key with credits
-                      </p>
-                    </div>
+                <div className="flex items-center justify-between gap-3 py-1">
+                  <div>
+                    <span className="text-sm font-medium">Enable AI resolver</span>
+                    <p className="text-xs text-muted-foreground">
+                      Requires an OpenRouter API key with credits.
+                    </p>
                   </div>
                   <Switch
                     checked={settings.data.metadataOpenrouterEnabled}
@@ -875,12 +732,9 @@ export const AdminUsersPage: React.FC = () => {
 
                 {/* Settings (only when enabled) */}
                 {settings.data.metadataOpenrouterEnabled && (
-                  <div className="animate-scale-in grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-border/20 bg-muted/8 p-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-md border border-border bg-muted/20 p-4">
                     <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Key className="size-3 text-muted-foreground" />
-                        <FieldLabel>API Key</FieldLabel>
-                      </div>
+                      <Label className="text-xs text-muted-foreground">API Key</Label>
                       <Input
                         type="password"
                         defaultValue={settings.data.metadataOpenrouterApiKey}
@@ -891,15 +745,12 @@ export const AdminUsersPage: React.FC = () => {
                           })
                         }
                       />
-                      <p className="text-[11px] text-muted-foreground/60">
+                      <p className="text-xs text-muted-foreground">
                         Get your key at openrouter.ai/keys
                       </p>
                     </div>
                     <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Brain className="size-3 text-muted-foreground" />
-                        <FieldLabel>Model</FieldLabel>
-                      </div>
+                      <Label className="text-xs text-muted-foreground">Model</Label>
                       <Input
                         type="text"
                         defaultValue={settings.data.metadataOpenrouterModel}
@@ -910,8 +761,8 @@ export const AdminUsersPage: React.FC = () => {
                           })
                         }
                       />
-                      <p className="text-[11px] text-muted-foreground/60">
-                        Any OpenRouter-compatible model identifier
+                      <p className="text-xs text-muted-foreground">
+                        Any OpenRouter-compatible model identifier.
                       </p>
                     </div>
                   </div>
@@ -924,36 +775,27 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             STORAGE & LIMITS
             ================================================================ */}
-        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden">
-          <div className="h-[2px] bg-gradient-to-r from-status-completed/30 via-status-completed/8 to-transparent" />
-
-          <CardHeader className="pb-4 pt-6 px-6">
-            <SectionHeader
-              icon={<HardDrive className="size-4 text-muted-foreground/70" />}
-              title="Storage"
-              description="Configure upload limits and storage behavior"
-            />
+        <Card className="rounded-lg border-border overflow-hidden">
+          <CardHeader className="pb-4 pt-5 px-6">
+            <h2 className="text-lg font-semibold tracking-tight">Storage</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Configure upload limits and storage behavior.
+            </p>
           </CardHeader>
 
           <CardContent className="px-6 pb-6">
             {settings.isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="size-5 text-primary animate-spin" />
+                <Loader2 className="size-5 text-muted-foreground animate-spin" />
               </div>
             ) : settings.data ? (
-              <div
-                className="flex items-start gap-4 rounded-xl border border-border/30 px-4 py-4 hover:border-border/50 transition-colors duration-150"
-                style={{ animation: "fade-up 0.35s ease-out both" }}
-              >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-status-completed/8">
-                  <Upload className="size-4 text-status-completed" />
-                </div>
-                <div className="flex-1 space-y-1.5">
+              <div className="flex items-center justify-between gap-4 py-1">
+                <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Upload Size Limit</span>
                     <Tooltip>
                       <TooltipTrigger>
-                        <Info className="size-3 text-muted-foreground/50" />
+                        <Info className="size-3.5 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
                         Maximum file size allowed for a single book upload.
@@ -961,8 +803,8 @@ export const AdminUsersPage: React.FC = () => {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-[11px] text-muted-foreground/50">
-                    The maximum file size for individual book uploads
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    The maximum file size for individual book uploads.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

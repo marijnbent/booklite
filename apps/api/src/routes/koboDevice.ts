@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { FastifyPluginAsync } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
-import { books, koboUserSettings } from "../db/schema";
+import { books } from "../db/schema";
 import {
   buildSyncTokenHeader,
   getBookMetadataForKobo,
@@ -13,6 +14,7 @@ import {
   getLibrarySyncPayload,
   isBookInKoboSyncScope,
   koboHeaders,
+  parseSyncTokenHeader,
   resolveBookIdFromImageId,
   upsertKoboReadingStates
 } from "../services/kobo";
@@ -67,17 +69,90 @@ const respondCover = async (
   return reply.send(fs.createReadStream(absolutePath));
 };
 
+const defaultStoreResources = {
+  affiliaterequest: "https://storeapi.kobo.com/v1/affiliate",
+  deals: "https://storeapi.kobo.com/v1/deals",
+  device_auth: "https://storeapi.kobo.com/v1/auth/device",
+  device_refresh: "https://storeapi.kobo.com/v1/auth/refresh",
+  get_tests_request: "https://storeapi.kobo.com/v1/analytics/gettests",
+  image_host: "https://cdn.kobo.com/book-images/",
+  image_url_template:
+    "https://cdn.kobo.com/book-images/{ImageId}/{Width}/{Height}/false/image.jpg",
+  image_url_quality_template:
+    "https://cdn.kobo.com/book-images/{ImageId}/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg",
+  library_metadata: "https://storeapi.kobo.com/v1/library/{Ids}/metadata",
+  library_sync: "https://storeapi.kobo.com/v1/library/sync",
+  post_analytics_event: "https://storeapi.kobo.com/v1/analytics/event",
+  user_loyalty_benefits: "https://storeapi.kobo.com/v1/user/loyalty/benefits",
+  user_profile: "https://storeapi.kobo.com/v1/user/profile",
+  user_recommendations: "https://storeapi.kobo.com/v1/user/recommendations",
+  user_wishlist: "https://storeapi.kobo.com/v1/user/wishlist"
+} as const;
+
 export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
+  // Kobo sometimes sends Content-Type: application/json with an empty body.
+  // Fastify rejects this by default, but Kobo expects these requests to be accepted.
+  fastify.removeContentTypeParser("application/json");
+  fastify.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (request, body, done) => {
+      const text = typeof body === "string" ? body.trim() : "";
+      if (text.length === 0) {
+        done(null, {});
+        return;
+      }
+
+      try {
+        done(null, JSON.parse(text));
+      } catch (error) {
+        done(error as Error);
+      }
+    }
+  );
+
   fastify.get("/api/kobo/:token/v1/initialization", async (request, reply) => {
     const params = z.object({ token: z.string().min(6) }).parse(request.params);
     const auth = await koboAuth(params.token);
     if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
 
+    const baseUrl = process.env.BASE_URL ?? "http://localhost:6060";
+    const localImageBase = `${baseUrl}/api/kobo/${params.token}/v1/books/{ImageId}`;
+
+    let resources: Record<string, unknown> = { ...defaultStoreResources };
+    try {
+      const upstream = await fetch("https://storeapi.kobo.com/v1/initialization", {
+        headers: {
+          "user-agent": request.headers["user-agent"] ?? "BookLite/1.0",
+          accept: request.headers.accept ?? "application/json"
+        }
+      });
+      if (upstream.ok) {
+        const body = (await upstream.json()) as { Resources?: Record<string, unknown> };
+        if (body?.Resources && typeof body.Resources === "object") {
+          resources = body.Resources;
+        }
+      }
+    } catch {
+      // fall back to static resource list
+    }
+
+    resources = {
+      ...resources,
+      device_auth: `${baseUrl}/api/kobo/${params.token}/v1/auth/device`,
+      device_refresh: `${baseUrl}/api/kobo/${params.token}/v1/auth/refresh`,
+      image_host: baseUrl,
+      image_url_template: `${localImageBase}/thumbnail/{Width}/{Height}/false/image.jpg`,
+      image_url_quality_template:
+        `${localImageBase}/thumbnail/{Width}/{Height}/{Quality}/{IsGreyscale}/image.jpg`,
+      library_sync: `${baseUrl}/api/kobo/${params.token}/v1/library/sync`,
+      library_metadata: `${baseUrl}/api/kobo/${params.token}/v1/library/{Ids}/metadata`,
+      reading_state: `${baseUrl}/api/kobo/${params.token}/v1/library/{Ids}/state`
+    };
+
+    reply.header("x-kobo-apitoken", "e30=");
     return {
-      Resources: {
-        LibrarySync: `${process.env.BASE_URL ?? "http://localhost:6060"}/api/kobo/${params.token}/v1/library/sync`,
-        DeviceAuth: `${process.env.BASE_URL ?? "http://localhost:6060"}/api/kobo/${params.token}/v1/auth/device`
-      },
+      Resources: resources,
       UserId: String(auth.userId)
     };
   });
@@ -96,15 +171,65 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  fastify.post("/api/kobo/:token/v1/auth/refresh", async (request, reply) => {
+    const params = z.object({ token: z.string().min(6) }).parse(request.params);
+    const auth = await koboAuth(params.token);
+    if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
+
+    const body = (request.body ?? {}) as {
+      UserKey?: string;
+      RefreshToken?: string;
+      refresh_token?: string;
+    };
+
+    return {
+      AccessToken: crypto.randomUUID(),
+      RefreshToken: body.RefreshToken ?? body.refresh_token ?? crypto.randomUUID(),
+      UserKey: body.UserKey ?? "booklite",
+      TrackingId: crypto.randomUUID()
+    };
+  });
+
+  fastify.get("/api/kobo/:token/v1/affiliate", async (request, reply) => {
+    const params = z.object({ token: z.string().min(6) }).parse(request.params);
+    const auth = await koboAuth(params.token);
+    if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
+
+    return {};
+  });
+
   fastify.get("/api/kobo/:token/v1/library/sync", async (request, reply) => {
     const params = z.object({ token: z.string().min(6) }).parse(request.params);
     const auth = await koboAuth(params.token);
     if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
 
+    const baselineSnapshotId = parseSyncTokenHeader(
+      request.headers[koboHeaders.syncToken] as string | string[] | undefined
+    );
+    const forceFullSync = baselineSnapshotId === null;
+
     const { payload, snapshotId } = await getLibrarySyncPayload(
       auth.userId,
       params.token,
-      process.env.BASE_URL ?? "http://localhost:6060"
+      process.env.BASE_URL ?? "http://localhost:6060",
+      {
+        baselineSnapshotId: baselineSnapshotId ?? undefined,
+        forceFullSync
+      }
+    );
+
+    const payloadCounts = payload.reduce<Record<string, number>>((acc, entry) => {
+      const key = Object.keys(entry)[0] ?? "Unknown";
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    fastify.log.info(
+      {
+        userId: auth.userId,
+        payloadTotal: payload.length,
+        payloadCounts
+      },
+      "kobo library sync payload built"
     );
 
     reply.header(koboHeaders.sync, "");
@@ -178,6 +303,21 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
         StatusInfoResult: { Result: "Success" }
       }))
     };
+  });
+
+  fastify.delete("/api/kobo/:token/v1/library/:bookId", async (request, reply) => {
+    const params = z
+      .object({ token: z.string().min(6), bookId: z.string().min(1) })
+      .parse(request.params);
+
+    const auth = await koboAuth(params.token);
+    if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
+
+    if (Number.isFinite(Number.parseInt(params.bookId, 10))) {
+      return {};
+    }
+
+    return reply.code(400).send({ error: "Invalid book id" });
   });
 
   fastify.get("/api/kobo/:token/v1/books/:bookId/download", async (request, reply) => {
@@ -257,6 +397,13 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
+  fastify.post("/api/kobo/:token/v1/analytics/event", async (request, reply) => {
+    const params = z.object({ token: z.string().min(6) }).parse(request.params);
+    const auth = await koboAuth(params.token);
+    if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
+    return {};
+  });
+
   fastify.all("/api/kobo/:token/*", async (request, reply) => {
     const params = z.object({ token: z.string().min(6) }).parse(request.params);
     const auth = await koboAuth(params.token);
@@ -264,12 +411,29 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
 
     const requestUrl = request.raw.url ?? "";
     const stripped = requestUrl.replace(/^\/api\/kobo\/[^/]+/, "");
+
+    if (/^\/v1\/products\/\d+\/nextread(?:\?|$)/i.test(stripped)) {
+      return {};
+    }
+
+    if (/^\/v1\/analytics\/event(?:\?|$)/i.test(stripped)) {
+      return {};
+    }
+
     const upstreamUrl = `https://storeapi.kobo.com${stripped}`;
 
     const headers: Record<string, string> = {
       "user-agent": request.headers["user-agent"] ?? "BookLite/1.0",
       accept: request.headers.accept ?? "application/json"
     };
+
+    if (typeof request.headers.authorization === "string") {
+      headers.authorization = request.headers.authorization;
+    }
+
+    if (typeof request.headers["accept-language"] === "string") {
+      headers["accept-language"] = request.headers["accept-language"];
+    }
 
     for (const [key, value] of Object.entries(request.headers)) {
       if (key.toLowerCase().startsWith("x-kobo-") && typeof value === "string") {
@@ -304,5 +468,3 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 };
-
-import crypto from "node:crypto";

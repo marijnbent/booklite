@@ -16,6 +16,54 @@ import crypto from "node:crypto";
 const encodeSyncToken = (snapshotId: string): string =>
   Buffer.from(JSON.stringify({ snapshotId }), "utf8").toString("base64");
 
+const parseSnapshotJsonToMap = (snapshotJson: string): Map<number, string> => {
+  const map = new Map<number, string>();
+  try {
+    const parsed = JSON.parse(snapshotJson) as Record<string, string>;
+    for (const [bookId, timestamp] of Object.entries(parsed)) {
+      const parsedBookId = Number.parseInt(bookId, 10);
+      if (!Number.isFinite(parsedBookId) || typeof timestamp !== "string") continue;
+      map.set(parsedBookId, timestamp);
+    }
+  } catch {
+    // ignore malformed snapshot payloads
+  }
+  return map;
+};
+
+const getSnapshotBookMap = async (
+  userId: number,
+  options: { baselineSnapshotId?: string; forceFullSync?: boolean }
+): Promise<Map<number, string>> => {
+  if (options.forceFullSync) return new Map<number, string>();
+
+  if (options.baselineSnapshotId) {
+    const byId = await db
+      .select({ snapshotJson: koboSyncSnapshots.snapshotJson })
+      .from(koboSyncSnapshots)
+      .where(
+        and(
+          eq(koboSyncSnapshots.userId, userId),
+          eq(koboSyncSnapshots.id, options.baselineSnapshotId)
+        )
+      )
+      .limit(1);
+
+    if (!byId[0]) return new Map<number, string>();
+    return parseSnapshotJsonToMap(byId[0].snapshotJson);
+  }
+
+  const latest = await db
+    .select({ snapshotJson: koboSyncSnapshots.snapshotJson })
+    .from(koboSyncSnapshots)
+    .where(eq(koboSyncSnapshots.userId, userId))
+    .orderBy(desc(koboSyncSnapshots.createdAt))
+    .limit(1);
+
+  if (!latest[0]) return new Map<number, string>();
+  return parseSnapshotJsonToMap(latest[0].snapshotJson);
+};
+
 const parseBookIdFromImageId = (imageId: string): number | null => {
   if (imageId.startsWith("BL-")) {
     const asNum = Number.parseInt(imageId.slice(3), 10);
@@ -26,6 +74,12 @@ const parseBookIdFromImageId = (imageId: string): number | null => {
 };
 
 export const resolveBookIdFromImageId = parseBookIdFromImageId;
+
+const isSqliteForeignKeyError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error as { code?: string }).code === "SQLITE_CONSTRAINT_FOREIGNKEY";
 
 export const getKoboUserByToken = async (token: string): Promise<{
   userId: number;
@@ -70,10 +124,19 @@ const getSelectedSyncCollections = async (
 
 const getSyncedBooksForUser = async (
   userId: number
-): Promise<Array<{ id: number; title: string; author: string | null; coverPath: string | null; updatedAt: string }>> => {
+): Promise<
+  Array<{
+    id: number;
+    title: string;
+    author: string | null;
+    coverPath: string | null;
+    updatedAt: string;
+    fileSize: number | null;
+  }>
+> => {
   const rows = await db.all(
     sql`
-      SELECT DISTINCT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt
+      SELECT DISTINCT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt, b.file_size AS fileSize
       FROM kobo_sync_collections ksc
       JOIN collections c ON c.id = ksc.collection_id
       JOIN collection_books cb ON cb.collection_id = c.id
@@ -84,7 +147,14 @@ const getSyncedBooksForUser = async (
     `
   );
 
-  return rows as Array<{ id: number; title: string; author: string | null; coverPath: string | null; updatedAt: string }>;
+  return rows as Array<{
+    id: number;
+    title: string;
+    author: string | null;
+    coverPath: string | null;
+    updatedAt: string;
+    fileSize: number | null;
+  }>;
 };
 
 export const isBookInKoboSyncScope = async (userId: number, bookId: number): Promise<boolean> => {
@@ -115,17 +185,42 @@ const buildBookMetadata = (
     author: string | null;
     coverPath: string | null;
     updatedAt: string;
+    fileSize?: number | null;
   }
 ): Record<string, unknown> => {
   const imageId = `BL-${book.id}`;
+  const slug = book.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
   return {
+    CrossRevisionId: String(book.id),
     RevisionId: String(book.id),
+    EntitlementId: String(book.id),
     WorkId: String(book.id),
+    Publisher: {
+      Name: "Unknown",
+      Imprint: "Unknown"
+    },
+    Genre: "00000000-0000-0000-0000-000000000001",
+    Slug: slug,
     Title: book.title,
     Attribution: book.author ?? "Unknown",
+    Contributors: [book.author ?? "Unknown"],
+    ContributorRoles: [],
+    ExternalIds: [],
+    Language: "en",
+    Series: {
+      Id: "",
+      Name: "",
+      Number: "",
+      NumberFloat: 0
+    },
+    Categories: ["00000000-0000-0000-0000-000000000001"],
     Description: "",
     IsPreOrder: false,
-    IsSocialEnabled: false,
+    IsSocialEnabled: true,
     IsPurchasedContent: true,
     IsHiddenFromArchive: false,
     IsInternetArchive: false,
@@ -135,14 +230,52 @@ const buildBookMetadata = (
     CoverImageId: imageId,
     DownloadUrls: [
       {
-        Format: "application/epub+zip",
-        Url: `${baseUrl}/api/kobo/${token}/v1/books/${book.id}/download`
+        DrmType: "None",
+        Format: "EPUB3",
+        Url: `${baseUrl}/api/kobo/${token}/v1/books/${book.id}/download`,
+        Size: book.fileSize ?? 0,
+        Platform: "Generic"
       }
     ],
     ThumbnailUrl: `${baseUrl}/api/kobo/${token}/v1/books/${imageId}/thumbnail/120/180/false/image.jpg`,
+    CurrentDisplayPrice: {
+      TotalAmount: 0,
+      CurrencyCode: "USD"
+    },
+    CurrentLoveDisplayPrice: {
+      TotalAmount: 0
+    },
+    PhoneticPronunciations: {},
     DateModified: book.updatedAt
   };
 };
+
+const buildDefaultReadingState = (
+  bookId: number,
+  modifiedAt: string
+): Record<string, unknown> => ({
+  EntitlementId: String(bookId),
+  Created: modifiedAt,
+  LastModified: modifiedAt,
+  PriorityTimestamp: modifiedAt,
+  StatusInfo: {
+    LastModified: modifiedAt,
+    Status: "ReadyToRead",
+    TimesStartedReading: 0
+  },
+  CurrentBookmark: {
+    ProgressPercent: 0,
+    LastModified: modifiedAt,
+    Location: {
+      Value: "",
+      Type: "Unknown",
+      Source: "booklite"
+    }
+  },
+  Statistics: {
+    LastModified: modifiedAt
+  }
+});
 
 const buildEntitlement = (
   token: string,
@@ -153,21 +286,43 @@ const buildEntitlement = (
     author: string | null;
     coverPath: string | null;
     updatedAt: string;
+    fileSize?: number | null;
   },
   type: "new" | "changed" | "removed"
 ): Record<string, unknown> => {
+  const modifiedAt = book.updatedAt || nowIso();
   const payload = {
     BookEntitlement: {
+      ActivePeriod: {
+        From: modifiedAt
+      },
+      Status: "Active",
+      Accessibility: "Full",
+      Id: String(book.id),
       EntitlementId: String(book.id),
-      ProductId: String(book.id),
       CrossRevisionId: String(book.id),
+      RevisionId: String(book.id),
+      ProductId: String(book.id),
+      Created: modifiedAt,
+      LastModified: modifiedAt,
+      DateModified: modifiedAt,
+      IsHiddenFromArchive: false,
+      IsLocked: false,
+      OriginCategory: "Imported",
       IsRemoved: type === "removed",
-      DateModified: book.updatedAt
+      IsDeleted: type === "removed"
     },
     BookMetadata: buildBookMetadata(token, baseUrl, book)
   };
 
-  if (type === "new") return { NewEntitlement: payload };
+  if (type === "new") {
+    return {
+      NewEntitlement: {
+        ...payload,
+        ReadingState: buildDefaultReadingState(book.id, modifiedAt)
+      }
+    };
+  }
   if (type === "changed") return { ChangedProductMetadata: payload };
   return { ChangedEntitlement: payload };
 };
@@ -268,31 +423,14 @@ const buildProgressEntitlements = async (userId: number): Promise<Record<string,
 export const getLibrarySyncPayload = async (
   userId: number,
   token: string,
-  baseUrl: string
+  baseUrl: string,
+  options: { baselineSnapshotId?: string; forceFullSync?: boolean } = {}
 ): Promise<{
   payload: Record<string, unknown>[];
   snapshotId: string;
 }> => {
   const currentBooks = await getSyncedBooksForUser(userId);
-
-  const prevSnapshot = await db
-    .select({ id: koboSyncSnapshots.id, snapshotJson: koboSyncSnapshots.snapshotJson })
-    .from(koboSyncSnapshots)
-    .where(eq(koboSyncSnapshots.userId, userId))
-    .orderBy(desc(koboSyncSnapshots.createdAt))
-    .limit(1);
-
-  const prevMap = new Map<number, string>();
-  if (prevSnapshot[0]) {
-    try {
-      const parsed = JSON.parse(prevSnapshot[0].snapshotJson) as Record<string, string>;
-      for (const [bookId, timestamp] of Object.entries(parsed)) {
-        prevMap.set(Number.parseInt(bookId, 10), timestamp);
-      }
-    } catch {
-      // ignore malformed previous snapshot
-    }
-  }
+  const prevMap = await getSnapshotBookMap(userId, options);
 
   const currentMap = new Map<number, string>();
   for (const book of currentBooks) {
@@ -353,6 +491,24 @@ export const koboHeaders = {
 export const buildSyncTokenHeader = (snapshotId: string): string =>
   encodeSyncToken(snapshotId);
 
+export const parseSyncTokenHeader = (
+  rawHeader: string | string[] | undefined
+): string | null => {
+  const raw = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+  if (!raw || typeof raw !== "string") return null;
+
+  try {
+    const decoded = Buffer.from(raw, "base64").toString("utf8");
+    const parsed = JSON.parse(decoded) as { snapshotId?: unknown };
+    if (typeof parsed.snapshotId === "string" && parsed.snapshotId.trim().length > 0) {
+      return parsed.snapshotId;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 export const getBookMetadataForKobo = async (
   userId: number,
   bookId: number,
@@ -381,9 +537,18 @@ export const upsertKoboReadingStates = async (
   userId: number,
   readingStates: Array<Record<string, any>>
 ): Promise<void> => {
+  const scopeByBookId = new Map<number, boolean>();
+
   for (const state of readingStates) {
     const entitlementId = Number.parseInt(String(state.EntitlementId ?? state.entitlementId), 10);
     if (!Number.isFinite(entitlementId)) continue;
+
+    let inSyncScope = scopeByBookId.get(entitlementId);
+    if (inSyncScope === undefined) {
+      inSyncScope = await isBookInKoboSyncScope(userId, entitlementId);
+      scopeByBookId.set(entitlementId, inSyncScope);
+    }
+    if (!inSyncScope) continue;
 
     const lastModified = String(
       state.LastModified ??
@@ -430,41 +595,48 @@ export const upsertKoboReadingStates = async (
       continue;
     }
 
-    await db
-      .insert(bookProgress)
-      .values({
-        userId,
-        bookId: entitlementId,
-        status: mappedStatus as "UNREAD" | "READING" | "DONE",
-        progressPercent,
-        positionRef,
-        updatedAt: lastModified
-      })
-      .onConflictDoUpdate({
-        target: [bookProgress.userId, bookProgress.bookId],
-        set: {
+    try {
+      await db
+        .insert(bookProgress)
+        .values({
+          userId,
+          bookId: entitlementId,
           status: mappedStatus as "UNREAD" | "READING" | "DONE",
           progressPercent,
           positionRef,
           updatedAt: lastModified
-        }
-      });
+        })
+        .onConflictDoUpdate({
+          target: [bookProgress.userId, bookProgress.bookId],
+          set: {
+            status: mappedStatus as "UNREAD" | "READING" | "DONE",
+            progressPercent,
+            positionRef,
+            updatedAt: lastModified
+          }
+        });
 
-    await db
-      .insert(koboReadingState)
-      .values({
-        userId,
-        bookId: entitlementId,
-        payloadJson: JSON.stringify(state),
-        lastModifiedAt: lastModified
-      })
-      .onConflictDoUpdate({
-        target: [koboReadingState.userId, koboReadingState.bookId],
-        set: {
+      await db
+        .insert(koboReadingState)
+        .values({
+          userId,
+          bookId: entitlementId,
           payloadJson: JSON.stringify(state),
           lastModifiedAt: lastModified
-        }
-      });
+        })
+        .onConflictDoUpdate({
+          target: [koboReadingState.userId, koboReadingState.bookId],
+          set: {
+            payloadJson: JSON.stringify(state),
+            lastModifiedAt: lastModified
+          }
+        });
+    } catch (error) {
+      if (isSqliteForeignKeyError(error)) {
+        continue;
+      }
+      throw error;
+    }
   }
 };
 
