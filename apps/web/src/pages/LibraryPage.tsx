@@ -11,7 +11,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiFetchRaw } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -472,8 +472,21 @@ export const LibraryPage: React.FC = () => {
     [selectedBookId, bookCollections.data, queryClient],
   );
 
-  const handleDownload = useCallback((bookId: number) => {
-    window.open(`/api/v1/books/${bookId}/download`, "_blank");
+  const handleDownload = useCallback(async (bookId: number) => {
+    const response = await apiFetchRaw(`/api/v1/books/${bookId}/download`);
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get("content-disposition") ?? "";
+    const match = contentDisposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] ?? `book-${bookId}.epub`;
+
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
   }, []);
 
   const isLoading = booksQuery.isLoading;

@@ -1,5 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
+import { config } from "../config";
 import {
   bookProgress,
   books,
@@ -131,12 +134,13 @@ const getSyncedBooksForUser = async (
     author: string | null;
     coverPath: string | null;
     updatedAt: string;
+    filePath: string;
     fileSize: number | null;
   }>
 > => {
   const rows = await db.all(
     sql`
-      SELECT DISTINCT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt, b.file_size AS fileSize
+      SELECT DISTINCT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
       FROM kobo_sync_collections ksc
       JOIN collections c ON c.id = ksc.collection_id
       JOIN collection_books cb ON cb.collection_id = c.id
@@ -153,6 +157,7 @@ const getSyncedBooksForUser = async (
     author: string | null;
     coverPath: string | null;
     updatedAt: string;
+    filePath: string;
     fileSize: number | null;
   }>;
 };
@@ -185,9 +190,22 @@ const buildBookMetadata = (
     author: string | null;
     coverPath: string | null;
     updatedAt: string;
+    filePath?: string;
     fileSize?: number | null;
   }
 ): Record<string, unknown> => {
+  let fileSize = book.fileSize ?? 0;
+  if (fileSize <= 0 && typeof book.filePath === "string" && book.filePath.length > 0) {
+    const absolutePath = path.isAbsolute(book.filePath)
+      ? book.filePath
+      : path.join(config.booksDir, book.filePath);
+    try {
+      fileSize = fs.statSync(absolutePath).size;
+    } catch {
+      fileSize = 0;
+    }
+  }
+
   const imageId = `BL-${book.id}`;
   const slug = book.title
     .toLowerCase()
@@ -233,8 +251,15 @@ const buildBookMetadata = (
         DrmType: "None",
         Format: "EPUB3",
         Url: `${baseUrl}/api/kobo/${token}/v1/books/${book.id}/download`,
-        Size: book.fileSize ?? 0,
+        Size: fileSize,
         Platform: "Generic"
+      },
+      {
+        DrmType: "None",
+        Format: "EPUB3",
+        Url: `${baseUrl}/api/kobo/${token}/v1/books/${book.id}/download`,
+        Size: fileSize,
+        Platform: "Android"
       }
     ],
     ThumbnailUrl: `${baseUrl}/api/kobo/${token}/v1/books/${imageId}/thumbnail/120/180/false/image.jpg`,
@@ -523,7 +548,9 @@ export const getBookMetadataForKobo = async (
       title: books.title,
       author: books.author,
       coverPath: books.coverPath,
-      updatedAt: books.updatedAt
+      updatedAt: books.updatedAt,
+      filePath: books.filePath,
+      fileSize: books.fileSize
     })
     .from(books)
     .where(eq(books.id, bookId))

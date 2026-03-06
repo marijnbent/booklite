@@ -1,10 +1,13 @@
 import path from "node:path";
+import fs from "node:fs";
 import { FastifyPluginAsync } from "fastify";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { lookup as lookupMime } from "mime-types";
 import { z } from "zod";
 import { db } from "../db/client";
 import { bookProgress, books, collectionBooks, collections } from "../db/schema";
 import { requireAuth } from "../auth/guards";
+import { config } from "../config";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "../services/metadata";
 import { resolveFilenameMetadata } from "../services/filenameNormalizer";
@@ -570,14 +573,21 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       const row = rows[0];
       if (!row) return reply.code(404).send({ error: "Book not found" });
 
-      const absolutePath = path.join(process.env.BOOKS_DIR ?? "/books", row.filePath);
-      if (!require("node:fs").existsSync(absolutePath)) {
+      const absolutePath = path.join(config.booksDir, row.filePath);
+      if (!fs.existsSync(absolutePath)) {
         return reply.code(404).send({ error: "File not found" });
       }
 
+      const stats = fs.statSync(absolutePath);
+      const contentType =
+        (lookupMime(row.fileExt) as string | false) || "application/octet-stream";
+
       return reply
+        .header("content-type", contentType)
+        .header("content-length", String(stats.size))
+        .header("accept-ranges", "bytes")
         .header("content-disposition", `attachment; filename=\"${row.title}.${row.fileExt}\"`)
-        .send(require("node:fs").createReadStream(absolutePath));
+        .send(fs.createReadStream(absolutePath));
     }
   );
 };

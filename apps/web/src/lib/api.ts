@@ -88,3 +88,33 @@ export const apiFetch = async <T>(
 
   return (await response.json()) as T;
 };
+
+export const apiFetchRaw = async (
+  input: string,
+  init?: RequestInit,
+  retries = 1
+): Promise<Response> => {
+  const headers = new Headers(init?.headers ?? {});
+  if (accessToken) {
+    headers.set("authorization", `Bearer ${accessToken}`);
+  }
+
+  const response = await fetch(`${BASE}${input}`, {
+    ...init,
+    headers
+  });
+
+  if (response.status === 401 && retries > 0) {
+    const refreshed = await doRefresh();
+    if (refreshed) {
+      return apiFetchRaw(input, init, retries - 1);
+    }
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || response.statusText);
+  }
+
+  return response;
+};
