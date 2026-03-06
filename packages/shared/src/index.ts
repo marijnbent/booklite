@@ -61,36 +61,30 @@ export interface KoboSettings {
   syncCollectionIds: number[];
 }
 
+export type MetadataProvider =
+  | "open_library"
+  | "amazon"
+  | "google"
+  | "hardcover"
+  | "goodreads"
+  | "douban"
+  | "none";
+
+export interface MetadataProviderEnabled {
+  open_library: boolean;
+  amazon: boolean;
+  google: boolean;
+  hardcover: boolean;
+  goodreads: boolean;
+  douban: boolean;
+}
+
 export interface AppSettings {
-  metadataProviderPrimary:
-    | "open_library"
-    | "amazon"
-    | "google"
-    | "hardcover"
-    | "goodreads"
-    | "douban"
-    | "none";
-  metadataProviderSecondary:
-    | "open_library"
-    | "amazon"
-    | "google"
-    | "hardcover"
-    | "goodreads"
-    | "douban"
-    | "none";
-  metadataProviderTertiary:
-    | "open_library"
-    | "amazon"
-    | "google"
-    | "hardcover"
-    | "goodreads"
-    | "douban"
-    | "none";
+  metadataProviderEnabled: MetadataProviderEnabled;
   metadataAmazonDomain: "com" | "co.uk" | "de" | "fr" | "es" | "it" | "nl" | "ca" | "com.au";
   metadataAmazonCookie: string;
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
-  metadataProviderFallback?: "google" | "none";
   uploadLimitMb: number;
 }

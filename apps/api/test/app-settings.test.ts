@@ -40,7 +40,7 @@ describe("app settings", () => {
     schemaModule = await import("../src/db/schema");
   });
 
-  it("normalizes legacy removed providers and omits removed settings fields", async () => {
+  it("omits manual provider-order fields and returns provider enable settings", async () => {
     await dbModule.db
       .insert(schemaModule.appSettings)
       .values({
@@ -85,9 +85,19 @@ describe("app settings", () => {
     expect(response.statusCode).toBe(200);
     const body = response.json() as Record<string, unknown>;
 
-    expect(body.metadataProviderPrimary).toBe("open_library");
-    expect(body.metadataProviderSecondary).toBe("google");
-    expect(body.metadataProviderTertiary).toBe("none");
+    expect(body).toHaveProperty("metadataProviderEnabled");
+    expect(body.metadataProviderEnabled).toEqual({
+      open_library: true,
+      amazon: true,
+      google: true,
+      hardcover: false,
+      goodreads: true,
+      douban: false
+    });
+    expect(body).not.toHaveProperty("metadataProviderPrimary");
+    expect(body).not.toHaveProperty("metadataProviderSecondary");
+    expect(body).not.toHaveProperty("metadataProviderTertiary");
+    expect(body).not.toHaveProperty("metadataFieldProviders");
     expect(body).not.toHaveProperty("metadataComicvineApiKey");
     expect(body).not.toHaveProperty("metadataAudibleDomain");
   });
@@ -105,6 +115,15 @@ describe("app settings", () => {
       }
     });
 
-    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(response.statusCode).toBe(400);
+    const body = response.json() as {
+      error?: string;
+      message?: string;
+      issues?: Array<{ code?: string; path?: string[] }>;
+    };
+    expect(body.error).toBe("BAD_REQUEST");
+    expect(body.message).toBe("Invalid app settings payload");
+    expect(body.issues?.[0]?.code).toBe("unrecognized_keys");
+    expect(body.issues?.[0]?.path).toEqual([]);
   });
 });

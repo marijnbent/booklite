@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -39,9 +40,7 @@ interface UserItem {
 }
 
 interface AppSettings {
-  metadataProviderPrimary: MetadataProvider;
-  metadataProviderSecondary: MetadataProvider;
-  metadataProviderTertiary: MetadataProvider;
+  metadataProviderEnabled: MetadataProviderEnabled;
   metadataAmazonDomain: AmazonDomain;
   metadataAmazonCookie: string;
   metadataGoogleLanguage: string;
@@ -50,25 +49,17 @@ interface AppSettings {
   uploadLimitMb: number;
 }
 
-type MetadataProvider =
+type EnabledMetadataProvider =
   | "open_library"
   | "amazon"
   | "google"
   | "hardcover"
   | "goodreads"
-  | "douban"
-  | "none";
-type AmazonDomain = "com" | "co.uk" | "de" | "fr" | "es" | "it" | "nl" | "ca" | "com.au";
+  | "douban";
 
-const metadataProviderOptions: Array<{ value: MetadataProvider; label: string }> = [
-  { value: "open_library", label: "Open Library" },
-  { value: "amazon", label: "Amazon" },
-  { value: "google", label: "Google Books" },
-  { value: "hardcover", label: "Hardcover" },
-  { value: "goodreads", label: "Goodreads" },
-  { value: "douban", label: "Douban" },
-  { value: "none", label: "None" }
-];
+type MetadataProviderEnabled = Record<EnabledMetadataProvider, boolean>;
+
+type AmazonDomain = "com" | "co.uk" | "de" | "fr" | "es" | "it" | "nl" | "ca" | "com.au";
 
 const amazonDomainOptions: Array<{ value: AmazonDomain; label: string }> = [
   { value: "com", label: "amazon.com" },
@@ -80,6 +71,18 @@ const amazonDomainOptions: Array<{ value: AmazonDomain; label: string }> = [
   { value: "nl", label: "amazon.nl" },
   { value: "ca", label: "amazon.ca" },
   { value: "com.au", label: "amazon.com.au" }
+];
+
+const metadataProviderToggleOptions: Array<{
+  key: EnabledMetadataProvider;
+  label: string;
+}> = [
+  { key: "open_library", label: "Open Library" },
+  { key: "amazon", label: "Amazon" },
+  { key: "google", label: "Google Books" },
+  { key: "hardcover", label: "Hardcover" },
+  { key: "goodreads", label: "Goodreads" },
+  { key: "douban", label: "Douban" }
 ];
 
 export const AdminUsersPage: React.FC = () => {
@@ -135,6 +138,19 @@ export const AdminUsersPage: React.FC = () => {
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["app-settings"] })
   });
+
+  const updateProviderEnabled = (
+    provider: EnabledMetadataProvider,
+    enabled: boolean
+  ): void => {
+    if (!settings.data) return;
+    patchSettings.mutate({
+      metadataProviderEnabled: {
+        ...settings.data.metadataProviderEnabled,
+        [provider]: enabled
+      }
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -354,78 +370,28 @@ export const AdminUsersPage: React.FC = () => {
                 <div>
                   <Label className="text-sm font-medium">Metadata providers</Label>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Choose provider order and optional API keys.
+                    Enable providers. BookLite automatically ranks provider matches and picks the
+                    best metadata per field.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="metadata-primary">Primary</Label>
-                    <Select
-                      value={settings.data.metadataProviderPrimary}
-                      onValueChange={(v) =>
-                        patchSettings.mutate({
-                          metadataProviderPrimary: v as MetadataProvider
-                        })
-                      }
-                    >
-                      <SelectTrigger id="metadata-primary">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {metadataProviderOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="metadata-secondary">Secondary</Label>
-                    <Select
-                      value={settings.data.metadataProviderSecondary}
-                      onValueChange={(v) =>
-                        patchSettings.mutate({
-                          metadataProviderSecondary: v as MetadataProvider
-                        })
-                      }
-                    >
-                      <SelectTrigger id="metadata-secondary">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {metadataProviderOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="metadata-tertiary">Tertiary</Label>
-                    <Select
-                      value={settings.data.metadataProviderTertiary}
-                      onValueChange={(v) =>
-                        patchSettings.mutate({
-                          metadataProviderTertiary: v as MetadataProvider
-                        })
-                      }
-                    >
-                      <SelectTrigger id="metadata-tertiary">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {metadataProviderOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="space-y-2">
+                  <Label className="text-sm">Enabled providers</Label>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {metadataProviderToggleOptions.map((provider) => (
+                      <div
+                        key={provider.key}
+                        className="rounded-md border border-border/50 px-3 py-2 flex items-center justify-between"
+                      >
+                        <span className="text-sm">{provider.label}</span>
+                        <Switch
+                          checked={settings.data.metadataProviderEnabled[provider.key]}
+                          onCheckedChange={(checked) =>
+                            updateProviderEnabled(provider.key, Boolean(checked))
+                          }
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 

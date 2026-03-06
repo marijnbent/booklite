@@ -22,22 +22,64 @@ type MetadataProvider =
   | "google"
   | "hardcover"
   | "goodreads"
-  | "douban"
-  | "none";
+  | "douban";
 
-const isMetadataProvider = (value: unknown): value is MetadataProvider =>
-  value === "open_library" ||
-  value === "amazon" ||
-  value === "google" ||
-  value === "hardcover" ||
-  value === "goodreads" ||
-  value === "douban" ||
-  value === "none";
+type MetadataProviderEnabled = Record<MetadataProvider, boolean>;
 
-const toProvider = (
+interface ProviderCandidate {
+  provider: MetadataProvider;
+  metadata: MetadataResult;
+  titleScore: number;
+  authorScore: number;
+  completeness: number;
+  trust: number;
+  overallScore: number;
+}
+
+const providerPreference: MetadataProvider[] = [
+  "open_library",
+  "google",
+  "goodreads",
+  "hardcover",
+  "amazon",
+  "douban"
+];
+
+const providerTrustScore: Record<MetadataProvider, number> = {
+  open_library: 1,
+  google: 0.98,
+  goodreads: 0.95,
+  hardcover: 0.95,
+  amazon: 0.92,
+  douban: 0.9
+};
+
+const defaultProviderEnabled: MetadataProviderEnabled = {
+  open_library: true,
+  amazon: true,
+  google: true,
+  hardcover: false,
+  goodreads: true,
+  douban: false
+};
+
+const toProviderEnabled = (
   value: unknown,
-  fallback: MetadataProvider
-): MetadataProvider => (isMetadataProvider(value) ? value : fallback);
+  fallback: MetadataProviderEnabled
+): MetadataProviderEnabled => {
+  if (!value || typeof value !== "object") return fallback;
+  const row = value as Record<string, unknown>;
+
+  return {
+    open_library:
+      typeof row.open_library === "boolean" ? row.open_library : fallback.open_library,
+    amazon: typeof row.amazon === "boolean" ? row.amazon : fallback.amazon,
+    google: typeof row.google === "boolean" ? row.google : fallback.google,
+    hardcover: typeof row.hardcover === "boolean" ? row.hardcover : fallback.hardcover,
+    goodreads: typeof row.goodreads === "boolean" ? row.goodreads : fallback.goodreads,
+    douban: typeof row.douban === "boolean" ? row.douban : fallback.douban
+  };
+};
 
 const toQuery = (title: string, author?: string): string => {
   const parts = [title.trim()];
@@ -61,6 +103,47 @@ const cleanText = (value: string): string =>
     .trim();
 
 const stripTags = (value: string): string => cleanText(value.replace(/<[^>]*>/g, " "));
+
+const normalizeForMatch = (value: string): string =>
+  value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tokenize = (value: string): string[] =>
+  normalizeForMatch(value)
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+
+const tokenOverlapScore = (query: string, candidate: string): number => {
+  const queryTokens = new Set(tokenize(query));
+  const candidateTokens = new Set(tokenize(candidate));
+  if (queryTokens.size === 0 || candidateTokens.size === 0) return 0;
+
+  let intersection = 0;
+  for (const token of queryTokens) {
+    if (candidateTokens.has(token)) intersection += 1;
+  }
+
+  const union = queryTokens.size + candidateTokens.size - intersection;
+  if (union <= 0) return 0;
+  return intersection / union;
+};
+
+const similarityScore = (query: string | undefined, candidate: string | undefined): number => {
+  if (!query || !candidate) return 0;
+
+  const q = normalizeForMatch(query);
+  const c = normalizeForMatch(candidate);
+  if (!q || !c) return 0;
+  if (q === c) return 1;
+  if (c.includes(q) || q.includes(c)) return 0.92;
+
+  return tokenOverlapScore(q, c);
+};
 
 const readMeta = (
   html: string,
@@ -91,44 +174,18 @@ const hasUsableMetadata = (result: MetadataResult): boolean =>
   hasText(result.coverPath);
 
 const resolveMetadataProviderSettings = async (): Promise<{
-  providerOrder: MetadataProvider[];
+  providerEnabled: MetadataProviderEnabled;
   amazonDomain: string;
   amazonCookie: string;
   googleLanguage: string;
   googleApiKey: string;
   hardcoverApiKey: string;
 }> => {
-  const legacyFallback = await getSetting<"google" | "none">(
-    "metadata_provider_fallback",
-    "google"
-  );
-  const defaultSecondary: MetadataProvider =
-    legacyFallback === "google" ? "google" : "none";
-
-  const primary = toProvider(
-    await getSetting<MetadataProvider>("metadata_provider_primary", "open_library"),
-    "open_library"
-  );
-  const secondary = toProvider(
-    await getSetting<MetadataProvider>("metadata_provider_secondary", defaultSecondary),
-    defaultSecondary
-  );
-  const tertiary = toProvider(
-    await getSetting<MetadataProvider>("metadata_provider_tertiary", "none"),
-    "none"
-  );
-
-  const seen = new Set<MetadataProvider>();
-  const providerOrder: MetadataProvider[] = [];
-  for (const provider of [primary, secondary, tertiary]) {
-    if (provider === "none" || seen.has(provider)) continue;
-    seen.add(provider);
-    providerOrder.push(provider);
-  }
-  if (providerOrder.length === 0) providerOrder.push("open_library");
-
   return {
-    providerOrder,
+    providerEnabled: toProviderEnabled(
+      await getSetting<unknown>("metadata_provider_enabled", defaultProviderEnabled),
+      defaultProviderEnabled
+    ),
     amazonDomain: (
       await getSetting<string>("metadata_amazon_domain", config.amazonBooksDomain)
     ).trim(),
@@ -147,13 +204,39 @@ const resolveMetadataProviderSettings = async (): Promise<{
   };
 };
 
+const scoreOpenLibraryDoc = (
+  doc: {
+    title?: string;
+    author_name?: string[];
+    cover_i?: number;
+    first_sentence?: string | string[];
+  },
+  queryTitle: string,
+  queryAuthor?: string
+): number => {
+  const titleScore = similarityScore(queryTitle, doc.title);
+  const authorScore = similarityScore(queryAuthor, doc.author_name?.[0]);
+  const description =
+    typeof doc.first_sentence === "string"
+      ? doc.first_sentence
+      : Array.isArray(doc.first_sentence)
+        ? doc.first_sentence[0]
+        : undefined;
+
+  let completeness = 0;
+  if (doc.cover_i) completeness += 0.5;
+  if (hasText(description)) completeness += 0.5;
+
+  return titleScore * 0.58 + authorScore * 0.3 + completeness * 0.12;
+};
+
 const getOpenLibraryMetadata = async (
   title: string,
   author?: string
 ): Promise<MetadataResult | null> => {
   const searchUrl = new URL("https://openlibrary.org/search.json");
   searchUrl.searchParams.set("q", toQuery(title, author));
-  searchUrl.searchParams.set("limit", "5");
+  searchUrl.searchParams.set("limit", "10");
 
   const response = await fetch(searchUrl, { method: "GET" });
   if (!response.ok) return null;
@@ -167,23 +250,52 @@ const getOpenLibraryMetadata = async (
     }>;
   };
 
-  const doc = json.docs?.[0];
-  if (!doc) return null;
+  const docs = json.docs ?? [];
+  if (docs.length === 0) return null;
+
+  const bestDoc = docs
+    .map((doc) => ({ doc, score: scoreOpenLibraryDoc(doc, title, author) }))
+    .sort((a, b) => b.score - a.score)[0]?.doc;
+
+  if (!bestDoc) return null;
 
   return {
-    title: doc.title,
-    author: doc.author_name?.[0],
-    coverPath: doc.cover_i
-      ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+    title: bestDoc.title,
+    author: bestDoc.author_name?.[0],
+    coverPath: bestDoc.cover_i
+      ? `https://covers.openlibrary.org/b/id/${bestDoc.cover_i}-L.jpg`
       : undefined,
     description:
-      typeof doc.first_sentence === "string"
-        ? doc.first_sentence
-        : Array.isArray(doc.first_sentence)
-          ? doc.first_sentence[0]
+      typeof bestDoc.first_sentence === "string"
+        ? bestDoc.first_sentence
+        : Array.isArray(bestDoc.first_sentence)
+          ? bestDoc.first_sentence[0]
           : undefined,
     source: "OPEN_LIBRARY"
   };
+};
+
+const scoreVolumeInfo = (
+  volume: {
+    title?: string;
+    authors?: string[];
+    description?: string;
+    imageLinks?: { thumbnail?: string; smallThumbnail?: string };
+  },
+  queryTitle: string,
+  queryAuthor?: string
+): number => {
+  const titleScore = similarityScore(queryTitle, volume.title);
+  const authorScore = similarityScore(queryAuthor, volume.authors?.[0]);
+
+  let completeness = 0;
+  if (hasText(volume.description)) completeness += 0.4;
+  if (hasText(volume.imageLinks?.thumbnail) || hasText(volume.imageLinks?.smallThumbnail)) {
+    completeness += 0.3;
+  }
+  if ((volume.authors?.length ?? 0) > 0) completeness += 0.3;
+
+  return titleScore * 0.56 + authorScore * 0.3 + completeness * 0.14;
 };
 
 const getGoogleMetadata = async (
@@ -198,7 +310,7 @@ const getGoogleMetadata = async (
 
   const searchUrl = new URL("https://www.googleapis.com/books/v1/volumes");
   searchUrl.searchParams.set("q", q || title);
-  searchUrl.searchParams.set("maxResults", "3");
+  searchUrl.searchParams.set("maxResults", "8");
   if (language) searchUrl.searchParams.set("langRestrict", language);
   if (apiKey) searchUrl.searchParams.set("key", apiKey);
 
@@ -216,14 +328,23 @@ const getGoogleMetadata = async (
     }>;
   };
 
-  const item = json.items?.[0]?.volumeInfo;
-  if (!item) return null;
+  const candidates = (json.items ?? [])
+    .map((item) => item.volumeInfo)
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+  if (candidates.length === 0) return null;
+
+  const best = candidates
+    .map((item) => ({ item, score: scoreVolumeInfo(item, title, author) }))
+    .sort((a, b) => b.score - a.score)[0]?.item;
+
+  if (!best) return null;
 
   return {
-    title: item.title,
-    author: item.authors?.[0],
-    description: item.description,
-    coverPath: item.imageLinks?.thumbnail ?? item.imageLinks?.smallThumbnail,
+    title: best.title,
+    author: best.authors?.[0],
+    description: best.description,
+    coverPath: best.imageLinks?.thumbnail ?? best.imageLinks?.smallThumbnail,
     source: "GOOGLE"
   };
 };
@@ -295,6 +416,26 @@ const getAmazonMetadata = async (
   };
 };
 
+const scoreHardcoverDoc = (
+  doc: {
+    title?: string;
+    author_names?: string[];
+    description?: string;
+    image?: { url?: string };
+  },
+  queryTitle: string,
+  queryAuthor?: string
+): number => {
+  const titleScore = similarityScore(queryTitle, doc.title);
+  const authorScore = similarityScore(queryAuthor, doc.author_names?.[0]);
+
+  let completeness = 0;
+  if (hasText(doc.description)) completeness += 0.5;
+  if (hasText(doc.image?.url)) completeness += 0.5;
+
+  return titleScore * 0.58 + authorScore * 0.3 + completeness * 0.12;
+};
+
 const getHardcoverMetadata = async (
   title: string,
   author: string | undefined,
@@ -312,7 +453,7 @@ const getHardcoverMetadata = async (
     body: JSON.stringify({
       query:
         'query BookSearch($q: String!, $limit: Int!) { search(query: $q, query_type: "Book", per_page: $limit, page: 1) { results } }',
-      variables: { q: query, limit: 3 }
+      variables: { q: query, limit: 8 }
     })
   });
   if (!response.ok) return null;
@@ -334,16 +475,68 @@ const getHardcoverMetadata = async (
     };
   };
 
-  const document = json.data?.search?.results?.hits?.[0]?.document;
-  if (!document) return null;
+  const docs = (json.data?.search?.results?.hits ?? [])
+    .map((hit) => hit.document)
+    .filter((doc): doc is NonNullable<typeof doc> => Boolean(doc));
+
+  if (docs.length === 0) return null;
+
+  const best = docs
+    .map((doc) => ({ doc, score: scoreHardcoverDoc(doc, title, author) }))
+    .sort((a, b) => b.score - a.score)[0]?.doc;
+
+  if (!best) return null;
 
   return {
-    title: document.title,
-    author: document.author_names?.[0],
-    description: document.description,
-    coverPath: document.image?.url,
+    title: best.title,
+    author: best.author_names?.[0],
+    description: best.description,
+    coverPath: best.image?.url,
     source: "HARDCOVER"
   };
+};
+
+interface GoodreadsSearchCandidate {
+  href: string;
+  title?: string;
+  author?: string;
+}
+
+const extractGoodreadsCandidates = (searchHtml: string): GoodreadsSearchCandidate[] => {
+  const rows = searchHtml.match(/<tr[^>]*itemtype=http:\/\/schema\.org\/Book[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
+  const candidates: GoodreadsSearchCandidate[] = [];
+
+  for (const row of rows.slice(0, 10)) {
+    const hrefMatch = row.match(
+      /href="(\/book\/show\/[^"]+|https:\/\/www\.goodreads\.com\/book\/show\/[^"]+)"/i
+    );
+    if (!hrefMatch?.[1]) continue;
+
+    const titleMatch =
+      row.match(/class="bookTitle"[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/i) ??
+      row.match(/class="bookTitle"[^>]*>\s*([\s\S]*?)\s*<\/a>/i);
+
+    const authorMatch =
+      row.match(/class="authorName"[\s\S]*?<span[^>]*itemprop="name"[^>]*>([\s\S]*?)<\/span>/i) ??
+      row.match(/class="authorName"[^>]*>\s*([\s\S]*?)\s*<\/a>/i);
+
+    candidates.push({
+      href: normalizeUrl(hrefMatch[1]),
+      title: titleMatch?.[1] ? stripTags(titleMatch[1]) : undefined,
+      author: authorMatch?.[1] ? stripTags(authorMatch[1]) : undefined
+    });
+  }
+
+  const deduped: GoodreadsSearchCandidate[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const href = normalizeUrl(candidate.href);
+    if (seen.has(href)) continue;
+    seen.add(href);
+    deduped.push({ ...candidate, href });
+  }
+
+  return deduped;
 };
 
 const getGoodreadsMetadata = async (
@@ -357,13 +550,32 @@ const getGoodreadsMetadata = async (
   if (!searchResponse.ok) return null;
   const searchHtml = await searchResponse.text();
 
-  const firstBookHref = getFirstMatch(searchHtml, [
-    /href="(\/book\/show\/[^"]+)"/i,
-    /href="(https:\/\/www\.goodreads\.com\/book\/show\/[^"]+)"/i
-  ]);
-  if (!firstBookHref) return null;
+  let candidates = extractGoodreadsCandidates(searchHtml);
+  if (candidates.length === 0) {
+    const firstBookHref = getFirstMatch(searchHtml, [
+      /href="(\/book\/show\/[^"]+)"/i,
+      /href="(https:\/\/www\.goodreads\.com\/book\/show\/[^"]+)"/i
+    ]);
+    if (firstBookHref) {
+      candidates = [{ href: firstBookHref }];
+    }
+  }
 
-  const detailUrl = absoluteUrl("https://www.goodreads.com", firstBookHref);
+  if (candidates.length === 0) return null;
+
+  const bestCandidate = candidates
+    .map((candidate) => ({
+      candidate,
+      score:
+        similarityScore(title, candidate.title) * 0.6 +
+        similarityScore(author, candidate.author) * 0.35 +
+        (hasText(candidate.author) ? 0.05 : 0)
+    }))
+    .sort((a, b) => b.score - a.score)[0]?.candidate;
+
+  if (!bestCandidate) return null;
+
+  const detailUrl = absoluteUrl("https://www.goodreads.com", bestCandidate.href);
   const detailResponse = await fetch(detailUrl, { method: "GET" });
   if (!detailResponse.ok) return null;
   const detailHtml = await detailResponse.text();
@@ -453,7 +665,7 @@ type ProviderFetcher = (
   settings: MetadataSettings
 ) => Promise<MetadataResult | null>;
 
-const providerFetchers: Record<Exclude<MetadataProvider, "none">, ProviderFetcher> = {
+const providerFetchers: Record<MetadataProvider, ProviderFetcher> = {
   open_library: (title, author) => getOpenLibraryMetadata(title, author),
   amazon: (title, author, settings) =>
     getAmazonMetadata(title, author, settings.amazonDomain || "com", settings.amazonCookie),
@@ -465,16 +677,78 @@ const providerFetchers: Record<Exclude<MetadataProvider, "none">, ProviderFetche
   douban: (title, author) => getDoubanMetadata(title, author)
 };
 
+const buildProviderFetchOrder = (providerEnabled: MetadataProviderEnabled): MetadataProvider[] =>
+  providerPreference.filter((provider) => providerEnabled[provider]);
+
+const metadataCompleteness = (result: MetadataResult): number => {
+  let presentFields = 0;
+  if (hasText(result.title)) presentFields += 1;
+  if (hasText(result.author)) presentFields += 1;
+  if (hasText(result.description)) presentFields += 1;
+  if (hasText(result.coverPath)) presentFields += 1;
+  return presentFields / 4;
+};
+
+const buildCandidate = (
+  provider: MetadataProvider,
+  metadata: MetadataResult,
+  queryTitle: string,
+  queryAuthor?: string
+): ProviderCandidate => {
+  const titleScore = similarityScore(queryTitle, metadata.title);
+  const authorScore = similarityScore(queryAuthor, metadata.author);
+  const completeness = metadataCompleteness(metadata);
+  const trust = providerTrustScore[provider] ?? 0.9;
+  const overallScore =
+    titleScore * 0.5 + authorScore * 0.2 + completeness * 0.2 + trust * 0.1;
+
+  return {
+    provider,
+    metadata,
+    titleScore,
+    authorScore,
+    completeness,
+    trust,
+    overallScore
+  };
+};
+
+const selectBestField = (
+  candidates: ProviderCandidate[],
+  extractor: (metadata: MetadataResult) => string | undefined,
+  scorer: (candidate: ProviderCandidate, value: string) => number
+): string | undefined => {
+  let bestValue: string | undefined;
+  let bestScore = -Infinity;
+
+  for (const candidate of candidates) {
+    const value = extractor(candidate.metadata);
+    if (!hasText(value)) continue;
+
+    const score = scorer(candidate, value);
+    if (score > bestScore) {
+      bestScore = score;
+      bestValue = value;
+    }
+  }
+
+  return bestValue;
+};
+
 export const fetchMetadataWithFallback = async (
   title: string,
   author?: string
 ): Promise<MetadataResult> => {
   const settings = await resolveMetadataProviderSettings();
-  const merged: Omit<MetadataResult, "source"> = {};
-  let resolvedSource: MetadataResult["source"] | null = null;
+  const providerOrder = buildProviderFetchOrder(settings.providerEnabled);
 
-  for (const provider of settings.providerOrder) {
-    if (provider === "none") continue;
+  if (providerOrder.length === 0) {
+    return { source: "NONE" };
+  }
+
+  const candidates: ProviderCandidate[] = [];
+
+  for (const provider of providerOrder) {
     const fetcher = providerFetchers[provider];
     if (!fetcher) continue;
 
@@ -487,20 +761,61 @@ export const fetchMetadataWithFallback = async (
 
     if (!result || !hasUsableMetadata(result)) continue;
 
-    if (!resolvedSource) resolvedSource = result.source;
-    if (!hasText(merged.title) && hasText(result.title)) merged.title = result.title;
-    if (!hasText(merged.author) && hasText(result.author)) merged.author = result.author;
-    if (!hasText(merged.description) && hasText(result.description)) {
-      merged.description = result.description;
-    }
-    if (!hasText(merged.coverPath) && hasText(result.coverPath)) {
-      merged.coverPath = result.coverPath;
-    }
+    candidates.push(buildCandidate(provider, result, title, author));
   }
 
-  if (!resolvedSource) return { source: "NONE" };
+  if (candidates.length === 0) {
+    return { source: "NONE" };
+  }
+
+  candidates.sort((a, b) => b.overallScore - a.overallScore);
+  const bestSource = candidates[0].metadata.source;
+
+  const mergedTitle = selectBestField(
+    candidates,
+    (metadata) => metadata.title,
+    (candidate) =>
+      candidate.titleScore * 0.75 + candidate.trust * 0.15 + candidate.completeness * 0.1
+  );
+  const mergedAuthor = selectBestField(
+    candidates,
+    (metadata) => metadata.author,
+    (candidate) =>
+      candidate.authorScore * 0.75 + candidate.trust * 0.15 + candidate.completeness * 0.1
+  );
+  const mergedDescription = selectBestField(
+    candidates,
+    (metadata) => metadata.description,
+    (candidate) =>
+      candidate.completeness * 0.5 +
+      candidate.titleScore * 0.2 +
+      candidate.authorScore * 0.1 +
+      candidate.trust * 0.2
+  );
+  const mergedCoverPath = selectBestField(
+    candidates,
+    (metadata) => metadata.coverPath,
+    (candidate) =>
+      candidate.completeness * 0.45 +
+      candidate.titleScore * 0.2 +
+      candidate.authorScore * 0.1 +
+      candidate.trust * 0.25
+  );
+
+  if (
+    !hasText(mergedTitle) &&
+    !hasText(mergedAuthor) &&
+    !hasText(mergedDescription) &&
+    !hasText(mergedCoverPath)
+  ) {
+    return { source: "NONE" };
+  }
+
   return {
-    ...merged,
-    source: resolvedSource
+    source: bestSource,
+    title: mergedTitle,
+    author: mergedAuthor,
+    description: mergedDescription,
+    coverPath: mergedCoverPath
   };
 };

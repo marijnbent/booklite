@@ -5,16 +5,28 @@ import { appSettings } from "../db/schema";
 import { requireOwner } from "../auth/guards";
 import { config } from "../config";
 
-const metadataProviderSchema = z.enum([
+const providerValues = [
   "open_library",
   "amazon",
   "google",
   "hardcover",
   "goodreads",
-  "douban",
-  "none"
-]);
-type MetadataProvider = z.infer<typeof metadataProviderSchema>;
+  "douban"
+] as const;
+
+type EnabledMetadataProvider = (typeof providerValues)[number];
+
+const metadataProviderEnabledSchema = z
+  .object({
+    open_library: z.boolean(),
+    amazon: z.boolean(),
+    google: z.boolean(),
+    hardcover: z.boolean(),
+    goodreads: z.boolean(),
+    douban: z.boolean()
+  })
+  .strict();
+type MetadataProviderEnabled = z.infer<typeof metadataProviderEnabledSchema>;
 
 const amazonDomainSchema = z.enum([
   "com",
@@ -29,32 +41,44 @@ const amazonDomainSchema = z.enum([
 ]);
 type AmazonDomain = z.infer<typeof amazonDomainSchema>;
 
-const toProvider = (
-  value: unknown,
-  fallback: MetadataProvider
-): MetadataProvider => {
-  const parsed = metadataProviderSchema.safeParse(value);
-  return parsed.success ? parsed.data : fallback;
+const defaultMetadataProviderEnabled: MetadataProviderEnabled = {
+  open_library: true,
+  amazon: true,
+  google: true,
+  hardcover: false,
+  goodreads: true,
+  douban: false
 };
 
-const patchSettingsSchema = z.object({
-  metadataProviderPrimary: metadataProviderSchema.optional(),
-  metadataProviderSecondary: metadataProviderSchema.optional(),
-  metadataProviderTertiary: metadataProviderSchema.optional(),
-  metadataAmazonDomain: amazonDomainSchema.optional(),
-  metadataAmazonCookie: z.string().trim().optional(),
-  metadataGoogleLanguage: z.string().trim().max(8).optional(),
-  metadataGoogleApiKey: z.string().trim().optional(),
-  metadataHardcoverApiKey: z.string().trim().optional(),
-  metadataProviderFallback: z.enum(["google", "none"]).optional(),
-  uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional()
-});
+const patchSettingsSchema = z
+  .object({
+    metadataProviderEnabled: metadataProviderEnabledSchema.optional(),
+    metadataAmazonDomain: amazonDomainSchema.optional(),
+    metadataAmazonCookie: z.string().trim().optional(),
+    metadataGoogleLanguage: z.string().trim().max(8).optional(),
+    metadataGoogleApiKey: z.string().trim().optional(),
+    metadataHardcoverApiKey: z.string().trim().optional(),
+    uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional()
+  })
+  .strict();
 
-const toLegacyFallback = (
-  secondary: MetadataProvider,
-  tertiary: MetadataProvider
-): "google" | "none" =>
-  secondary === "google" || tertiary === "google" ? "google" : "none";
+const toMetadataProviderEnabled = (
+  value: unknown,
+  fallback: MetadataProviderEnabled
+): MetadataProviderEnabled => {
+  if (!value || typeof value !== "object") return fallback;
+  const row = value as Record<EnabledMetadataProvider, unknown>;
+
+  return {
+    open_library:
+      typeof row.open_library === "boolean" ? row.open_library : fallback.open_library,
+    amazon: typeof row.amazon === "boolean" ? row.amazon : fallback.amazon,
+    google: typeof row.google === "boolean" ? row.google : fallback.google,
+    hardcover: typeof row.hardcover === "boolean" ? row.hardcover : fallback.hardcover,
+    goodreads: typeof row.goodreads === "boolean" ? row.goodreads : fallback.goodreads,
+    douban: typeof row.douban === "boolean" ? row.douban : fallback.douban
+  };
+};
 
 const toAmazonDomain = (value: unknown, fallback: AmazonDomain): AmazonDomain => {
   const parsed = amazonDomainSchema.safeParse(value);
@@ -62,68 +86,40 @@ const toAmazonDomain = (value: unknown, fallback: AmazonDomain): AmazonDomain =>
 };
 
 const resolveSettings = async (): Promise<{
-  metadataProviderPrimary: MetadataProvider;
-  metadataProviderSecondary: MetadataProvider;
-  metadataProviderTertiary: MetadataProvider;
+  metadataProviderEnabled: MetadataProviderEnabled;
   metadataAmazonDomain: AmazonDomain;
   metadataAmazonCookie: string;
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
-  metadataProviderFallback: "google" | "none";
   uploadLimitMb: number;
-}> => {
-  const legacyFallback = await getSetting<"google" | "none">(
-    "metadata_provider_fallback",
-    "google"
-  );
-  const defaultSecondary: MetadataProvider =
-    legacyFallback === "google" ? "google" : "none";
-
-  const metadataProviderPrimary = toProvider(
-    await getSetting<MetadataProvider>("metadata_provider_primary", "open_library"),
-    "open_library"
-  );
-  const metadataProviderSecondary = toProvider(
-    await getSetting<MetadataProvider>("metadata_provider_secondary", defaultSecondary),
-    defaultSecondary
-  );
-  const metadataProviderTertiary = toProvider(
-    await getSetting<MetadataProvider>("metadata_provider_tertiary", "none"),
-    "none"
-  );
-
-  return {
-    metadataProviderPrimary,
-    metadataProviderSecondary,
-    metadataProviderTertiary,
-    metadataAmazonDomain: toAmazonDomain(
-      await getSetting<string>("metadata_amazon_domain", config.amazonBooksDomain),
-      "com"
-    ),
-    metadataAmazonCookie: await getSetting<string>(
-      "metadata_amazon_cookie",
-      config.amazonBooksCookie
-    ),
-    metadataGoogleLanguage: await getSetting<string>(
-      "metadata_google_language",
-      config.googleBooksLanguage
-    ),
-    metadataGoogleApiKey: await getSetting<string>(
-      "metadata_google_api_key",
-      config.googleBooksApiKey
-    ),
-    metadataHardcoverApiKey: await getSetting<string>(
-      "metadata_hardcover_api_key",
-      config.hardcoverApiKey
-    ),
-    metadataProviderFallback: toLegacyFallback(
-      metadataProviderSecondary,
-      metadataProviderTertiary
-    ),
-    uploadLimitMb: await getSetting<number>("upload_limit_mb", 100)
-  };
-};
+}> => ({
+  metadataProviderEnabled: toMetadataProviderEnabled(
+    await getSetting<unknown>("metadata_provider_enabled", defaultMetadataProviderEnabled),
+    defaultMetadataProviderEnabled
+  ),
+  metadataAmazonDomain: toAmazonDomain(
+    await getSetting<string>("metadata_amazon_domain", config.amazonBooksDomain),
+    "com"
+  ),
+  metadataAmazonCookie: await getSetting<string>(
+    "metadata_amazon_cookie",
+    config.amazonBooksCookie
+  ),
+  metadataGoogleLanguage: await getSetting<string>(
+    "metadata_google_language",
+    config.googleBooksLanguage
+  ),
+  metadataGoogleApiKey: await getSetting<string>(
+    "metadata_google_api_key",
+    config.googleBooksApiKey
+  ),
+  metadataHardcoverApiKey: await getSetting<string>(
+    "metadata_hardcover_api_key",
+    config.hardcoverApiKey
+  ),
+  uploadLimitMb: await getSetting<number>("upload_limit_mb", 100)
+});
 
 export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/app-settings", { preHandler: requireOwner }, async () =>
@@ -133,8 +129,16 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.patch(
     "/api/v1/app-settings",
     { preHandler: requireOwner },
-    async (request) => {
-      const body = patchSettingsSchema.parse(request.body);
+    async (request, reply) => {
+      const parsedBody = patchSettingsSchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "BAD_REQUEST",
+          message: "Invalid app settings payload",
+          issues: parsedBody.error.issues
+        });
+      }
+      const body = parsedBody.data;
 
       const upsert = async (key: string, value: unknown): Promise<void> => {
         await db
@@ -146,22 +150,8 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
           });
       };
 
-      if (body.metadataProviderFallback !== undefined) {
-        await upsert("metadata_provider_fallback", body.metadataProviderFallback);
-        await upsert(
-          "metadata_provider_secondary",
-          body.metadataProviderFallback === "google" ? "google" : "none"
-        );
-        await upsert("metadata_provider_tertiary", "none");
-      }
-      if (body.metadataProviderPrimary !== undefined) {
-        await upsert("metadata_provider_primary", body.metadataProviderPrimary);
-      }
-      if (body.metadataProviderSecondary !== undefined) {
-        await upsert("metadata_provider_secondary", body.metadataProviderSecondary);
-      }
-      if (body.metadataProviderTertiary !== undefined) {
-        await upsert("metadata_provider_tertiary", body.metadataProviderTertiary);
+      if (body.metadataProviderEnabled !== undefined) {
+        await upsert("metadata_provider_enabled", body.metadataProviderEnabled);
       }
       if (body.metadataAmazonDomain !== undefined) {
         await upsert("metadata_amazon_domain", body.metadataAmazonDomain);

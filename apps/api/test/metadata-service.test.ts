@@ -29,20 +29,16 @@ const mockJsonResponse = (payload: unknown): Response =>
 describe("metadata service fallback merge", () => {
   beforeEach(() => {
     settings.clear();
-    settings.set("metadata_provider_primary", "open_library");
-    settings.set("metadata_provider_secondary", "google");
-    settings.set("metadata_provider_tertiary", "none");
-    settings.set("metadata_provider_fallback", "google");
     vi.restoreAllMocks();
   });
 
-  it("merges partial metadata across providers using configured priority", async () => {
+  it("merges partial metadata automatically using provider scoring", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
 
       if (url.includes("openlibrary.org/search.json")) {
         return mockJsonResponse({
-          docs: [{ title: "Open Title" }]
+          docs: [{ title: "Some Title" }]
         });
       }
 
@@ -51,7 +47,7 @@ describe("metadata service fallback merge", () => {
           items: [
             {
               volumeInfo: {
-                title: "Google Title",
+                title: "Other Book",
                 authors: ["Merged Author"],
                 description: "Merged Description",
                 imageLinks: { thumbnail: "https://covers.example/cover.jpg" }
@@ -68,7 +64,7 @@ describe("metadata service fallback merge", () => {
 
     expect(result).toEqual({
       source: "OPEN_LIBRARY",
-      title: "Open Title",
+      title: "Some Title",
       author: "Merged Author",
       description: "Merged Description",
       coverPath: "https://covers.example/cover.jpg"
@@ -126,5 +122,97 @@ describe("metadata service fallback merge", () => {
     const result = await fetchMetadataWithFallback("Some Title", "Some Author");
 
     expect(result).toEqual({ source: "NONE" });
+  });
+
+  it("skips disabled providers and resolves fields from enabled providers", async () => {
+    settings.set("metadata_provider_enabled", {
+      open_library: false,
+      amazon: false,
+      google: true,
+      hardcover: false,
+      goodreads: false,
+      douban: false
+    });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("openlibrary.org/search.json")) {
+        throw new Error("Open Library should not be called when disabled");
+      }
+
+      if (url.includes("googleapis.com/books/v1/volumes")) {
+        return mockJsonResponse({
+          items: [
+            {
+              volumeInfo: {
+                title: "Enabled Google Title",
+                authors: ["Enabled Google Author"]
+              }
+            }
+          ]
+        });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const result = await fetchMetadataWithFallback("Some Title", "Some Author");
+
+    expect(result).toEqual({
+      source: "GOOGLE",
+      title: "Enabled Google Title",
+      author: "Enabled Google Author"
+    });
+  });
+
+  it("selects the best Open Library candidate instead of always taking the first hit", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("openlibrary.org/search.json")) {
+        return mockJsonResponse({
+          docs: [
+            {
+              title: "Completely Different Book",
+              author_name: ["Someone Else"],
+              cover_i: 101,
+              first_sentence: "Not related"
+            },
+            {
+              title: "The Exact Match",
+              author_name: ["Alice Author"]
+            }
+          ]
+        });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const result = await fetchMetadataWithFallback("The Exact Match", "Alice Author");
+
+    expect(result).toEqual({
+      source: "OPEN_LIBRARY",
+      title: "The Exact Match",
+      author: "Alice Author"
+    });
+  });
+
+  it("returns NONE when all providers are disabled", async () => {
+    settings.set("metadata_provider_enabled", {
+      open_library: false,
+      amazon: false,
+      google: false,
+      hardcover: false,
+      goodreads: false,
+      douban: false
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const result = await fetchMetadataWithFallback("Some Title", "Some Author");
+
+    expect(result).toEqual({ source: "NONE" });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
