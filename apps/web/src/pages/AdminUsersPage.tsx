@@ -51,6 +51,7 @@ import {
   Shield,
   HardDrive,
   Info,
+  Link2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,7 @@ interface AppSettings {
   metadataOpenrouterModel: string;
   metadataOpenrouterEnabled: boolean;
   uploadLimitMb: number;
+  ebookDownloadUrl: string;
 }
 
 type EnabledMetadataProvider =
@@ -818,6 +820,50 @@ export const AdminUsersPage: React.FC = () => {
                     className="h-9 w-20 text-center tabular-nums"
                   />
                   <span className="text-sm text-muted-foreground font-medium">MB</span>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border-border overflow-hidden">
+          <CardHeader className="pb-4 pt-5 px-6">
+            <div className="flex items-center gap-2.5">
+              <Link2 className="size-4 text-muted-foreground" />
+              <h2 className="text-lg font-semibold tracking-tight">External Links</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Configure optional links that appear in the app menu.
+            </p>
+          </CardHeader>
+
+          <CardContent className="px-6 pb-6">
+            {settings.isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="size-5 text-muted-foreground animate-spin" />
+              </div>
+            ) : settings.data ? (
+              <div className="max-w-2xl rounded-md border border-border bg-muted/20 p-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs text-muted-foreground">Ebook Download URL</Label>
+                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                      Optional
+                    </Badge>
+                  </div>
+                  <Input
+                    type="url"
+                    defaultValue={settings.data.ebookDownloadUrl}
+                    placeholder="https://example.com/downloads"
+                    onBlur={(e) =>
+                      patchSettings.mutate({
+                        ebookDownloadUrl: e.target.value,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave this empty to keep the menu item hidden. When set, it opens in a new tab.
+                  </p>
                 </div>
               </div>
             ) : null}

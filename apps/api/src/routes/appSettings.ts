@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { db, getSetting } from "../db/client";
 import { appSettings } from "../db/schema";
-import { requireOwner } from "../auth/guards";
+import { requireAuth, requireOwner } from "../auth/guards";
 import { config } from "../config";
 import {
   defaultMetadataProviderEnabled,
@@ -24,6 +24,14 @@ const amazonDomainSchema = z.enum([
 ]);
 type AmazonDomain = z.infer<typeof amazonDomainSchema>;
 
+const optionalUrlSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || z.string().url().safeParse(value).success,
+    "Must be a valid URL or empty"
+  );
+
 const patchSettingsSchema = z
   .object({
     metadataProviderEnabled: metadataProviderEnabledSchema.optional(),
@@ -35,12 +43,18 @@ const patchSettingsSchema = z
     metadataOpenrouterApiKey: z.string().trim().optional(),
     metadataOpenrouterModel: z.string().trim().max(100).optional(),
     metadataOpenrouterEnabled: z.boolean().optional(),
-    uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional()
+    uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional(),
+    ebookDownloadUrl: optionalUrlSchema.optional()
   })
   .strict();
 
 const toAmazonDomain = (value: unknown, fallback: AmazonDomain): AmazonDomain => {
   const parsed = amazonDomainSchema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
+};
+
+const toOptionalUrl = (value: unknown, fallback = ""): string => {
+  const parsed = optionalUrlSchema.safeParse(value);
   return parsed.success ? parsed.data : fallback;
 };
 
@@ -55,6 +69,7 @@ const resolveSettings = async (): Promise<{
   metadataOpenrouterModel: string;
   metadataOpenrouterEnabled: boolean;
   uploadLimitMb: number;
+  ebookDownloadUrl: string;
 }> => ({
   metadataProviderEnabled: toMetadataProviderEnabled(
     await getSetting<unknown>("metadata_provider_enabled", defaultMetadataProviderEnabled),
@@ -89,10 +104,21 @@ const resolveSettings = async (): Promise<{
     ""
   ),
   metadataOpenrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false),
-  uploadLimitMb: await getSetting<number>("upload_limit_mb", 100)
+  uploadLimitMb: await getSetting<number>("upload_limit_mb", 100),
+  ebookDownloadUrl: toOptionalUrl(await getSetting<unknown>("ebook_download_url", ""))
+});
+
+const resolvePublicSettings = async (): Promise<{ ebookDownloadUrl: string }> => ({
+  ebookDownloadUrl: toOptionalUrl(await getSetting<unknown>("ebook_download_url", ""))
 });
 
 export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get(
+    "/api/v1/app-settings/public",
+    { preHandler: requireAuth },
+    async () => resolvePublicSettings()
+  );
+
   fastify.get("/api/v1/app-settings", { preHandler: requireOwner }, async () =>
     resolveSettings()
   );
@@ -150,6 +176,9 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       }
       if (body.uploadLimitMb !== undefined) {
         await upsert("upload_limit_mb", body.uploadLimitMb);
+      }
+      if (body.ebookDownloadUrl !== undefined) {
+        await upsert("ebook_download_url", body.ebookDownloadUrl);
       }
 
       return resolveSettings();

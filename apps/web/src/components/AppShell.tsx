@@ -1,8 +1,10 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,6 +26,7 @@ import {
   X,
   CircleHelp,
   ChevronsUpDown,
+  Download,
 } from "lucide-react";
 
 const navItems = [
@@ -38,6 +41,19 @@ const bottomItems = [
   { to: "/profile", label: "Profile", icon: User },
 ];
 
+interface PublicAppSettings {
+  ebookDownloadUrl: string;
+}
+
+type NavItem = {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  ownerOnly?: boolean;
+} & (
+  | { to: string; href?: never }
+  | { href: string; to?: never }
+);
+
 export const AppShell: React.FC = () => {
   const { me, logout } = useAuth();
   const { resolved, setTheme } = useTheme();
@@ -46,9 +62,17 @@ export const AppShell: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isReaderRoute =
     location.pathname.startsWith("/library/") && location.pathname.endsWith("/read");
+  const publicSettings = useQuery({
+    queryKey: ["public-app-settings"],
+    queryFn: () => apiFetch<PublicAppSettings>("/api/v1/app-settings/public"),
+  });
+  const ebookDownloadUrl = publicSettings.data?.ebookDownloadUrl?.trim() ?? "";
+  const topItems: NavItem[] = ebookDownloadUrl
+    ? [...navItems, { href: ebookDownloadUrl, label: "Ebooks", icon: Download }]
+    : navItems;
 
   const visibleBottomItems = bottomItems.filter((i) => !i.ownerOnly || me?.role === "OWNER");
-  const allItems = [...navItems, ...visibleBottomItems];
+  const allItems = [...topItems, ...visibleBottomItems];
 
   const handleLogout = async () => {
     await logout();
@@ -69,6 +93,46 @@ export const AppShell: React.FC = () => {
       isActive ? "text-primary" : "text-muted-foreground/70 group-hover:text-foreground"
     );
 
+  const renderNavItem = (item: NavItem, closeMobile = false) => {
+    if ("href" in item) {
+      return (
+        <a
+          key={item.href}
+          href={item.href}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => closeMobile && setMobileOpen(false)}
+          className={cn(
+            "group relative flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg transition-all duration-150",
+            "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+          )}
+        >
+          <item.icon className={iconClass(false)} />
+          {item.label}
+        </a>
+      );
+    }
+
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        onClick={() => closeMobile && setMobileOpen(false)}
+        className={linkClass}
+      >
+        {({ isActive }) => (
+          <>
+            {isActive && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
+            )}
+            <item.icon className={iconClass(isActive)} />
+            {item.label}
+          </>
+        )}
+      </NavLink>
+    );
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
       {!isReaderRoute && (
@@ -81,35 +145,11 @@ export const AppShell: React.FC = () => {
           </div>
 
           <nav className="flex flex-1 flex-col gap-1 px-3 pt-2">
-            {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} className={linkClass}>
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
-                    )}
-                    <item.icon className={iconClass(isActive)} />
-                    {item.label}
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {topItems.map((item) => renderNavItem(item))}
 
             <div className="h-px bg-border/50 my-2 mx-1" />
 
-            {visibleBottomItems.map((item) => (
-              <NavLink key={item.to} to={item.to} className={linkClass}>
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
-                    )}
-                    <item.icon className={iconClass(isActive)} />
-                    {item.label}
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {visibleBottomItems.map((item) => renderNavItem(item))}
           </nav>
 
           <div className="px-3 pb-3">
@@ -157,16 +197,7 @@ export const AppShell: React.FC = () => {
 
             {mobileOpen && (
               <nav className="md:hidden border-b border-border/40 bg-muted/20 p-2.5 flex flex-col gap-0.5 animate-fade-in">
-                {allItems.map((item) => (
-                  <NavLink key={item.to} to={item.to} onClick={() => setMobileOpen(false)} className={linkClass}>
-                    {({ isActive }) => (
-                      <>
-                        <item.icon className={iconClass(isActive)} />
-                        {item.label}
-                      </>
-                    )}
-                  </NavLink>
-                ))}
+                {allItems.map((item) => renderNavItem(item, true))}
               </nav>
             )}
           </>
