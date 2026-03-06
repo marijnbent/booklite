@@ -146,6 +146,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       const author = normalizeOptionalText(fields.author);
       const series = normalizeOptionalText(fields.series);
       const description = normalizeOptionalText(fields.description);
+      const coverPath = normalizeOptionalText(fields.coverPath);
       const favorite = parseBooleanField(fields.favorite, false);
       const autoMetadata = parseBooleanField(fields.autoMetadata, true);
 
@@ -165,6 +166,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
             author,
             series,
             description,
+            coverPath,
             collectionIds,
             favorite,
             autoMetadata

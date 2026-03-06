@@ -6,6 +6,7 @@ import { collections, koboSyncCollections, koboUserSettings } from "../db/schema
 import { requireAuth } from "../auth/guards";
 import { randomToken } from "../utils/hash";
 import { nowIso } from "../utils/time";
+import { ensureKoboSettingsRow } from "../services/koboSettings";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
 
 const settingsSchema = z.object({
@@ -16,37 +17,12 @@ const settingsSchema = z.object({
   syncCollectionIds: z.array(z.coerce.number().int().positive())
 });
 
-const ensureSettingsRow = async (userId: number) => {
-  const found = await db
-    .select()
-    .from(koboUserSettings)
-    .where(eq(koboUserSettings.userId, userId))
-    .limit(1);
-
-  if (found[0]) return found[0];
-
-  const [inserted] = await db
-    .insert(koboUserSettings)
-    .values({
-      userId,
-      token: randomToken(),
-      syncEnabled: 0,
-      twoWayProgressSync: 0,
-      markReadingThreshold: 1,
-      markFinishedThreshold: 99,
-      updatedAt: nowIso()
-    })
-    .returning();
-
-  return inserted;
-};
-
 export const koboSettingsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/kobo/settings", { preHandler: requireAuth }, async (request, reply) => {
     if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
     await ensureSystemCollectionsForUser(request.auth.userId);
 
-    const settings = await ensureSettingsRow(request.auth.userId);
+    const settings = await ensureKoboSettingsRow(request.auth.userId);
     const syncRows = await db
       .select({ collectionId: koboSyncCollections.collectionId })
       .from(koboSyncCollections)
@@ -74,7 +50,7 @@ export const koboSettingsRoutes: FastifyPluginAsync = async (fastify) => {
 
     const body = settingsSchema.parse(request.body);
     await ensureSystemCollectionsForUser(request.auth.userId);
-    await ensureSettingsRow(request.auth.userId);
+    await ensureKoboSettingsRow(request.auth.userId);
 
     const syncCollectionIds = [...new Set(body.syncCollectionIds)];
     if (syncCollectionIds.length > 0) {
@@ -153,7 +129,7 @@ export const koboSettingsRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
 
-      await ensureSettingsRow(request.auth.userId);
+      await ensureKoboSettingsRow(request.auth.userId);
       const [updated] = await db
         .update(koboUserSettings)
         .set({ token: randomToken(), updatedAt: nowIso() })

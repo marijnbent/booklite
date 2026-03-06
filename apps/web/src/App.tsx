@@ -5,12 +5,13 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { LoginPage } from "@/pages/LoginPage";
 import { SetupPage } from "@/pages/SetupPage";
 import { LibraryPage } from "@/pages/LibraryPage";
-import { CollectionsPage } from "@/pages/CollectionsPage";
+
 import { UploadsPage } from "@/pages/UploadsPage";
 import { KoboPage } from "@/pages/KoboPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { DocsPage } from "@/pages/DocsPage";
+import { ReaderPage } from "@/pages/ReaderPage";
 
 export const App: React.FC = () => (
   <Routes>
@@ -20,7 +21,8 @@ export const App: React.FC = () => (
     <Route element={<ProtectedRoute />}>
       <Route element={<AppShell />}>
         <Route path="/library" element={<LibraryPage />} />
-        <Route path="/collections" element={<CollectionsPage />} />
+        <Route path="/library/:bookId/read" element={<ReaderPage />} />
+
         <Route path="/uploads" element={<UploadsPage />} />
         <Route path="/kobo" element={<KoboPage />} />
         <Route path="/docs" element={<DocsPage />} />

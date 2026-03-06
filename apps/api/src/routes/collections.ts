@@ -6,6 +6,7 @@ import { collectionBooks, collections } from "../db/schema";
 import { requireAuth } from "../auth/guards";
 import { nowIso } from "../utils/time";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
+import { mapBookRow, koboSyncableCase } from "./books";
 
 const createCollectionSchema = z.object({
   name: z.string().min(1),
@@ -22,12 +23,22 @@ const reorderSchema = z.object({
   bookIds: z.array(z.number().int().positive())
 });
 
+const listCollectionsSchema = z.object({
+  includeVirtual: z
+    .union([z.literal("1"), z.literal("true"), z.literal("0"), z.literal("false")])
+    .optional()
+});
+
 export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/collections", { preHandler: requireAuth }, async (request, reply) => {
     if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
     await ensureSystemCollectionsForUser(request.auth.userId);
 
-    return db.all(sql`
+    const query = listCollectionsSchema.parse(request.query);
+    const includeVirtual =
+      query.includeVirtual === "1" || query.includeVirtual === "true";
+
+    const rows = await db.all(sql`
       SELECT c.*, COUNT(cb.book_id) AS book_count
       FROM collections c
       LEFT JOIN collection_books cb ON cb.collection_id = c.id
@@ -35,6 +46,39 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       GROUP BY c.id
       ORDER BY c.updated_at DESC
     `);
+
+    if (!includeVirtual) {
+      return rows;
+    }
+
+    const uncollectedRows = await db.all<{ book_count: number }>(sql`
+      SELECT COUNT(*) AS book_count
+      FROM books b
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM collection_books cb
+        INNER JOIN collections c ON c.id = cb.collection_id
+        WHERE cb.book_id = b.id
+          AND c.user_id = ${request.auth.userId}
+          AND c.is_system = 0
+      )
+    `);
+
+    return [
+      ...rows,
+      {
+        id: -1,
+        user_id: request.auth.userId,
+        name: "Uncollected",
+        icon: "🗃️",
+        slug: "uncollected",
+        is_system: 1,
+        created_at: "",
+        updated_at: "",
+        book_count: uncollectedRows[0]?.book_count ?? 0,
+        virtual: 1
+      }
+    ];
   });
 
   fastify.post(
@@ -240,6 +284,37 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   fastify.get(
+    "/api/v1/collections/uncollected/books",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      await ensureSystemCollectionsForUser(request.auth.userId);
+
+      const rows = await db.all(sql`
+        SELECT b.id, b.owner_user_id, b.title, b.author, b.series, b.description, b.cover_path, b.file_path, b.file_ext, b.file_size,
+               ${koboSyncableCase(request.auth.userId)} AS kobo_syncable, b.created_at, b.updated_at,
+               bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+               CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
+        FROM books b
+        LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
+        LEFT JOIN collections fav ON fav.user_id = ${request.auth.userId} AND fav.slug = 'favorites'
+        LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM collection_books cb2
+          INNER JOIN collections c2 ON c2.id = cb2.collection_id
+          WHERE cb2.book_id = b.id
+            AND c2.user_id = ${request.auth.userId}
+            AND c2.is_system = 0
+        )
+        ORDER BY b.updated_at DESC
+      `);
+
+      return rows.map(mapBookRow);
+    }
+  );
+
+  fastify.get(
     "/api/v1/collections/:id/books",
     { preHandler: requireAuth },
     async (request, reply) => {
@@ -247,14 +322,22 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       await ensureSystemCollectionsForUser(request.auth.userId);
       const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
 
-      return db.all(sql`
-        SELECT b.*, cb.sort_order
+      const rows = await db.all(sql`
+        SELECT b.id, b.owner_user_id, b.title, b.author, b.series, b.description, b.cover_path, b.file_path, b.file_ext, b.file_size,
+               ${koboSyncableCase(request.auth.userId)} AS kobo_syncable, b.created_at, b.updated_at,
+               bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
+               CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+               cb.sort_order
         FROM collection_books cb
         JOIN collections c ON c.id = cb.collection_id
         JOIN books b ON b.id = cb.book_id
+        LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
+        LEFT JOIN collections fav ON fav.user_id = ${request.auth.userId} AND fav.slug = 'favorites'
+        LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
         WHERE c.user_id = ${request.auth.userId} AND c.id = ${params.id}
         ORDER BY cb.sort_order ASC
       `);
+      return rows.map(mapBookRow);
     }
   );
 };

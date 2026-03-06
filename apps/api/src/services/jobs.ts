@@ -15,6 +15,7 @@ interface UploadControls {
   author?: string;
   series?: string;
   description?: string;
+  coverPath?: string;
   collectionIds: number[];
   favorite: boolean;
   autoMetadata: boolean;
@@ -60,6 +61,7 @@ const processUploadJob = async (job: {
     author: payload.controls?.author,
     series: payload.controls?.series,
     description: payload.controls?.description,
+    coverPath: payload.controls?.coverPath,
     collectionIds: payload.controls?.collectionIds ?? [],
     favorite: payload.controls?.favorite ?? false,
     autoMetadata: payload.controls?.autoMetadata ?? true
@@ -69,6 +71,7 @@ const processUploadJob = async (job: {
   const normalizedControlAuthor = controls.author?.trim() || undefined;
   const normalizedControlSeries = controls.series?.trim() || undefined;
   const normalizedControlDescription = controls.description?.trim() || undefined;
+  const normalizedControlCoverPath = controls.coverPath?.trim() || undefined;
   const rawFileTitle = getRawFileTitle(payload.fileName);
 
   let defaults = filenameToBasicMetadata(payload.fileName);
@@ -107,7 +110,7 @@ const processUploadJob = async (job: {
       author: resolvedAuthor,
       series: normalizedControlSeries ?? defaults.series ?? null,
       description: normalizedControlDescription ?? null,
-      coverPath: null,
+      coverPath: normalizedControlCoverPath ?? null,
       filePath: payload.filePath,
       fileExt: payload.fileExt,
       fileSize: payload.fileSize,

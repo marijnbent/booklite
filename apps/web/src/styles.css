@@ -32,6 +32,7 @@
   --animate-fade-up: fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-slide-in-right: slide-in-right 0.2s ease-out;
   --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-slide-up: slide-up 0.15s ease-out;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -83,6 +84,11 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes slide-up {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
 * {
   box-sizing: border-box;
   border-color: var(--color-border);
@@ -114,4 +120,43 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Reader */
+.reader-root {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;
+  overscroll-behavior: none;
+}
+
+.reader-surface .epub-container {
+  height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.reader-surface .epub-view {
+  height: 100% !important;
+}
+
+.reader-surface .epub-view > iframe {
+  height: 100% !important;
+}
+
+@keyframes slide-up-reader {
+  from { opacity: 0; transform: translateY(2rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-down-reader {
+  from { opacity: 0; transform: translateY(-1rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up-reader {
+  animation: slide-up-reader 0.2s ease-out;
+}
+
+.animate-fade-down-reader {
+  animation: fade-down-reader 0.2s ease-out;
 }

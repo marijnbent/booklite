@@ -18,6 +18,21 @@ export interface MetadataResult {
     | "NONE";
 }
 
+export interface MetadataCoverOption {
+  coverPath: string;
+  source:
+    | "OPEN_LIBRARY"
+    | "AMAZON"
+    | "GOOGLE"
+    | "HARDCOVER"
+    | "GOODREADS"
+    | "DOUBAN";
+}
+
+export interface MetadataPreviewResult extends MetadataResult {
+  coverOptions: MetadataCoverOption[];
+}
+
 type MetadataProvider =
   | "open_library"
   | "amazon"
@@ -1116,6 +1131,39 @@ const resolveCoverFromProviders = (
   return bestScore >= 0.75 ? bestValue : undefined;
 };
 
+const buildCoverOptions = (
+  candidates: ProviderCandidate[],
+  selectedCoverPath: string | undefined
+): MetadataCoverOption[] => {
+  const selectedKey = hasText(selectedCoverPath) ? normalizeUrl(selectedCoverPath.trim()) : null;
+  const seen = new Set<string>();
+  const options: MetadataCoverOption[] = [];
+  let selectedOption: MetadataCoverOption | null = null;
+
+  for (const candidate of candidates) {
+    const coverPath = candidate.metadata.coverPath?.trim();
+    if (!hasText(coverPath) || candidate.metadata.source === "NONE") continue;
+
+    const normalizedCover = normalizeUrl(coverPath);
+    if (seen.has(normalizedCover)) continue;
+    seen.add(normalizedCover);
+
+    const option: MetadataCoverOption = {
+      coverPath,
+      source: candidate.metadata.source
+    };
+
+    if (selectedKey && normalizedCover === selectedKey) {
+      selectedOption = option;
+      continue;
+    }
+
+    options.push(option);
+  }
+
+  return selectedOption ? [selectedOption, ...options] : options;
+};
+
 const resolveWithLlm = async (
   queryTitle: string,
   queryAuthor: string | undefined,
@@ -1199,15 +1247,15 @@ ${providerRows}`;
   }
 };
 
-export const fetchMetadataWithFallback = async (
+const resolveMetadata = async (
   title: string,
   author?: string
-): Promise<MetadataResult> => {
+): Promise<{ result: MetadataResult; candidates: ProviderCandidate[] }> => {
   const settings = await resolveMetadataProviderSettings();
   const providerOrder = buildProviderFetchOrder(settings.providerEnabled);
 
   if (providerOrder.length === 0) {
-    return { source: "NONE" };
+    return { result: { source: "NONE" }, candidates: [] };
   }
 
   // Fetch all enabled providers in parallel
@@ -1230,7 +1278,7 @@ export const fetchMetadataWithFallback = async (
   }
 
   if (candidates.length === 0) {
-    return { source: "NONE" };
+    return { result: { source: "NONE" }, candidates: [] };
   }
 
   candidates.sort((a, b) => b.overallScore - a.overallScore);
@@ -1251,8 +1299,11 @@ export const fetchMetadataWithFallback = async (
 
     if (llmResolved) {
       return {
-        ...llmResolved,
-        source: bestSource
+        result: {
+          ...llmResolved,
+          source: bestSource
+        },
+        candidates
       };
     }
   }
@@ -1302,15 +1353,38 @@ export const fetchMetadataWithFallback = async (
     !hasText(mergedDescription) &&
     !hasText(mergedCoverPath)
   ) {
-    return { source: "NONE" };
+    return { result: { source: "NONE" }, candidates };
   }
 
   return {
-    source: bestSource,
-    title: mergedTitle,
-    author: mergedAuthor,
-    series: mergedSeries,
-    description: mergedDescription,
-    coverPath: mergedCoverPath
+    result: {
+      source: bestSource,
+      title: mergedTitle,
+      author: mergedAuthor,
+      series: mergedSeries,
+      description: mergedDescription,
+      coverPath: mergedCoverPath
+    },
+    candidates
+  };
+};
+
+export const fetchMetadataWithFallback = async (
+  title: string,
+  author?: string
+): Promise<MetadataResult> => {
+  const { result } = await resolveMetadata(title, author);
+  return result;
+};
+
+export const fetchMetadataPreview = async (
+  title: string,
+  author?: string
+): Promise<MetadataPreviewResult> => {
+  const { result, candidates } = await resolveMetadata(title, author);
+
+  return {
+    ...result,
+    coverOptions: buildCoverOptions(candidates, result.coverPath)
   };
 };

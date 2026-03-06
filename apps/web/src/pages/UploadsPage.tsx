@@ -1,22 +1,34 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import type { MetadataCoverOption, MetadataSource } from "@/lib/metadata";
+import { sourceLabel } from "@/lib/metadata";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CoverOptionGrid } from "@/components/CoverOptionGrid";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Upload,
   FileUp,
   CheckCircle2,
+  Check,
   XCircle,
   Loader2,
   Clock,
   Plus,
   Trash2,
   Star,
+  Pencil,
 } from "lucide-react";
 
 interface UploadJob {
@@ -33,18 +45,13 @@ interface CollectionItem {
 }
 
 interface MetadataPreview {
-  source:
-    | "OPEN_LIBRARY"
-    | "AMAZON"
-    | "GOOGLE"
-    | "HARDCOVER"
-    | "GOODREADS"
-    | "DOUBAN"
-    | "NONE";
+  source: MetadataSource;
   title?: string | null;
   author?: string | null;
   series?: string | null;
   description?: string | null;
+  coverPath?: string | null;
+  coverOptions: MetadataCoverOption[];
 }
 
 interface UploadDraft {
@@ -55,6 +62,8 @@ interface UploadDraft {
   author: string;
   series: string;
   description: string;
+  coverPath: string;
+  coverOptions: MetadataCoverOption[];
   favorite: boolean;
   collectionIds: number[];
   selected: boolean;
@@ -83,12 +92,6 @@ const extAllowed = (name: string): boolean => {
 
 const toInitialTitle = (name: string): string => name.replace(/\.[^.]+$/, "");
 
-const sourceLabel = (source: string | null): string => {
-  if (source === "OPEN_LIBRARY") return "Open Library";
-  if (source === "GOOGLE") return "Google Books";
-  return "Metadata";
-};
-
 const toErrorMessage = (error: unknown): string => {
   if (!(error instanceof Error)) return "Upload failed";
 
@@ -109,8 +112,11 @@ export const UploadsPage: React.FC = () => {
   const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [uploadingIds, setUploadingIds] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const intervalRef = useRef<number | null>(null);
+
+  const editingDraft = editingDraftId ? drafts.find((d) => d.id === editingDraftId) ?? null : null;
 
   const collections = useQuery({
     queryKey: ["collections", "uploads"],
@@ -156,6 +162,7 @@ export const UploadsPage: React.FC = () => {
 
   const removeDraft = (id: string) => {
     setDrafts((prev) => prev.filter((draft) => draft.id !== id));
+    if (editingDraftId === id) setEditingDraftId(null);
   };
 
   const runMetadataPreview = async (target: UploadDraft): Promise<void> => {
@@ -188,10 +195,17 @@ export const UploadsPage: React.FC = () => {
           if (preview.source === "NONE") {
             return {
               ...draft,
+              coverPath: "",
+              coverOptions: [],
               metadataState: "none",
               metadataSource: "NONE"
             };
           }
+
+          const selectedCoverPath =
+            preview.coverPath?.trim() ||
+            preview.coverOptions[0]?.coverPath ||
+            "";
 
           return {
             ...draft,
@@ -201,6 +215,8 @@ export const UploadsPage: React.FC = () => {
             description: draft.descriptionTouched
               ? draft.description
               : (preview.description ?? draft.description),
+            coverPath: selectedCoverPath,
+            coverOptions: preview.coverOptions,
             metadataState: "enriched",
             metadataSource: preview.source
           };
@@ -234,6 +250,8 @@ export const UploadsPage: React.FC = () => {
         author: "",
         series: "",
         description: "",
+        coverPath: "",
+        coverOptions: [],
         favorite: false,
         collectionIds: [],
         selected: true,
@@ -265,6 +283,7 @@ export const UploadsPage: React.FC = () => {
       if (draft.author.trim()) formData.append("author", draft.author.trim());
       if (draft.series.trim()) formData.append("series", draft.series.trim());
       if (draft.description.trim()) formData.append("description", draft.description.trim());
+      if (draft.coverPath.trim()) formData.append("coverPath", draft.coverPath.trim());
 
       formData.append("favorite", String(draft.favorite));
       formData.append("autoMetadata", "true");
@@ -354,7 +373,7 @@ export const UploadsPage: React.FC = () => {
         />
       </div>
 
-      {/* Draft cards */}
+      {/* Draft rows */}
       {drafts.length > 0 && (
         <div className="space-y-5">
           {/* Toolbar */}
@@ -394,8 +413,8 @@ export const UploadsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Draft list */}
-          <div className="space-y-3">
+          {/* Compact draft list */}
+          <div className="space-y-1">
             {drafts.map((draft) => {
               const isUploading = uploadingIds.includes(draft.id);
               const isLoading = draft.metadataState === "loading";
@@ -409,231 +428,268 @@ export const UploadsPage: React.FC = () => {
                 <div
                   key={draft.id}
                   className={cn(
-                    "rounded-lg border bg-card transition-colors duration-200",
+                    "group flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors duration-150",
                     draft.selected
-                      ? "border-primary/30"
+                      ? "border-primary/30 bg-primary/[0.02]"
                       : "border-border/60",
-                    isUploading && "opacity-60 pointer-events-none"
+                    isUploading && "opacity-60 pointer-events-none",
+                    draft.error && "border-destructive/30",
+                    (isNoMatch || isError) && "border-status-queued/40 bg-status-queued/[0.03]"
                   )}
                 >
-                  <div className="p-5">
-                    {/* Top row: checkbox, file info, metadata status */}
-                    <div className="flex items-start gap-3">
-                      {/* Checkbox */}
-                      <div className="pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => updateDraft(draft.id, { selected: !draft.selected })}
-                          className={cn(
-                            "flex size-4.5 items-center justify-center rounded border transition-colors duration-150",
-                            draft.selected
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border hover:border-muted-foreground/50"
-                          )}
-                        >
-                          {draft.selected && <CheckCircle2 className="size-3" />}
-                        </button>
+                  {/* Checkbox */}
+                  <button
+                    type="button"
+                    onClick={() => updateDraft(draft.id, { selected: !draft.selected })}
+                    className={cn(
+                      "flex size-4.5 shrink-0 items-center justify-center rounded border transition-colors duration-150",
+                      draft.selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border hover:border-muted-foreground/50"
+                    )}
+                  >
+                    {draft.selected && <CheckCircle2 className="size-3" />}
+                  </button>
+
+                  {/* Cover thumbnail */}
+                  <button
+                    type="button"
+                    onClick={() => setEditingDraftId(draft.id)}
+                    className="shrink-0 overflow-hidden rounded border border-border/40 bg-muted/30 transition-colors hover:border-primary/40"
+                    style={{ width: 32, height: 48 }}
+                  >
+                    {draft.coverPath ? (
+                      <img
+                        src={draft.coverPath}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center text-muted-foreground/30">
+                        <FileUp className="size-3" />
                       </div>
+                    )}
+                  </button>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0 space-y-4">
-                        {/* File info row */}
-                        <div className="flex items-center gap-2.5">
-                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            {fileExt}
-                          </span>
-                          <p className="text-sm font-medium truncate">{draft.file.name}</p>
-                          <span className="shrink-0 text-[11px] text-muted-foreground/50 tabular-nums">{fileSizeMB} MB</span>
+                  {/* Title */}
+                  <input
+                    value={draft.title}
+                    onChange={(e) => updateDraft(draft.id, { title: e.target.value, titleTouched: true })}
+                    placeholder="Title"
+                    className="min-w-0 flex-[3] truncate border-0 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground/40 focus:underline focus:decoration-primary/30 focus:underline-offset-4"
+                  />
 
-                          {/* Metadata status */}
-                          <div className="ml-auto shrink-0 flex items-center gap-2">
-                            {isLoading && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground">
-                                <Loader2 className="size-3 animate-spin" />
-                                <span className="text-[11px]">Looking up metadata...</span>
-                              </div>
-                            )}
-                            {isEnriched && (
-                              <span className="text-[11px] text-status-completed">
-                                {sourceLabel(draft.metadataSource)}
-                              </span>
-                            )}
-                            {isNoMatch && (
-                              <span className="text-[11px] text-muted-foreground/50">
-                                No metadata found
-                              </span>
-                            )}
-                            {isError && (
-                              <span className="text-[11px] text-destructive">
-                                Lookup failed
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                  <span className="shrink-0 text-muted-foreground/30">—</span>
 
-                        {/* Loading state */}
-                        {isLoading && (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {["Title", "Author", "Series"].map((label) => (
-                              <div key={label} className="space-y-1.5">
-                                <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wide">{label}</span>
-                                <div className="h-9 rounded-md bg-muted/50 flex items-center justify-center">
-                                  <span className="text-xs text-muted-foreground/40">Loading...</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                  {/* Author */}
+                  <input
+                    value={draft.author}
+                    onChange={(e) => updateDraft(draft.id, { author: e.target.value, authorTouched: true })}
+                    placeholder="Author"
+                    className="min-w-0 flex-[2] truncate border-0 bg-transparent text-sm text-muted-foreground outline-none placeholder:text-muted-foreground/40 focus:underline focus:decoration-primary/30 focus:underline-offset-4"
+                  />
 
-                        {/* Metadata fields */}
-                        {!isLoading && (
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="space-y-1.5">
-                                <Label className="text-[11px] text-muted-foreground">
-                                  Title
-                                  {isEnriched && !draft.titleTouched && draft.title && (
-                                    <span className="ml-1 text-muted-foreground/50">(auto)</span>
-                                  )}
-                                </Label>
-                                <Input
-                                  value={draft.title}
-                                  onChange={(e) => updateDraft(draft.id, { title: e.target.value, titleTouched: true })}
-                                  className="h-9"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-[11px] text-muted-foreground">
-                                  Author
-                                  {isEnriched && !draft.authorTouched && draft.author && (
-                                    <span className="ml-1 text-muted-foreground/50">(auto)</span>
-                                  )}
-                                </Label>
-                                <Input
-                                  value={draft.author}
-                                  onChange={(e) => updateDraft(draft.id, { author: e.target.value, authorTouched: true })}
-                                  className="h-9"
-                                />
-                              </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-[11px] text-muted-foreground">Series</Label>
-                                <Input
-                                  value={draft.series}
-                                  onChange={(e) => updateDraft(draft.id, { series: e.target.value })}
-                                  className="h-9"
-                                />
-                              </div>
-                            </div>
+                  {/* Series — always rendered to keep alignment */}
+                  <span className="hidden shrink-0 w-36 text-xs text-muted-foreground/50 lg:inline truncate text-right">
+                    {draft.series || "\u00A0"}
+                  </span>
 
-                            <div className="space-y-1.5">
-                              <Label className="text-[11px] text-muted-foreground">
-                                Description
-                                {isEnriched && !draft.descriptionTouched && draft.description && (
-                                  <span className="ml-1 text-muted-foreground/50">(auto)</span>
-                                )}
-                              </Label>
-                              <Textarea
-                                rows={2}
-                                value={draft.description}
-                                onChange={(e) => updateDraft(draft.id, { description: e.target.value, descriptionTouched: true })}
-                                className="text-sm resize-none"
-                              />
-                            </div>
-
-                            {/* Bottom row: collections, favorite, actions */}
-                            <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/40">
-                              <div className="flex items-center gap-3 flex-wrap">
-                                {/* Collections as checkboxes */}
-                                {(collections.data ?? []).length > 0 && (
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    {(collections.data ?? []).map((collection) => {
-                                      const selected = draft.collectionIds.includes(collection.id);
-                                      return (
-                                        <label
-                                          key={collection.id}
-                                          className="flex items-center gap-1.5 text-[12px] cursor-pointer select-none"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={selected}
-                                            onChange={() => {
-                                              const next = selected
-                                                ? draft.collectionIds.filter((id) => id !== collection.id)
-                                                : [...draft.collectionIds, collection.id];
-                                              updateDraft(draft.id, { collectionIds: next });
-                                            }}
-                                            className="rounded border-border accent-primary size-3.5"
-                                          />
-                                          <span className="text-muted-foreground">
-                                            {collection.icon && <span className="mr-0.5">{collection.icon}</span>}
-                                            {collection.name}
-                                          </span>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-
-                                {/* Favorite toggle */}
-                                <button
-                                  type="button"
-                                  onClick={() => updateDraft(draft.id, { favorite: !draft.favorite })}
-                                  className={cn(
-                                    "inline-flex items-center gap-1 text-[12px] transition-colors duration-150",
-                                    draft.favorite
-                                      ? "text-status-queued"
-                                      : "text-muted-foreground/40 hover:text-muted-foreground"
-                                  )}
-                                >
-                                  <Star className={cn("size-3.5", draft.favorite && "fill-current")} />
-                                  Favorite
-                                </button>
-                              </div>
-
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-8 text-muted-foreground/40 hover:text-destructive"
-                                  onClick={() => removeDraft(draft.id)}
-                                  disabled={isUploading}
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => void uploadDraft(draft)}
-                                  disabled={isUploading || isLoading}
-                                >
-                                  {isUploading ? (
-                                    <Loader2 className="size-3.5 animate-spin" />
-                                  ) : (
-                                    <Plus className="size-3.5" />
-                                  )}
-                                  Add to library
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Error message */}
-                        {draft.error && (
-                          <div className="flex items-center gap-2 rounded-md bg-destructive/5 px-3 py-2.5 mt-1">
-                            <XCircle className="size-3.5 text-destructive shrink-0" />
-                            <p className="text-xs text-destructive">{draft.error}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                  {/* Metadata status — fixed width */}
+                  <div className="shrink-0 w-20 text-right">
+                    {isLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground inline-block" />}
+                    {isEnriched && (
+                      <span className="text-[11px] text-status-completed whitespace-nowrap">
+                        {sourceLabel(draft.metadataSource)}
+                      </span>
+                    )}
+                    {isNoMatch && (
+                      <span className="text-[11px] text-status-queued font-medium whitespace-nowrap">No match</span>
+                    )}
+                    {isError && (
+                      <span className="text-[11px] text-destructive whitespace-nowrap">Error</span>
+                    )}
                   </div>
+
+                  {/* File badge — fixed width */}
+                  <span className="hidden shrink-0 w-24 text-right text-[10px] text-muted-foreground/50 tabular-nums sm:inline whitespace-nowrap">
+                    {fileExt} · {fileSizeMB} MB
+                  </span>
+
+                  {/* Edit button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-muted-foreground/40 hover:text-foreground"
+                    onClick={() => setEditingDraftId(draft.id)}
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+
+                  {/* Delete button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-muted-foreground/40 hover:text-destructive"
+                    onClick={() => removeDraft(draft.id)}
+                    disabled={isUploading}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
                 </div>
               );
             })}
           </div>
         </div>
       )}
+
+      {/* Edit dialog */}
+      <Dialog
+        open={editingDraft !== null}
+        onOpenChange={(open) => { if (!open) setEditingDraftId(null); }}
+      >
+        {editingDraft && (
+          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Edit Book Details</DialogTitle>
+              <DialogDescription className="truncate">
+                {editingDraft.file.name}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-1 overflow-y-auto min-h-0">
+              {/* Top: selected cover + fields side by side */}
+              <div className="flex gap-4">
+                {/* Selected cover preview */}
+                <div className="shrink-0 w-24">
+                  {editingDraft.coverPath ? (
+                    <img
+                      src={editingDraft.coverPath}
+                      alt=""
+                      className="w-full rounded-lg border border-border/40 object-cover aspect-[2/3]"
+                    />
+                  ) : (
+                    <div className="flex w-full aspect-[2/3] items-center justify-center rounded-lg border border-dashed border-border/40 bg-muted/30">
+                      <FileUp className="size-5 text-muted-foreground/30" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Fields */}
+                <div className="flex-1 min-w-0 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] text-muted-foreground">Title</Label>
+                    <Input
+                      value={editingDraft.title}
+                      onChange={(e) => updateDraft(editingDraft.id, { title: e.target.value, titleTouched: true })}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground">Author</Label>
+                      <Input
+                        value={editingDraft.author}
+                        onChange={(e) => updateDraft(editingDraft.id, { author: e.target.value, authorTouched: true })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground">Series</Label>
+                      <Input
+                        value={editingDraft.series}
+                        onChange={(e) => updateDraft(editingDraft.id, { series: e.target.value })}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] text-muted-foreground">Description</Label>
+                    <Textarea
+                      rows={2}
+                      value={editingDraft.description}
+                      onChange={(e) => updateDraft(editingDraft.id, { description: e.target.value, descriptionTouched: true })}
+                      className="text-sm resize-none max-h-16"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Cover alternatives — horizontal strip */}
+              {(editingDraft.coverOptions.length > 0 || editingDraft.coverPath) && (
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-muted-foreground">Cover options</Label>
+                  <CoverOptionGrid
+                    selectedCoverPath={editingDraft.coverPath}
+                    options={editingDraft.coverOptions.map((option, index) => ({
+                      ...option,
+                      badgeLabel: index === 0 ? "Default" : "Option",
+                      metaLabel: sourceLabel(option.source)
+                    }))}
+                    onSelectCover={(coverPath) => updateDraft(editingDraft.id, { coverPath })}
+                    onClearCover={() => updateDraft(editingDraft.id, { coverPath: "" })}
+                    clearSelectedLabel="Using title card"
+                    clearIdleLabel="Remove cover"
+                    compact
+                    className="grid-cols-5 sm:grid-cols-6"
+                  />
+                </div>
+              )}
+
+              {/* Collections, favorite, done */}
+              <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/40">
+                <div className="flex items-center gap-3 flex-wrap">
+                  {(collections.data ?? []).map((collection) => {
+                    const selected = editingDraft.collectionIds.includes(collection.id);
+                    return (
+                      <label
+                        key={collection.id}
+                        className="flex items-center gap-1.5 text-[12px] cursor-pointer select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => {
+                            const next = selected
+                              ? editingDraft.collectionIds.filter((id) => id !== collection.id)
+                              : [...editingDraft.collectionIds, collection.id];
+                            updateDraft(editingDraft.id, { collectionIds: next });
+                          }}
+                          className="rounded border-border accent-primary size-3.5"
+                        />
+                        <span className="text-muted-foreground">
+                          {collection.icon && <span className="mr-0.5">{collection.icon}</span>}
+                          {collection.name}
+                        </span>
+                      </label>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => updateDraft(editingDraft.id, { favorite: !editingDraft.favorite })}
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[12px] transition-colors duration-150",
+                      editingDraft.favorite
+                        ? "text-status-queued"
+                        : "text-muted-foreground/40 hover:text-muted-foreground"
+                    )}
+                  >
+                    <Star className={cn("size-3.5", editingDraft.favorite && "fill-current")} />
+                    Favorite
+                  </button>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => setEditingDraftId(null)}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
 
       {/* Import progress */}
       {jobs.length > 0 && (

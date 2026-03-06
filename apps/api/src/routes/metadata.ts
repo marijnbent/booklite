@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { requireAuth } from "../auth/guards";
-import { fetchMetadataWithFallback } from "../services/metadata";
+import { fetchMetadataPreview } from "../services/metadata";
 
 const previewSchema = z.object({
   title: z.string().trim().min(1),
@@ -16,14 +16,15 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
       if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
 
       const body = previewSchema.parse(request.body);
-      const result = await fetchMetadataWithFallback(body.title, body.author);
+      const result = await fetchMetadataPreview(body.title, body.author);
       return {
         source: result.source,
         title: result.title,
         author: result.author,
         series: result.series,
         description: result.description,
-        coverPath: result.coverPath
+        coverPath: result.coverPath,
+        coverOptions: result.coverOptions
       };
     }
   );

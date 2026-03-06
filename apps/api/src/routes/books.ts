@@ -12,6 +12,10 @@ import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "../services/metadata";
 import { resolveFilenameMetadata } from "../services/filenameNormalizer";
 import {
+  getKoboThresholdsForUser,
+  inferStatusFromProgress
+} from "../services/koboSettings";
+import {
   ensureSystemCollectionsForUser,
   getFavoritesCollectionId
 } from "../services/systemCollections";
@@ -21,6 +25,7 @@ const patchBookSchema = z.object({
   author: z.string().nullable().optional(),
   series: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  coverPath: z.string().nullable().optional(),
   status: z.enum(["UNREAD", "READING", "DONE"]).optional(),
   progressPercent: z.coerce.number().min(0).max(100).optional(),
   positionRef: z.string().nullable().optional()
@@ -34,7 +39,7 @@ const favoriteSchema = z.object({
   favorite: z.boolean()
 });
 
-const mapBookRow = (row: any) => ({
+export const mapBookRow = (row: any) => ({
   id: row.id,
   ownerUserId: row.owner_user_id,
   title: row.title,
@@ -60,7 +65,7 @@ const mapBookRow = (row: any) => ({
         }
 });
 
-const koboSyncableCase = (userId: number) => sql`
+export const koboSyncableCase = (userId: number) => sql`
   CASE
     WHEN lower(b.file_ext) = 'epub' AND EXISTS (
       SELECT 1
@@ -251,6 +256,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       if (body.author !== undefined) bookSet.author = body.author;
       if (body.series !== undefined) bookSet.series = body.series;
       if (body.description !== undefined) bookSet.description = body.description;
+      if (body.coverPath !== undefined) bookSet.coverPath = body.coverPath;
 
       if (Object.keys(bookSet).length > 0) {
         bookSet.updatedAt = nowIso();
@@ -277,12 +283,22 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           )
           .limit(1);
 
+        const nextStatus =
+          body.status !== undefined
+            ? body.status
+            : body.progressPercent !== undefined
+              ? inferStatusFromProgress(
+                  body.progressPercent,
+                  await getKoboThresholdsForUser(request.auth.userId)
+                )
+              : (current[0]?.status ?? "UNREAD");
+
         await db
           .insert(bookProgress)
           .values({
             userId: request.auth.userId,
             bookId: params.id,
-            status: body.status ?? current[0]?.status ?? "UNREAD",
+            status: nextStatus,
             progressPercent: body.progressPercent ?? current[0]?.progressPercent ?? 0,
             positionRef:
               body.positionRef === undefined
@@ -293,7 +309,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           .onConflictDoUpdate({
             target: [bookProgress.userId, bookProgress.bookId],
             set: {
-              status: body.status ?? current[0]?.status ?? "UNREAD",
+              status: nextStatus,
               progressPercent: body.progressPercent ?? current[0]?.progressPercent ?? 0,
               positionRef:
                 body.positionRef === undefined
@@ -302,6 +318,42 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
               updatedAt: nowIso()
             }
           });
+      }
+
+      return { ok: true };
+    }
+  );
+
+  fastify.delete(
+    "/api/v1/books/:id",
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+
+      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+
+      const existing = await db
+        .select({ id: books.id, filePath: books.filePath, ownerUserId: books.ownerUserId })
+        .from(books)
+        .where(eq(books.id, params.id))
+        .limit(1);
+
+      if (!existing[0]) return reply.code(404).send({ error: "Book not found" });
+      if (existing[0].ownerUserId !== request.auth.userId) {
+        return reply.code(403).send({ error: "Forbidden" });
+      }
+
+      // Delete related rows first
+      await db.delete(collectionBooks).where(eq(collectionBooks.bookId, params.id));
+      await db.delete(bookProgress).where(eq(bookProgress.bookId, params.id));
+      await db.delete(books).where(eq(books.id, params.id));
+
+      // Delete file from disk (best effort)
+      try {
+        const fullPath = path.resolve(config.booksDir, existing[0].filePath);
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+      } catch {
+        // ignore file deletion errors
       }
 
       return { ok: true };
