@@ -1,28 +1,169 @@
 import { FastifyPluginAsync } from "fastify";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, getSetting } from "../db/client";
 import { appSettings } from "../db/schema";
 import { requireOwner } from "../auth/guards";
+import { config } from "../config";
+
+const metadataProviderSchema = z.enum([
+  "open_library",
+  "amazon",
+  "google",
+  "hardcover",
+  "goodreads",
+  "douban",
+  "lubimyczytac",
+  "ranobedb",
+  "comicvine",
+  "audible",
+  "none"
+]);
+type MetadataProvider = z.infer<typeof metadataProviderSchema>;
+
+const amazonDomainSchema = z.enum([
+  "com",
+  "co.uk",
+  "de",
+  "fr",
+  "es",
+  "it",
+  "nl",
+  "ca",
+  "com.au"
+]);
+type AmazonDomain = z.infer<typeof amazonDomainSchema>;
+
+const audibleDomainSchema = z.enum([
+  "com",
+  "co.uk",
+  "de",
+  "fr",
+  "it",
+  "ca",
+  "com.au"
+]);
+type AudibleDomain = z.infer<typeof audibleDomainSchema>;
+
+const toProvider = (
+  value: unknown,
+  fallback: MetadataProvider
+): MetadataProvider => {
+  const parsed = metadataProviderSchema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
+};
 
 const patchSettingsSchema = z.object({
+  metadataProviderPrimary: metadataProviderSchema.optional(),
+  metadataProviderSecondary: metadataProviderSchema.optional(),
+  metadataProviderTertiary: metadataProviderSchema.optional(),
+  metadataAmazonDomain: amazonDomainSchema.optional(),
+  metadataAmazonCookie: z.string().trim().optional(),
+  metadataGoogleLanguage: z.string().trim().max(8).optional(),
+  metadataGoogleApiKey: z.string().trim().optional(),
+  metadataHardcoverApiKey: z.string().trim().optional(),
+  metadataComicvineApiKey: z.string().trim().optional(),
+  metadataAudibleDomain: audibleDomainSchema.optional(),
   metadataProviderFallback: z.enum(["google", "none"]).optional(),
-  kepubConversionEnabled: z.boolean().optional(),
   uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional()
 });
 
-export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/api/v1/app-settings", { preHandler: requireOwner }, async () => ({
-    metadataProviderFallback: await getSetting<"google" | "none">(
-      "metadata_provider_fallback",
-      "google"
+const toLegacyFallback = (
+  secondary: MetadataProvider,
+  tertiary: MetadataProvider
+): "google" | "none" =>
+  secondary === "google" || tertiary === "google" ? "google" : "none";
+
+const toAmazonDomain = (value: unknown, fallback: AmazonDomain): AmazonDomain => {
+  const parsed = amazonDomainSchema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
+};
+
+const toAudibleDomain = (
+  value: unknown,
+  fallback: AudibleDomain
+): AudibleDomain => {
+  const parsed = audibleDomainSchema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
+};
+
+const resolveSettings = async (): Promise<{
+  metadataProviderPrimary: MetadataProvider;
+  metadataProviderSecondary: MetadataProvider;
+  metadataProviderTertiary: MetadataProvider;
+  metadataAmazonDomain: AmazonDomain;
+  metadataAmazonCookie: string;
+  metadataGoogleLanguage: string;
+  metadataGoogleApiKey: string;
+  metadataHardcoverApiKey: string;
+  metadataComicvineApiKey: string;
+  metadataAudibleDomain: AudibleDomain;
+  metadataProviderFallback: "google" | "none";
+  uploadLimitMb: number;
+}> => {
+  const legacyFallback = await getSetting<"google" | "none">(
+    "metadata_provider_fallback",
+    "google"
+  );
+  const defaultSecondary: MetadataProvider =
+    legacyFallback === "google" ? "google" : "none";
+
+  const metadataProviderPrimary = toProvider(
+    await getSetting<MetadataProvider>("metadata_provider_primary", "open_library"),
+    "open_library"
+  );
+  const metadataProviderSecondary = toProvider(
+    await getSetting<MetadataProvider>("metadata_provider_secondary", defaultSecondary),
+    defaultSecondary
+  );
+  const metadataProviderTertiary = toProvider(
+    await getSetting<MetadataProvider>("metadata_provider_tertiary", "none"),
+    "none"
+  );
+
+  return {
+    metadataProviderPrimary,
+    metadataProviderSecondary,
+    metadataProviderTertiary,
+    metadataAmazonDomain: toAmazonDomain(
+      await getSetting<string>("metadata_amazon_domain", config.amazonBooksDomain),
+      "com"
     ),
-    kepubConversionEnabled: await getSetting<boolean>(
-      "kepub_conversion_enabled",
-      false
+    metadataAmazonCookie: await getSetting<string>(
+      "metadata_amazon_cookie",
+      config.amazonBooksCookie
+    ),
+    metadataGoogleLanguage: await getSetting<string>(
+      "metadata_google_language",
+      config.googleBooksLanguage
+    ),
+    metadataGoogleApiKey: await getSetting<string>(
+      "metadata_google_api_key",
+      config.googleBooksApiKey
+    ),
+    metadataHardcoverApiKey: await getSetting<string>(
+      "metadata_hardcover_api_key",
+      config.hardcoverApiKey
+    ),
+    metadataComicvineApiKey: await getSetting<string>(
+      "metadata_comicvine_api_key",
+      config.comicvineApiKey
+    ),
+    metadataAudibleDomain: toAudibleDomain(
+      await getSetting<string>("metadata_audible_domain", config.audibleDomain),
+      "com"
+    ),
+    metadataProviderFallback: toLegacyFallback(
+      metadataProviderSecondary,
+      metadataProviderTertiary
     ),
     uploadLimitMb: await getSetting<number>("upload_limit_mb", 100)
-  }));
+  };
+};
+
+export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get("/api/v1/app-settings", { preHandler: requireOwner }, async () =>
+    resolveSettings()
+  );
 
   fastify.patch(
     "/api/v1/app-settings",
@@ -42,25 +183,47 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (body.metadataProviderFallback !== undefined) {
         await upsert("metadata_provider_fallback", body.metadataProviderFallback);
+        await upsert(
+          "metadata_provider_secondary",
+          body.metadataProviderFallback === "google" ? "google" : "none"
+        );
+        await upsert("metadata_provider_tertiary", "none");
       }
-      if (body.kepubConversionEnabled !== undefined) {
-        await upsert("kepub_conversion_enabled", body.kepubConversionEnabled);
+      if (body.metadataProviderPrimary !== undefined) {
+        await upsert("metadata_provider_primary", body.metadataProviderPrimary);
+      }
+      if (body.metadataProviderSecondary !== undefined) {
+        await upsert("metadata_provider_secondary", body.metadataProviderSecondary);
+      }
+      if (body.metadataProviderTertiary !== undefined) {
+        await upsert("metadata_provider_tertiary", body.metadataProviderTertiary);
+      }
+      if (body.metadataAmazonDomain !== undefined) {
+        await upsert("metadata_amazon_domain", body.metadataAmazonDomain);
+      }
+      if (body.metadataAmazonCookie !== undefined) {
+        await upsert("metadata_amazon_cookie", body.metadataAmazonCookie);
+      }
+      if (body.metadataGoogleLanguage !== undefined) {
+        await upsert("metadata_google_language", body.metadataGoogleLanguage);
+      }
+      if (body.metadataGoogleApiKey !== undefined) {
+        await upsert("metadata_google_api_key", body.metadataGoogleApiKey);
+      }
+      if (body.metadataHardcoverApiKey !== undefined) {
+        await upsert("metadata_hardcover_api_key", body.metadataHardcoverApiKey);
+      }
+      if (body.metadataComicvineApiKey !== undefined) {
+        await upsert("metadata_comicvine_api_key", body.metadataComicvineApiKey);
+      }
+      if (body.metadataAudibleDomain !== undefined) {
+        await upsert("metadata_audible_domain", body.metadataAudibleDomain);
       }
       if (body.uploadLimitMb !== undefined) {
         await upsert("upload_limit_mb", body.uploadLimitMb);
       }
 
-      return {
-        metadataProviderFallback: await getSetting<"google" | "none">(
-          "metadata_provider_fallback",
-          "google"
-        ),
-        kepubConversionEnabled: await getSetting<boolean>(
-          "kepub_conversion_enabled",
-          false
-        ),
-        uploadLimitMb: await getSetting<number>("upload_limit_mb", 100)
-      };
+      return resolveSettings();
     }
   );
 };

@@ -7,6 +7,7 @@ import { bookProgress, books, collectionBooks, collections } from "../db/schema"
 import { requireAuth } from "../auth/guards";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "../services/metadata";
+import { filenameToBasicMetadata } from "../services/books";
 import {
   ensureSystemCollectionsForUser,
   getFavoritesCollectionId
@@ -397,7 +398,12 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
 
       const found = await db
-        .select({ id: books.id, title: books.title, author: books.author })
+        .select({
+          id: books.id,
+          title: books.title,
+          author: books.author,
+          filePath: books.filePath
+        })
         .from(books)
         .where(eq(books.id, params.id))
         .limit(1);
@@ -410,6 +416,23 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       );
 
       if (metadata.source === "NONE") {
+        const fallback = filenameToBasicMetadata(path.basename(found[0].filePath));
+        const title = fallback.title || found[0].title;
+        const author =
+          found[0].author && found[0].author.trim().length > 0
+            ? found[0].author
+            : fallback.author;
+
+        if (title !== found[0].title || author !== found[0].author) {
+          await db
+            .update(books)
+            .set({
+              title,
+              author,
+              updatedAt: nowIso()
+            })
+            .where(eq(books.id, params.id));
+        }
         return { ok: true, source: "NONE" };
       }
 

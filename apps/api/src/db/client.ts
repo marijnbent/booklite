@@ -197,7 +197,16 @@ const insertSetting = sqlite.prepare(
   "INSERT OR IGNORE INTO app_settings(key, value_json) VALUES (?, ?)"
 );
 insertSetting.run("metadata_provider_fallback", JSON.stringify("google"));
-insertSetting.run("kepub_conversion_enabled", JSON.stringify(false));
+insertSetting.run("metadata_provider_primary", JSON.stringify("open_library"));
+insertSetting.run("metadata_provider_secondary", JSON.stringify("google"));
+insertSetting.run("metadata_provider_tertiary", JSON.stringify("none"));
+insertSetting.run("metadata_amazon_domain", JSON.stringify(config.amazonBooksDomain));
+insertSetting.run("metadata_amazon_cookie", JSON.stringify(config.amazonBooksCookie));
+insertSetting.run("metadata_google_language", JSON.stringify(config.googleBooksLanguage));
+insertSetting.run("metadata_google_api_key", JSON.stringify(config.googleBooksApiKey));
+insertSetting.run("metadata_hardcover_api_key", JSON.stringify(config.hardcoverApiKey));
+insertSetting.run("metadata_comicvine_api_key", JSON.stringify(config.comicvineApiKey));
+insertSetting.run("metadata_audible_domain", JSON.stringify(config.audibleDomain));
 insertSetting.run("upload_limit_mb", JSON.stringify(config.uploadLimitMb));
 
 export const walCheckpoint = (): void => {

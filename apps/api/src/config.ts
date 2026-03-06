@@ -17,7 +17,13 @@ export const config = {
   accessTokenTtlSeconds: toInt(process.env.ACCESS_TOKEN_TTL_SECONDS, 900),
   refreshTokenTtlSeconds: toInt(process.env.REFRESH_TOKEN_TTL_SECONDS, 604800),
   uploadLimitMb: toInt(process.env.UPLOAD_LIMIT_MB, 100),
-  googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? ""
+  googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? "",
+  googleBooksLanguage: process.env.GOOGLE_BOOKS_LANGUAGE ?? "",
+  hardcoverApiKey: process.env.HARDCOVER_API_KEY ?? "",
+  comicvineApiKey: process.env.COMICVINE_API_KEY ?? "",
+  amazonBooksDomain: process.env.AMAZON_BOOKS_DOMAIN ?? "com",
+  amazonBooksCookie: process.env.AMAZON_BOOKS_COOKIE ?? "",
+  audibleDomain: process.env.AUDIBLE_DOMAIN ?? "com"
 };
 
 export const dbFilePath = path.join(config.appDataDir, "booklite.db");

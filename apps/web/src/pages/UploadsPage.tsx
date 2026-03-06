@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Upload,
   FileUp,
@@ -20,6 +20,10 @@ import {
   Trash2,
   Star,
   Sparkles,
+  AlertCircle,
+  BookOpen,
+  Search,
+  ArrowRight,
 } from "lucide-react";
 
 interface UploadJob {
@@ -36,7 +40,18 @@ interface CollectionItem {
 }
 
 interface MetadataPreview {
-  source: "OPEN_LIBRARY" | "GOOGLE" | "NONE";
+  source:
+    | "OPEN_LIBRARY"
+    | "AMAZON"
+    | "GOOGLE"
+    | "HARDCOVER"
+    | "GOODREADS"
+    | "DOUBAN"
+    | "LUBIMYCZYTAC"
+    | "RANOBEDB"
+    | "COMICVINE"
+    | "AUDIBLE"
+    | "NONE";
   title?: string | null;
   author?: string | null;
   description?: string | null;
@@ -51,7 +66,6 @@ interface UploadDraft {
   series: string;
   description: string;
   favorite: boolean;
-  autoMetadata: boolean;
   collectionIds: number[];
   selected: boolean;
   metadataState: "idle" | "loading" | "enriched" | "none" | "error";
@@ -78,6 +92,38 @@ const extAllowed = (name: string): boolean => {
 };
 
 const toInitialTitle = (name: string): string => name.replace(/\.[^.]+$/, "");
+
+const sourceLabel = (source: string | null): string => {
+  if (source === "OPEN_LIBRARY") return "Open Library";
+  if (source === "GOOGLE") return "Google Books";
+  return "Metadata";
+};
+
+const toErrorMessage = (error: unknown): string => {
+  if (!(error instanceof Error)) return "Upload failed";
+
+  try {
+    const parsed = JSON.parse(error.message) as { error?: string };
+    if (typeof parsed.error === "string" && parsed.error.trim().length > 0) {
+      return parsed.error;
+    }
+  } catch {
+    // Ignore JSON parse errors and return the raw error message.
+  }
+
+  return error.message || "Upload failed";
+};
+
+/** Small indicator shown next to auto-filled fields */
+const AutoFilledHint: React.FC<{ visible: boolean }> = ({ visible }) => {
+  if (!visible) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-status-completed/80 select-none">
+      <Sparkles className="size-2.5" />
+      auto-filled
+    </span>
+  );
+};
 
 export const UploadsPage: React.FC = () => {
   const [drafts, setDrafts] = useState<UploadDraft[]>([]);
@@ -134,8 +180,6 @@ export const UploadsPage: React.FC = () => {
   };
 
   const runMetadataPreview = async (target: UploadDraft): Promise<void> => {
-    if (!target.autoMetadata) return;
-
     setDrafts((prev) =>
       prev.map((draft): UploadDraft =>
         draft.id === target.id
@@ -161,7 +205,6 @@ export const UploadsPage: React.FC = () => {
       setDrafts((prev) =>
         prev.map((draft): UploadDraft => {
           if (draft.id !== target.id) return draft;
-          if (!draft.autoMetadata) return draft;
 
           if (preview.source === "NONE") {
             return {
@@ -212,7 +255,6 @@ export const UploadsPage: React.FC = () => {
         series: "",
         description: "",
         favorite: false,
-        autoMetadata: true,
         collectionIds: [],
         selected: true,
         metadataState: "idle",
@@ -245,30 +287,20 @@ export const UploadsPage: React.FC = () => {
       if (draft.description.trim()) formData.append("description", draft.description.trim());
 
       formData.append("favorite", String(draft.favorite));
-      formData.append("autoMetadata", String(draft.autoMetadata));
+      formData.append("autoMetadata", "true");
       formData.append("collectionIds", JSON.stringify(draft.collectionIds));
 
-      const response = await fetch("/api/v1/uploads", {
+      const payload = await apiFetch<{ jobId: string; status: UploadJob["status"] }>("/api/v1/uploads", {
         method: "POST",
-        headers: {
-          authorization: `Bearer ${JSON.parse(localStorage.getItem("booklite_tokens") || "{}").accessToken ?? ""}`
-        },
         body: formData
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        updateDraft(draft.id, { error: errorText || "Upload failed" });
-        return false;
-      }
-
-      const payload = (await response.json()) as { jobId: string; status: UploadJob["status"] };
       setJobs((prev) => [{ id: payload.jobId, status: payload.status }, ...prev]);
       removeDraft(draft.id);
       return true;
     } catch (error) {
       updateDraft(draft.id, {
-        error: error instanceof Error ? error.message : "Upload failed"
+        error: toErrorMessage(error)
       });
       return false;
     } finally {
@@ -295,291 +327,473 @@ export const UploadsPage: React.FC = () => {
     (draft) => draft.selected && draft.metadataState === "loading"
   );
 
+  // Determine which "step" the user is on for visual guidance
+  const currentStep = drafts.length === 0 ? 1 : 2;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Page header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Uploads</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Files are enriched with metadata first, then you review and queue imports.
+        <h1 className="text-3xl font-bold tracking-tight">Add Books</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground/70">
+          Drop your files, review the auto-filled details, and add to your library.
         </p>
       </div>
 
-      <Card className="border-border/40">
-        <CardContent className="pt-5">
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={cn(
-              "flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 transition-all duration-200 cursor-pointer",
-              dragOver
-                ? "border-primary bg-primary/[0.04] shadow-inner"
-                : "border-border/50 bg-muted/10 hover:border-primary/30 hover:bg-muted/20"
-            )}
-          >
-            <div className={cn(
-              "flex size-14 items-center justify-center rounded-2xl transition-colors duration-200",
-              dragOver ? "bg-primary/15" : "bg-muted/50"
-            )}>
-              <FileUp className={cn(
-                "size-7 transition-colors duration-200",
-                dragOver ? "text-primary" : "text-muted-foreground/40"
-              )} />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-medium">Drop files here or click to browse</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Supports EPUB and PDF files, multiple at once
-              </p>
-            </div>
+      {/* Step indicators -- subtle horizontal flow */}
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em]">
+        <span className={cn(
+          "flex items-center gap-1.5 transition-colors duration-200",
+          currentStep === 1 ? "text-primary" : "text-muted-foreground/50"
+        )}>
+          <span className={cn(
+            "flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200",
+            currentStep === 1
+              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+              : drafts.length > 0
+                ? "bg-status-completed/15 text-status-completed"
+                : "bg-muted text-muted-foreground/60"
+          )}>
+            {drafts.length > 0 ? <CheckCircle2 className="size-3" /> : "1"}
+          </span>
+          Select files
+        </span>
+        <ArrowRight className="size-3 text-muted-foreground/30" />
+        <span className={cn(
+          "flex items-center gap-1.5 transition-colors duration-200",
+          currentStep === 2 ? "text-primary" : "text-muted-foreground/40"
+        )}>
+          <span className={cn(
+            "flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200",
+            currentStep === 2
+              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+              : "bg-muted text-muted-foreground/60"
+          )}>
+            2
+          </span>
+          Review metadata
+        </span>
+        <ArrowRight className="size-3 text-muted-foreground/30" />
+        <span className="flex items-center gap-1.5 text-muted-foreground/40">
+          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground/60">
+            3
+          </span>
+          Add to library
+        </span>
+      </div>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".epub,.pdf"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files) addFilesToDrafts(e.target.files);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
-            />
-          </div>
+      {/* Drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={cn(
+          "group relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-12 transition-all duration-300 cursor-pointer overflow-hidden",
+          dragOver
+            ? "border-primary bg-primary/[0.06] shadow-[inset_0_2px_20px_-4px] shadow-primary/10"
+            : "border-border/40 bg-gradient-to-b from-muted/20 to-transparent hover:border-primary/30 hover:from-primary/[0.03]"
+        )}
+      >
+        {/* Decorative background glow on drag */}
+        <div className={cn(
+          "pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-500",
+          dragOver ? "opacity-100" : "opacity-0"
+        )} style={{
+          background: "radial-gradient(circle at 50% 50%, oklch(0.55 0.14 55 / 0.08), transparent 70%)"
+        }} />
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="sm">
-              <Plus className="size-4" />
-              Add files
-            </Button>
-            <Button
-              onClick={() => void handleAddSelected()}
-              disabled={selectedCount === 0 || uploadingAny || selectedLoadingMetadata}
-              size="sm"
-            >
-              {uploadingAny ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-              Add selected ({selectedCount})
-            </Button>
-            {selectedLoadingMetadata && (
-              <Badge variant="info" className="text-[10px]">
-                Waiting for metadata...
-              </Badge>
-            )}
-            {drafts.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const nextSelected = selectedCount !== drafts.length;
-                  setDrafts((prev) => prev.map((draft) => ({ ...draft, selected: nextSelected })));
-                }}
-              >
-                {selectedCount === drafts.length ? "Clear selection" : "Select all"}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        <div className={cn(
+          "relative flex size-16 items-center justify-center rounded-2xl transition-all duration-300",
+          dragOver
+            ? "bg-primary/15 scale-110"
+            : "bg-muted/40 group-hover:bg-primary/10 group-hover:scale-105"
+        )}>
+          <FileUp className={cn(
+            "size-8 transition-all duration-300",
+            dragOver ? "text-primary -translate-y-1" : "text-muted-foreground/35 group-hover:text-primary/60"
+          )} />
+        </div>
+        <div className="relative text-center">
+          <p className="text-sm font-semibold">Drop EPUB or PDF files here</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">
+            or click to browse -- metadata is looked up automatically
+          </p>
+        </div>
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".epub,.pdf"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files) addFilesToDrafts(e.target.files);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
+      </div>
+
+      {/* Draft cards */}
       {drafts.length > 0 && (
-        <Card className="border-border/40">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+        <div className="space-y-5">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
               <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
-                <FileText className="size-3.5 text-primary" />
+                <BookOpen className="size-3.5 text-primary" />
               </div>
-              Review Queue
-              <Badge variant="secondary" className="ml-auto text-[10px]">
-                {drafts.length}
+              <h2 className="text-base font-semibold">Review & Edit</h2>
+              <Badge variant="secondary" className="text-[10px]">
+                {drafts.length} {drafts.length === 1 ? "file" : "files"}
               </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {drafts.map((draft) => {
+            </div>
+            <div className="flex items-center gap-2">
+              {drafts.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    const nextSelected = selectedCount !== drafts.length;
+                    setDrafts((prev) => prev.map((draft) => ({ ...draft, selected: nextSelected })));
+                  }}
+                >
+                  {selectedCount === drafts.length ? "Deselect all" : "Select all"}
+                </Button>
+              )}
+              <Button
+                onClick={() => void handleAddSelected()}
+                disabled={selectedCount === 0 || uploadingAny || selectedLoadingMetadata}
+                size="sm"
+                className="shadow-sm shadow-primary/20"
+              >
+                {uploadingAny ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Upload className="size-4" />
+                )}
+                Add {selectedCount > 0 ? `${selectedCount} to library` : "to library"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Draft list */}
+          <div className="space-y-4">
+            {drafts.map((draft, i) => {
               const isUploading = uploadingIds.includes(draft.id);
+              const isLoading = draft.metadataState === "loading";
+              const isEnriched = draft.metadataState === "enriched";
+              const isNoMatch = draft.metadataState === "none";
+              const isError = draft.metadataState === "error";
+              const fileExt = draft.file.name.split(".").pop()?.toUpperCase() ?? "FILE";
+              const fileSizeMB = (draft.file.size / 1024 / 1024).toFixed(1);
+
               return (
-                <div key={draft.id} className="rounded-xl border border-border/50 p-4 space-y-3 bg-muted/10">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={draft.selected}
-                          onChange={(e) => updateDraft(draft.id, { selected: e.target.checked })}
-                        />
-                        <p className="text-sm font-semibold truncate">{draft.file.name}</p>
-                        {draft.metadataState === "loading" && <Loader2 className="size-3.5 animate-spin text-primary" />}
-                        {draft.metadataState === "enriched" && (
-                          <Badge variant="success" className="text-[10px]">{draft.metadataSource ?? "Metadata"}</Badge>
-                        )}
-                        {draft.metadataState === "none" && (
-                          <Badge variant="secondary" className="text-[10px]">No metadata match</Badge>
-                        )}
-                        {draft.metadataState === "error" && (
-                          <Badge variant="destructive" className="text-[10px]">Metadata failed</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {(draft.file.size / 1024 / 1024).toFixed(1)} MB
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant={draft.favorite ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => updateDraft(draft.id, { favorite: !draft.favorite })}
-                      >
-                        <Star className={cn("size-3.5", draft.favorite && "fill-current")} />
-                        Favorite
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeDraft(draft.id)}
-                        disabled={isUploading}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Title"
-                      value={draft.title}
-                      onChange={(e) => updateDraft(draft.id, { title: e.target.value, titleTouched: true })}
-                    />
-                    <Input
-                      placeholder="Author"
-                      value={draft.author}
-                      onChange={(e) => updateDraft(draft.id, { author: e.target.value, authorTouched: true })}
-                    />
-                    <Input
-                      placeholder="Series"
-                      value={draft.series}
-                      onChange={(e) => updateDraft(draft.id, { series: e.target.value })}
-                    />
-                    <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-                      <div className="flex items-center gap-2 text-xs">
-                        <Sparkles className="size-3.5" />
-                        Auto metadata
-                      </div>
-                      <Switch
-                        checked={draft.autoMetadata}
-                        onCheckedChange={(checked) => {
-                          updateDraft(draft.id, { autoMetadata: checked });
-                          if (checked) void runMetadataPreview({ ...draft, autoMetadata: true });
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <Textarea
-                    rows={3}
-                    placeholder="Description"
-                    value={draft.description}
-                    onChange={(e) => updateDraft(draft.id, { description: e.target.value, descriptionTouched: true })}
-                  />
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Collections</p>
-                    <div className="flex flex-wrap gap-2">
-                      {(collections.data ?? []).map((collection) => {
-                        const selected = draft.collectionIds.includes(collection.id);
-                        return (
-                          <Button
-                            key={collection.id}
-                            type="button"
-                            size="sm"
-                            variant={selected ? "default" : "outline"}
-                            onClick={() => {
-                              const next = selected
-                                ? draft.collectionIds.filter((id) => id !== collection.id)
-                                : [...draft.collectionIds, collection.id];
-                              updateDraft(draft.id, { collectionIds: next });
-                            }}
-                          >
-                            {collection.name}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {draft.error && (
-                    <p className="text-xs text-destructive">{draft.error}</p>
+                <Card
+                  key={draft.id}
+                  className={cn(
+                    "border-border/40 transition-all duration-300 animate-fade-up overflow-hidden",
+                    draft.selected && "ring-1 ring-primary/20 border-primary/30",
+                    isUploading && "opacity-70 pointer-events-none"
+                  )}
+                  style={{ animationDelay: `${i * 60}ms`, animationFillMode: "backwards" }}
+                >
+                  {/* Loading shimmer bar at top of card */}
+                  {isLoading && (
+                    <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-shimmer" style={{ backgroundSize: "200% 100%" }} />
                   )}
 
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      onClick={() => void uploadDraft(draft)}
-                      disabled={isUploading || draft.metadataState === "loading"}
-                    >
-                      {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                      Quick add
-                    </Button>
-                  </div>
-                </div>
+                  <CardContent className="p-5">
+                    {/* Top row: file info + metadata status + actions */}
+                    <div className="flex items-start gap-4">
+                      {/* Checkbox */}
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => updateDraft(draft.id, { selected: !draft.selected })}
+                          className={cn(
+                            "flex size-5 items-center justify-center rounded-md border-2 transition-all duration-200",
+                            draft.selected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border/60 hover:border-primary/40"
+                          )}
+                        >
+                          {draft.selected && <CheckCircle2 className="size-3" />}
+                        </button>
+                      </div>
+
+                      {/* File type badge + name */}
+                      <div className="flex-1 min-w-0 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className={cn(
+                              "shrink-0 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider",
+                              fileExt === "EPUB"
+                                ? "bg-status-processing/12 text-status-processing"
+                                : "bg-status-queued/15 text-status-queued"
+                            )}>
+                              {fileExt}
+                            </span>
+                            <p className="text-sm font-semibold truncate">{draft.file.name}</p>
+                            <span className="shrink-0 text-[11px] text-muted-foreground/50">{fileSizeMB} MB</span>
+                          </div>
+
+                          {/* Metadata status indicator */}
+                          <div className="ml-auto shrink-0 flex items-center gap-2">
+                            {isLoading && (
+                              <div className="flex items-center gap-1.5 text-primary animate-pulse-soft">
+                                <Search className="size-3.5" />
+                                <span className="text-[11px] font-medium">Looking up metadata...</span>
+                              </div>
+                            )}
+                            {isEnriched && (
+                              <Badge variant="success" className="gap-1 text-[10px]">
+                                <Sparkles className="size-2.5" />
+                                {sourceLabel(draft.metadataSource)}
+                              </Badge>
+                            )}
+                            {isNoMatch && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                                <AlertCircle className="size-3.5" />
+                                <span className="text-[11px] font-medium">No metadata found -- fill in manually</span>
+                              </div>
+                            )}
+                            {isError && (
+                              <Badge variant="destructive" className="gap-1 text-[10px]">
+                                <XCircle className="size-2.5" />
+                                Lookup failed
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Metadata loading skeleton */}
+                        {isLoading && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {["Title", "Author", "Series"].map((label) => (
+                              <div key={label} className="space-y-1.5">
+                                <span className="text-[11px] font-medium text-muted-foreground/50">{label}</span>
+                                <div className="h-9 rounded-lg bg-muted/40 animate-shimmer" style={{ backgroundSize: "200% 100%", backgroundImage: "linear-gradient(90deg, transparent 0%, oklch(0.55 0.14 55 / 0.06) 50%, transparent 100%)" }} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Metadata fields -- shown once loading is done */}
+                        {!isLoading && (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-[11px] font-medium text-muted-foreground/70">Title</Label>
+                                  <AutoFilledHint visible={isEnriched && !draft.titleTouched && !!draft.title} />
+                                </div>
+                                <Input
+                                  value={draft.title}
+                                  onChange={(e) => updateDraft(draft.id, { title: e.target.value, titleTouched: true })}
+                                  className={cn(
+                                    "h-9",
+                                    isEnriched && !draft.titleTouched && draft.title && "border-status-completed/25 bg-status-completed/[0.04]"
+                                  )}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-[11px] font-medium text-muted-foreground/70">Author</Label>
+                                  <AutoFilledHint visible={isEnriched && !draft.authorTouched && !!draft.author} />
+                                </div>
+                                <Input
+                                  value={draft.author}
+                                  onChange={(e) => updateDraft(draft.id, { author: e.target.value, authorTouched: true })}
+                                  className={cn(
+                                    "h-9",
+                                    isEnriched && !draft.authorTouched && draft.author && "border-status-completed/25 bg-status-completed/[0.04]"
+                                  )}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-[11px] font-medium text-muted-foreground/70">Series</Label>
+                                <Input
+                                  value={draft.series}
+                                  onChange={(e) => updateDraft(draft.id, { series: e.target.value })}
+                                  className="h-9"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[11px] font-medium text-muted-foreground/70">Description</Label>
+                                <AutoFilledHint visible={isEnriched && !draft.descriptionTouched && !!draft.description} />
+                              </div>
+                              <Textarea
+                                rows={2}
+                                value={draft.description}
+                                onChange={(e) => updateDraft(draft.id, { description: e.target.value, descriptionTouched: true })}
+                                className={cn(
+                                  "text-sm resize-none",
+                                  isEnriched && !draft.descriptionTouched && draft.description && "border-status-completed/25 bg-status-completed/[0.04]"
+                                )}
+                              />
+                            </div>
+
+                            {/* Bottom row: collections, favorite, quick add */}
+                            <div className="flex items-center justify-between gap-3 pt-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {/* Collections */}
+                                {(collections.data ?? []).length > 0 && (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50 mr-0.5">
+                                      Collections
+                                    </span>
+                                    {(collections.data ?? []).map((collection) => {
+                                      const selected = draft.collectionIds.includes(collection.id);
+                                      return (
+                                        <button
+                                          key={collection.id}
+                                          type="button"
+                                          onClick={() => {
+                                            const next = selected
+                                              ? draft.collectionIds.filter((id) => id !== collection.id)
+                                              : [...draft.collectionIds, collection.id];
+                                            updateDraft(draft.id, { collectionIds: next });
+                                          }}
+                                          className={cn(
+                                            "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium transition-all duration-200 border",
+                                            selected
+                                              ? "bg-primary/10 text-primary border-primary/25"
+                                              : "bg-transparent text-muted-foreground/60 border-border/40 hover:border-primary/30 hover:text-foreground/80"
+                                          )}
+                                        >
+                                          {collection.icon && <span className="mr-1">{collection.icon}</span>}
+                                          {collection.name}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Favorite toggle */}
+                                <button
+                                  type="button"
+                                  onClick={() => updateDraft(draft.id, { favorite: !draft.favorite })}
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-all duration-200 border",
+                                    draft.favorite
+                                      ? "bg-status-queued/15 text-status-queued border-status-queued/25"
+                                      : "bg-transparent text-muted-foreground/50 border-border/40 hover:border-status-queued/30 hover:text-status-queued/70"
+                                  )}
+                                >
+                                  <Star className={cn("size-3", draft.favorite && "fill-current")} />
+                                  Favorite
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8 text-muted-foreground/40 hover:text-destructive"
+                                  onClick={() => removeDraft(draft.id)}
+                                  disabled={isUploading}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => void uploadDraft(draft)}
+                                  disabled={isUploading || isLoading}
+                                  className="shadow-sm shadow-primary/20"
+                                >
+                                  {isUploading ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <Plus className="size-3.5" />
+                                  )}
+                                  Add to library
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Error message */}
+                        {draft.error && (
+                          <div className="flex items-center gap-2 rounded-lg bg-destructive/8 border border-destructive/15 px-3 py-2 mt-2">
+                            <XCircle className="size-3.5 text-destructive shrink-0" />
+                            <p className="text-xs text-destructive">{draft.error}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
+      {/* Upload jobs */}
       {jobs.length > 0 && (
-        <Card className="border-border/40">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
-                <Upload className="size-3.5 text-primary" />
-              </div>
-              Upload Jobs
-              <Badge variant="secondary" className="ml-auto text-[10px]">
-                {jobs.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
+              <Upload className="size-3.5 text-primary" />
+            </div>
+            <h2 className="text-base font-semibold">Import Progress</h2>
+            <Badge variant="secondary" className="text-[10px]">
+              {jobs.filter((j) => j.status === "COMPLETED").length}/{jobs.length} done
+            </Badge>
+          </div>
+
+          <div className="grid gap-2">
             {jobs.map((job, i) => {
               const display = statusDisplay[job.status];
               return (
                 <div
                   key={job.id}
-                  className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/10 p-3 animate-fade-up"
-                  style={{ animationDelay: `${i * 40}ms` }}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-200 animate-fade-up",
+                    job.status === "COMPLETED" && "border-status-completed/20 bg-status-completed/[0.04]",
+                    job.status === "FAILED" && "border-destructive/20 bg-destructive/[0.04]",
+                    job.status === "PROCESSING" && "border-status-processing/20 bg-status-processing/[0.04]",
+                    job.status === "QUEUED" && "border-border/40 bg-muted/10"
+                  )}
+                  style={{ animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={cn(
-                      "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                      job.status === "COMPLETED" && "bg-status-completed/10",
-                      job.status === "FAILED" && "bg-destructive/10",
-                      job.status === "PROCESSING" && "bg-status-processing/10",
-                      job.status === "QUEUED" && "bg-status-queued/10"
-                    )}>
-                      {display.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">Job {job.id.slice(0, 8)}</p>
-                      {job.error && (
-                        <p className="text-xs text-destructive mt-0.5 truncate">{job.error}</p>
-                      )}
-                      {job.result?.bookId && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Book ID: {job.result.bookId}
-                        </p>
-                      )}
-                    </div>
+                  <div className={cn(
+                    "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                    job.status === "COMPLETED" && "bg-status-completed/15 text-status-completed",
+                    job.status === "FAILED" && "bg-destructive/15 text-destructive",
+                    job.status === "PROCESSING" && "bg-status-processing/15 text-status-processing",
+                    job.status === "QUEUED" && "bg-status-queued/15 text-status-queued"
+                  )}>
+                    {display.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {job.status === "COMPLETED" ? "Book imported" : `Job ${job.id.slice(0, 8)}`}
+                    </p>
+                    {job.error && (
+                      <p className="text-xs text-destructive mt-0.5 truncate">{job.error}</p>
+                    )}
+                    {job.result?.bookId && (
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        Book #{job.result.bookId}
+                      </p>
+                    )}
                   </div>
                   <Badge variant={display.variant} className="shrink-0 gap-1">
+                    {display.icon}
                     {display.label}
                   </Badge>
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );

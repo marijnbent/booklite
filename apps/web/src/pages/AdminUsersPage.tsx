@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -25,7 +23,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Shield,
   UserPlus,
   Users,
   Settings,
@@ -42,10 +39,69 @@ interface UserItem {
 }
 
 interface AppSettings {
-  metadataProviderFallback: "google" | "none";
-  kepubConversionEnabled: boolean;
+  metadataProviderPrimary: MetadataProvider;
+  metadataProviderSecondary: MetadataProvider;
+  metadataProviderTertiary: MetadataProvider;
+  metadataAmazonDomain: AmazonDomain;
+  metadataAmazonCookie: string;
+  metadataGoogleLanguage: string;
+  metadataGoogleApiKey: string;
+  metadataHardcoverApiKey: string;
+  metadataComicvineApiKey: string;
+  metadataAudibleDomain: AudibleDomain;
   uploadLimitMb: number;
 }
+
+type MetadataProvider =
+  | "open_library"
+  | "amazon"
+  | "google"
+  | "hardcover"
+  | "goodreads"
+  | "douban"
+  | "lubimyczytac"
+  | "ranobedb"
+  | "comicvine"
+  | "audible"
+  | "none";
+type AmazonDomain = "com" | "co.uk" | "de" | "fr" | "es" | "it" | "nl" | "ca" | "com.au";
+type AudibleDomain = "com" | "co.uk" | "de" | "fr" | "it" | "ca" | "com.au";
+
+const metadataProviderOptions: Array<{ value: MetadataProvider; label: string }> = [
+  { value: "open_library", label: "Open Library" },
+  { value: "amazon", label: "Amazon" },
+  { value: "google", label: "Google Books" },
+  { value: "hardcover", label: "Hardcover" },
+  { value: "goodreads", label: "Goodreads" },
+  { value: "douban", label: "Douban" },
+  { value: "lubimyczytac", label: "Lubimyczytac" },
+  { value: "ranobedb", label: "RanobeDB" },
+  { value: "comicvine", label: "Comic Vine" },
+  { value: "audible", label: "Audible" },
+  { value: "none", label: "None" }
+];
+
+const amazonDomainOptions: Array<{ value: AmazonDomain; label: string }> = [
+  { value: "com", label: "amazon.com" },
+  { value: "co.uk", label: "amazon.co.uk" },
+  { value: "de", label: "amazon.de" },
+  { value: "fr", label: "amazon.fr" },
+  { value: "es", label: "amazon.es" },
+  { value: "it", label: "amazon.it" },
+  { value: "nl", label: "amazon.nl" },
+  { value: "ca", label: "amazon.ca" },
+  { value: "com.au", label: "amazon.com.au" }
+];
+
+const audibleDomainOptions: Array<{ value: AudibleDomain; label: string }> = [
+  { value: "com", label: "audible.com" },
+  { value: "co.uk", label: "audible.co.uk" },
+  { value: "de", label: "audible.de" },
+  { value: "fr", label: "audible.fr" },
+  { value: "it", label: "audible.it" },
+  { value: "ca", label: "audible.ca" },
+  { value: "com.au", label: "audible.com.au" }
+];
 
 export const AdminUsersPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -314,46 +370,208 @@ export const AdminUsersPage: React.FC = () => {
             </div>
           ) : settings.data ? (
             <div className="space-y-5">
-              {/* Metadata fallback */}
-              <div className="space-y-2">
-                <Label htmlFor="metadata-fallback">Metadata provider fallback</Label>
-                <Select
-                  value={settings.data.metadataProviderFallback}
-                  onValueChange={(v) =>
-                    patchSettings.mutate({
-                      metadataProviderFallback: v as "google" | "none"
-                    })
-                  }
-                >
-                  <SelectTrigger id="metadata-fallback" className="max-w-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="google">Google fallback on Open Library miss</SelectItem>
-                    <SelectItem value="none">Open Library only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Separator />
-
-              {/* Kepub conversion */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="kepub-toggle" className="text-sm font-medium">
-                    Kepub conversion
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Enable kepub conversion (flag only in v1)
+              {/* Metadata providers */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Metadata providers</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Choose provider order and optional API keys.
                   </p>
                 </div>
-                <Switch
-                  id="kepub-toggle"
-                  checked={settings.data.kepubConversionEnabled}
-                  onCheckedChange={(checked) =>
-                    patchSettings.mutate({ kepubConversionEnabled: checked })
-                  }
-                />
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-primary">Primary</Label>
+                    <Select
+                      value={settings.data.metadataProviderPrimary}
+                      onValueChange={(v) =>
+                        patchSettings.mutate({
+                          metadataProviderPrimary: v as MetadataProvider
+                        })
+                      }
+                    >
+                      <SelectTrigger id="metadata-primary">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {metadataProviderOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-secondary">Secondary</Label>
+                    <Select
+                      value={settings.data.metadataProviderSecondary}
+                      onValueChange={(v) =>
+                        patchSettings.mutate({
+                          metadataProviderSecondary: v as MetadataProvider
+                        })
+                      }
+                    >
+                      <SelectTrigger id="metadata-secondary">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {metadataProviderOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-tertiary">Tertiary</Label>
+                    <Select
+                      value={settings.data.metadataProviderTertiary}
+                      onValueChange={(v) =>
+                        patchSettings.mutate({
+                          metadataProviderTertiary: v as MetadataProvider
+                        })
+                      }
+                    >
+                      <SelectTrigger id="metadata-tertiary">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {metadataProviderOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-amazon-domain">Amazon region</Label>
+                    <Select
+                      value={settings.data.metadataAmazonDomain}
+                      onValueChange={(v) =>
+                        patchSettings.mutate({
+                          metadataAmazonDomain: v as AmazonDomain
+                        })
+                      }
+                    >
+                      <SelectTrigger id="metadata-amazon-domain">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {amazonDomainOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-amazon-cookie">Amazon cookie (optional)</Label>
+                    <Input
+                      id="metadata-amazon-cookie"
+                      type="password"
+                      defaultValue={settings.data.metadataAmazonCookie}
+                      placeholder="Paste Amazon session cookie"
+                      onBlur={(e) =>
+                        patchSettings.mutate({
+                          metadataAmazonCookie: e.target.value
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-google-language">Google language (optional)</Label>
+                    <Input
+                      id="metadata-google-language"
+                      type="text"
+                      defaultValue={settings.data.metadataGoogleLanguage}
+                      placeholder="e.g. en, nl, de"
+                      onBlur={(e) =>
+                        patchSettings.mutate({
+                          metadataGoogleLanguage: e.target.value
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-google-api-key">Google Books API key (optional)</Label>
+                    <Input
+                      id="metadata-google-api-key"
+                      type="password"
+                      defaultValue={settings.data.metadataGoogleApiKey}
+                      placeholder="Enter Google Books API key"
+                      onBlur={(e) =>
+                        patchSettings.mutate({
+                          metadataGoogleApiKey: e.target.value
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-hardcover-api-key">Hardcover API token (optional)</Label>
+                    <Input
+                      id="metadata-hardcover-api-key"
+                      type="password"
+                      defaultValue={settings.data.metadataHardcoverApiKey}
+                      placeholder="Enter Hardcover API token"
+                      onBlur={(e) =>
+                        patchSettings.mutate({
+                          metadataHardcoverApiKey: e.target.value
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-comicvine-api-key">Comic Vine API token (optional)</Label>
+                    <Input
+                      id="metadata-comicvine-api-key"
+                      type="password"
+                      defaultValue={settings.data.metadataComicvineApiKey}
+                      placeholder="Enter Comic Vine API token"
+                      onBlur={(e) =>
+                        patchSettings.mutate({
+                          metadataComicvineApiKey: e.target.value
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata-audible-domain">Audible region</Label>
+                    <Select
+                      value={settings.data.metadataAudibleDomain}
+                      onValueChange={(v) =>
+                        patchSettings.mutate({
+                          metadataAudibleDomain: v as AudibleDomain
+                        })
+                      }
+                    >
+                      <SelectTrigger id="metadata-audible-domain">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {audibleDomainOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
               <Separator />

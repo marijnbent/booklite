@@ -55,8 +55,17 @@ export interface KoboSettings {
     syncCollectionIds: number[];
 }
 export interface AppSettings {
-    metadataProviderFallback: "google" | "none";
-    kepubConversionEnabled: boolean;
+    metadataProviderPrimary: "open_library" | "amazon" | "google" | "hardcover" | "goodreads" | "douban" | "lubimyczytac" | "ranobedb" | "comicvine" | "audible" | "none";
+    metadataProviderSecondary: "open_library" | "amazon" | "google" | "hardcover" | "goodreads" | "douban" | "lubimyczytac" | "ranobedb" | "comicvine" | "audible" | "none";
+    metadataProviderTertiary: "open_library" | "amazon" | "google" | "hardcover" | "goodreads" | "douban" | "lubimyczytac" | "ranobedb" | "comicvine" | "audible" | "none";
+    metadataAmazonDomain: "com" | "co.uk" | "de" | "fr" | "es" | "it" | "nl" | "ca" | "com.au";
+    metadataAmazonCookie: string;
+    metadataGoogleLanguage: string;
+    metadataGoogleApiKey: string;
+    metadataHardcoverApiKey: string;
+    metadataComicvineApiKey: string;
+    metadataAudibleDomain: "com" | "co.uk" | "de" | "fr" | "it" | "ca" | "com.au";
+    metadataProviderFallback?: "google" | "none";
     uploadLimitMb: number;
 }
 //# sourceMappingURL=index.d.ts.map

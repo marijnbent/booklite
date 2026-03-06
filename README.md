@@ -19,7 +19,7 @@ Included:
 - Local auth (JWT access + refresh rotation)
 - OWNER/MEMBER user model
 - Upload/import jobs
-- Basic metadata fetch (Open Library with Google fallback)
+- Configurable metadata providers (Open Library, Amazon, Google Books, Hardcover, Goodreads, Douban, Lubimyczytac, RanobeDB, Comic Vine, Audible)
 - Library search via SQLite FTS5
 - Collections CRUD + drag/drop assignment
 - Kobo token settings + Kobo device endpoints + progress sync
@@ -58,7 +58,13 @@ See `.env.example`:
 - `BOOKLITE_FRONTEND_MODE` (`auto`/`vite`/`static`/`off`, default `auto`)
   - `auto` resolves to `vite` when `NODE_ENV` is not `production`
   - `auto` resolves to `static` when `NODE_ENV=production`
+- `AMAZON_BOOKS_DOMAIN` (optional, default `com`)
+- `AMAZON_BOOKS_COOKIE` (optional)
+- `GOOGLE_BOOKS_LANGUAGE` (optional, example `en`)
 - `GOOGLE_BOOKS_API_KEY` (optional)
+- `HARDCOVER_API_KEY` (optional)
+- `COMICVINE_API_KEY` (optional)
+- `AUDIBLE_DOMAIN` (optional, default `com`)
 
 ## Development
 
