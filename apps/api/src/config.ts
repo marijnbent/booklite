@@ -21,7 +21,7 @@ export const config = {
   googleBooksLanguage: process.env.GOOGLE_BOOKS_LANGUAGE ?? "",
   hardcoverApiKey: process.env.HARDCOVER_API_KEY ?? "",
   openrouterApiKey: process.env.OPENROUTER_API_KEY ?? "",
-  openrouterModel: process.env.OPENROUTER_MODEL ?? "google/gemini-2.0-flash-lite-001",
+  openrouterModel: process.env.OPENROUTER_MODEL ?? "google/gemini-3.1-flash-lite-preview",
   amazonBooksDomain: process.env.AMAZON_BOOKS_DOMAIN ?? "com",
   amazonBooksCookie: process.env.AMAZON_BOOKS_COOKIE ?? ""
 };
