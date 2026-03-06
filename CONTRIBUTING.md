@@ -1,5 +1,7 @@
 # Contributing
 
+BookLite aims to stay simple and focused — a lightweight alternative to [BookLore](https://github.com/booklore-app/booklore) for users who just need uploads, collections, metadata, and Kobo sync. If a feature belongs in the full-featured version, it belongs in BookLore, not here.
+
 ## Stack
 
 - Node.js 22

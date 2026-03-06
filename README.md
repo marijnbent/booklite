@@ -1,33 +1,24 @@
 # BookLite
 
-BookLite is a lightweight hard-cutover rewrite of BookLore focused on a simple multi-user book workflow:
+BookLite is a simple, self-hosted digital book library. It is inspired by [BookLore](https://github.com/booklore-app/booklore) but strips away the complexity — no OPDS feeds, no KOReader sync, no comic/audiobook support, no complex permissions or BookDrop imports. Just the essentials: upload books, organize them, fetch metadata, and sync to your Kobo.
 
-- Upload EPUB/PDF from the web UI
-- Organize with personal collections (drag and drop)
-- Keep setup low-friction (local auth, OWNER/MEMBER roles only)
-- Sync EPUB library + reading progress with Kobo (`/api/kobo/{token}/...`)
+If you need the full feature set, check out [BookLore](https://github.com/booklore-app/booklore).
+
+## Features
+
+- **Upload** EPUB and PDF files from the web UI
+- **Collections** with drag-and-drop organization
+- **Metadata** from 6 providers (Open Library, Google Books, Amazon, Hardcover, Goodreads, Douban)
+- **Kobo sync** — books and reading progress over the built-in Kobo API
+- **Multi-user** with simple Owner/Member roles
+- **Built-in EPUB reader**
+- **Full-text search** powered by SQLite FTS5
 
 ## Stack
 
 - Backend: Fastify + TypeScript + Drizzle + SQLite (WAL)
 - Frontend: React + Vite + TanStack Query + dnd-kit
 - Runtime: Single Docker container
-
-## Current Scope (v1)
-
-Included:
-- Local auth (JWT access + refresh rotation)
-- OWNER/MEMBER user model
-- Upload/import jobs
-- Configurable metadata providers (Open Library, Amazon, Google Books, Hardcover, Goodreads, Douban)
-- Library search via SQLite FTS5
-- Collections CRUD + drag/drop assignment
-- Kobo token settings + Kobo device endpoints + progress sync
-
-Removed from legacy runtime:
-- Browser readers
-- OPDS/KOReader/Komga/OIDC/remote-auth/email/stats/task manager
-- Fine-grained permission matrix and oversized settings surface
 
 ## Quick Start (Docker)
 
@@ -99,5 +90,5 @@ npm test
 
 - Sync endpoint remains at `/api/kobo/{token}/...`
 - Only EPUB books are synced to Kobo
-- PDF remains library-only in v1
+- PDF remains library-only
 - Progress sync uses latest timestamp wins

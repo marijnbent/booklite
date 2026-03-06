@@ -16,6 +16,8 @@ import {
   Lock,
   Search,
   RefreshCw,
+  Library,
+  Star,
 } from "lucide-react";
 
 const TroubleshootItem: React.FC<{
@@ -95,6 +97,8 @@ const BulletItem: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const NAV_ITEMS = [
+  { id: "about", label: "About", icon: BookOpen },
+  { id: "features", label: "Features", icon: Star },
   { id: "kobo-setup", label: "Kobo setup", icon: TabletSmartphone },
   { id: "metadata-and-ai", label: "Metadata & AI", icon: Sparkles },
   { id: "accounts-and-roles", label: "Accounts & roles", icon: Users },
@@ -130,6 +134,37 @@ export const DocsPage: React.FC = () => {
       </nav>
 
       <div className="space-y-14">
+        {/* ---- About ---- */}
+        <section id="about" className="scroll-mt-20">
+          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
+            About
+          </h2>
+          <p className="text-sm text-foreground/85 leading-relaxed mb-4">
+            BookLite is a simple, self-hosted digital book library. Upload books, organize them in collections, fetch metadata, and sync to your Kobo &mdash; nothing more, nothing less.
+          </p>
+          <p className="text-sm text-foreground/85 leading-relaxed mb-4">
+            It is inspired by{" "}
+            <a href="https://github.com/booklore-app/booklore" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline underline-offset-2">BookLore</a>,
+            a full-featured self-hosted library with OPDS, KOReader sync, comic and audiobook support, BookDrop imports, and much more. BookLite deliberately leaves all of that out to stay lightweight and focused. If you need those features, BookLore is the project for you.
+          </p>
+        </section>
+
+        {/* ---- Features ---- */}
+        <section id="features" className="scroll-mt-20">
+          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
+            Features
+          </h2>
+          <ul className="space-y-2">
+            <BulletItem>Upload EPUB and PDF files from the web UI.</BulletItem>
+            <BulletItem>Organize books into collections with drag and drop.</BulletItem>
+            <BulletItem>Automatic metadata from 6 providers (Open Library, Google Books, Amazon, Hardcover, Goodreads, Douban).</BulletItem>
+            <BulletItem>Kobo sync &mdash; books and reading progress over the built-in Kobo API.</BulletItem>
+            <BulletItem>Multi-user with simple Owner/Member roles.</BulletItem>
+            <BulletItem>Built-in EPUB reader.</BulletItem>
+            <BulletItem>Full-text search powered by SQLite FTS5.</BulletItem>
+          </ul>
+        </section>
+
         {/* ---- Kobo setup ---- */}
         <section id="kobo-setup" className="scroll-mt-20">
           <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
@@ -145,7 +180,7 @@ export const DocsPage: React.FC = () => {
               in the menu.
             </Step>
             <Step number={2}>Enable sync.</Step>
-            <Step number={3}>Choose one or more collections to sync.</Step>
+            <Step number={3}>Choose to sync all books, or pick specific collections.</Step>
             <Step number={4}>Copy the API endpoint line from the Kobo page.</Step>
             <Step number={5}>Paste it into your Kobo configuration.</Step>
             <Step number={6} isLast>Sync from your device.</Step>
@@ -157,8 +192,16 @@ export const DocsPage: React.FC = () => {
             </div>
             <ul className="space-y-1.5">
               <BulletItem>Only EPUB books sync to Kobo.</BulletItem>
-              <BulletItem>Only books inside selected sync collections are included.</BulletItem>
+              <BulletItem>You can sync all books or only books from selected collections.</BulletItem>
               <BulletItem>Regenerating your token immediately invalidates the old token.</BulletItem>
+            </ul>
+            <div className="flex items-center gap-1.5 mt-4 mb-2.5">
+              <Info className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reading progress</span>
+            </div>
+            <ul className="space-y-1.5">
+              <BulletItem>Kobo → BookLite always works: position, percentage, and reading status sync automatically.</BulletItem>
+              <BulletItem>BookLite → Kobo requires "Two-way progress sync" to be enabled. The percentage and status will update on the Kobo, but because the Kobo tracks its reading position internally, it will still open the book where you last left off on the device — not where you were in BookLite.</BulletItem>
             </ul>
           </div>
         </section>
