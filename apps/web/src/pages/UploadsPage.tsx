@@ -115,7 +115,7 @@ const toErrorMessage = (error: unknown): string => {
 const AutoFilledHint: React.FC<{ visible: boolean }> = ({ visible }) => {
   if (!visible) return null;
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-status-completed/80 select-none">
+    <span className="inline-flex items-center gap-1 rounded-full bg-status-completed/8 px-2 py-0.5 text-[10px] font-medium text-status-completed/90 select-none">
       <Sparkles className="size-2.5" />
       auto-filled
     </span>
@@ -329,55 +329,67 @@ export const UploadsPage: React.FC = () => {
   const currentStep = drafts.length === 0 ? 1 : 2;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Page header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Add Books</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground/70">
+        <p className="mt-2 text-[13px] text-muted-foreground/70 leading-relaxed max-w-md">
           Drop your files, review the auto-filled details, and add to your library.
         </p>
       </div>
 
-      {/* Step indicators -- subtle horizontal flow */}
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em]">
-        <span className={cn(
-          "flex items-center gap-1.5 transition-colors duration-200",
+      {/* Step indicators -- connected line design */}
+      <div className="flex items-center gap-0">
+        {/* Step 1 */}
+        <div className={cn(
+          "flex items-center gap-2 transition-colors duration-200",
           currentStep === 1 ? "text-primary" : "text-muted-foreground/50"
         )}>
           <span className={cn(
-            "flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200",
+            "flex size-7 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-300",
             currentStep === 1
               ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
               : drafts.length > 0
-                ? "bg-status-completed/15 text-status-completed"
+                ? "bg-status-completed/15 text-status-completed ring-2 ring-status-completed/10"
                 : "bg-muted text-muted-foreground/60"
           )}>
-            {drafts.length > 0 ? <CheckCircle2 className="size-3" /> : "1"}
+            {drafts.length > 0 ? <CheckCircle2 className="size-3.5" /> : "1"}
           </span>
-          Select files
-        </span>
-        <ArrowRight className="size-3 text-muted-foreground/30" />
-        <span className={cn(
-          "flex items-center gap-1.5 transition-colors duration-200",
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">Select files</span>
+        </div>
+
+        {/* Connector line */}
+        <div className={cn(
+          "mx-3 h-px flex-1 max-w-16 transition-colors duration-300",
+          drafts.length > 0 ? "bg-status-completed/30" : "bg-border/50"
+        )} />
+
+        {/* Step 2 */}
+        <div className={cn(
+          "flex items-center gap-2 transition-colors duration-200",
           currentStep === 2 ? "text-primary" : "text-muted-foreground/40"
         )}>
           <span className={cn(
-            "flex size-5 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200",
+            "flex size-7 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-300",
             currentStep === 2
               ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
               : "bg-muted text-muted-foreground/60"
           )}>
             2
           </span>
-          Review metadata
-        </span>
-        <ArrowRight className="size-3 text-muted-foreground/30" />
-        <span className="flex items-center gap-1.5 text-muted-foreground/40">
-          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground/60">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">Review metadata</span>
+        </div>
+
+        {/* Connector line */}
+        <div className="mx-3 h-px flex-1 max-w-16 bg-border/50" />
+
+        {/* Step 3 */}
+        <div className="flex items-center gap-2 text-muted-foreground/40">
+          <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground/60">
             3
           </span>
-          Add to library
-        </span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em]">Add to library</span>
+        </div>
       </div>
 
       {/* Drop zone */}
@@ -387,34 +399,40 @@ export const UploadsPage: React.FC = () => {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={cn(
-          "group relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-12 transition-all duration-300 cursor-pointer overflow-hidden",
+          "group relative flex flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-16 transition-all duration-300 cursor-pointer overflow-hidden",
           dragOver
-            ? "border-primary bg-primary/[0.06] shadow-[inset_0_2px_20px_-4px] shadow-primary/10"
-            : "border-border/40 bg-gradient-to-b from-muted/20 to-transparent hover:border-primary/30 hover:from-primary/[0.03]"
+            ? "border-primary/60 bg-primary/[0.06] shadow-[inset_0_0_60px_-12px] shadow-primary/10 scale-[1.005]"
+            : "border-border/40 bg-gradient-to-b from-muted/30 via-transparent to-transparent hover:border-primary/30 hover:from-primary/[0.03]"
         )}
       >
-        {/* Decorative background glow on drag */}
+        {/* Decorative background glow on drag -- multiple layers for richness */}
         <div className={cn(
           "pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-500",
           dragOver ? "opacity-100" : "opacity-0"
         )} style={{
-          background: "radial-gradient(circle at 50% 50%, oklch(0.55 0.14 55 / 0.08), transparent 70%)"
+          background: "radial-gradient(ellipse 60% 50% at 50% 50%, oklch(0.52 0.15 50 / 0.1), transparent 70%)"
+        }} />
+        <div className={cn(
+          "pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-700",
+          dragOver ? "opacity-100" : "opacity-0"
+        )} style={{
+          background: "radial-gradient(circle at 30% 40%, oklch(0.60 0.18 148 / 0.04), transparent 50%), radial-gradient(circle at 70% 60%, oklch(0.62 0.16 250 / 0.04), transparent 50%)"
         }} />
 
         <div className={cn(
-          "relative flex size-16 items-center justify-center rounded-2xl transition-all duration-300",
+          "relative flex size-20 items-center justify-center rounded-[1.25rem] transition-all duration-300",
           dragOver
-            ? "bg-primary/15 scale-110"
-            : "bg-muted/40 group-hover:bg-primary/10 group-hover:scale-105"
+            ? "bg-primary/15 scale-110 shadow-lg shadow-primary/10"
+            : "bg-muted/30 group-hover:bg-primary/8 group-hover:scale-105"
         )}>
           <FileUp className={cn(
-            "size-8 transition-all duration-300",
-            dragOver ? "text-primary -translate-y-1" : "text-muted-foreground/35 group-hover:text-primary/60"
+            "size-9 transition-all duration-300",
+            dragOver ? "text-primary -translate-y-1.5" : "text-muted-foreground/30 group-hover:text-primary/50"
           )} />
         </div>
-        <div className="relative text-center">
-          <p className="text-sm font-semibold">Drop EPUB or PDF files here</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">
+        <div className="relative text-center space-y-1.5">
+          <p className="text-sm font-semibold tracking-tight">Drop EPUB or PDF files here</p>
+          <p className="text-xs text-muted-foreground/50">
             or click to browse -- metadata is looked up automatically
           </p>
         </div>
@@ -434,15 +452,15 @@ export const UploadsPage: React.FC = () => {
 
       {/* Draft cards */}
       {drafts.length > 0 && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {/* Toolbar */}
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
                 <BookOpen className="size-3.5 text-primary" />
               </div>
-              <h2 className="text-base font-semibold">Review & Edit</h2>
-              <Badge variant="secondary" className="text-[10px]">
+              <h2 className="text-base font-semibold tracking-tight">Review & Edit</h2>
+              <Badge variant="secondary" className="text-[10px] tabular-nums">
                 {drafts.length} {drafts.length === 1 ? "file" : "files"}
               </Badge>
             </div>
@@ -451,7 +469,7 @@ export const UploadsPage: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-xs"
+                  className="text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     const nextSelected = selectedCount !== drafts.length;
                     setDrafts((prev) => prev.map((draft) => ({ ...draft, selected: nextSelected })));
@@ -464,7 +482,7 @@ export const UploadsPage: React.FC = () => {
                 onClick={() => void handleAddSelected()}
                 disabled={selectedCount === 0 || uploadingAny || selectedLoadingMetadata}
                 size="sm"
-                className="shadow-sm shadow-primary/20"
+                className="shadow-sm shadow-primary/20 active:scale-[0.97] transition-all duration-200"
               >
                 {uploadingAny ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -488,33 +506,35 @@ export const UploadsPage: React.FC = () => {
               const fileSizeMB = (draft.file.size / 1024 / 1024).toFixed(1);
 
               return (
-                <Card
+                <div
                   key={draft.id}
                   className={cn(
-                    "border-border/40 transition-all duration-300 animate-fade-up overflow-hidden",
-                    draft.selected && "ring-1 ring-primary/20 border-primary/30",
-                    isUploading && "opacity-70 pointer-events-none"
+                    "group/card relative rounded-2xl border bg-card transition-all duration-300 animate-fade-up overflow-hidden",
+                    draft.selected
+                      ? "border-primary/25 shadow-sm shadow-primary/[0.04] ring-1 ring-primary/10"
+                      : "border-border/40 hover:border-border/60",
+                    isUploading && "opacity-60 pointer-events-none"
                   )}
                   style={{ animationDelay: `${i * 60}ms`, animationFillMode: "backwards" }}
                 >
-                  {/* Loading shimmer bar at top of card */}
+                  {/* Loading shimmer bar at top of card -- refined gradient */}
                   {isLoading && (
-                    <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-shimmer" style={{ backgroundSize: "200% 100%" }} />
+                    <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-shimmer" style={{ backgroundSize: "200% 100%" }} />
                   )}
 
-                  <CardContent className="p-5">
+                  <div className="p-6">
                     {/* Top row: file info + metadata status + actions */}
                     <div className="flex items-start gap-4">
-                      {/* Checkbox */}
-                      <div className="pt-1">
+                      {/* Checkbox -- refined with subtle animation */}
+                      <div className="pt-0.5">
                         <button
                           type="button"
                           onClick={() => updateDraft(draft.id, { selected: !draft.selected })}
                           className={cn(
                             "flex size-5 items-center justify-center rounded-md border-2 transition-all duration-200",
                             draft.selected
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border/60 hover:border-primary/40"
+                              ? "border-primary bg-primary text-primary-foreground scale-100"
+                              : "border-border/60 hover:border-primary/40 hover:scale-105"
                           )}
                         >
                           {draft.selected && <CheckCircle2 className="size-3" />}
@@ -522,57 +542,57 @@ export const UploadsPage: React.FC = () => {
                       </div>
 
                       {/* File type badge + name */}
-                      <div className="flex-1 min-w-0 space-y-3">
+                      <div className="flex-1 min-w-0 space-y-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex items-center gap-3 min-w-0">
                             <span className={cn(
-                              "shrink-0 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider",
+                              "shrink-0 inline-flex items-center rounded-lg px-2 py-1 text-[10px] font-bold tracking-wider",
                               fileExt === "EPUB"
-                                ? "bg-status-processing/12 text-status-processing"
-                                : "bg-status-queued/15 text-status-queued"
+                                ? "bg-status-processing/10 text-status-processing"
+                                : "bg-status-queued/12 text-status-queued"
                             )}>
                               {fileExt}
                             </span>
                             <p className="text-sm font-semibold truncate">{draft.file.name}</p>
-                            <span className="shrink-0 text-[11px] text-muted-foreground/50">{fileSizeMB} MB</span>
+                            <span className="shrink-0 text-[11px] text-muted-foreground/40 tabular-nums">{fileSizeMB} MB</span>
                           </div>
 
                           {/* Metadata status indicator */}
                           <div className="ml-auto shrink-0 flex items-center gap-2">
                             {isLoading && (
-                              <div className="flex items-center gap-1.5 text-primary animate-pulse-soft">
+                              <div className="flex items-center gap-1.5 text-primary/80 animate-pulse-soft">
                                 <Search className="size-3.5" />
                                 <span className="text-[11px] font-medium">Looking up metadata...</span>
                               </div>
                             )}
                             {isEnriched && (
-                              <Badge variant="success" className="gap-1 text-[10px]">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-status-completed/8 px-2.5 py-1 text-[10px] font-semibold text-status-completed">
                                 <Sparkles className="size-2.5" />
                                 {sourceLabel(draft.metadataSource)}
-                              </Badge>
+                              </span>
                             )}
                             {isNoMatch && (
-                              <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                              <div className="flex items-center gap-1.5 text-muted-foreground/50">
                                 <AlertCircle className="size-3.5" />
-                                <span className="text-[11px] font-medium">No metadata found -- fill in manually</span>
+                                <span className="text-[11px] font-medium">No metadata found</span>
                               </div>
                             )}
                             {isError && (
-                              <Badge variant="destructive" className="gap-1 text-[10px]">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/8 px-2.5 py-1 text-[10px] font-semibold text-destructive">
                                 <XCircle className="size-2.5" />
                                 Lookup failed
-                              </Badge>
+                              </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Metadata loading skeleton */}
+                        {/* Metadata loading skeleton -- refined with better shimmer */}
                         {isLoading && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {["Title", "Author", "Series"].map((label) => (
-                              <div key={label} className="space-y-1.5">
-                                <span className="text-[11px] font-medium text-muted-foreground/50">{label}</span>
-                                <div className="h-9 rounded-lg bg-muted/40 animate-shimmer" style={{ backgroundSize: "200% 100%", backgroundImage: "linear-gradient(90deg, transparent 0%, oklch(0.55 0.14 55 / 0.06) 50%, transparent 100%)" }} />
+                              <div key={label} className="space-y-2">
+                                <span className="text-[11px] font-medium text-muted-foreground/40 uppercase tracking-[0.06em]">{label}</span>
+                                <div className="h-9 rounded-xl bg-muted/30 animate-shimmer" style={{ backgroundSize: "200% 100%", backgroundImage: "linear-gradient(90deg, transparent 0%, oklch(0.52 0.15 50 / 0.05) 50%, transparent 100%)" }} />
                               </div>
                             ))}
                           </div>
@@ -580,49 +600,49 @@ export const UploadsPage: React.FC = () => {
 
                         {/* Metadata fields -- shown once loading is done */}
                         {!isLoading && (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              <div className="space-y-1.5">
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <Label className="text-[11px] font-medium text-muted-foreground/70">Title</Label>
+                                  <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Title</Label>
                                   <AutoFilledHint visible={isEnriched && !draft.titleTouched && !!draft.title} />
                                 </div>
                                 <Input
                                   value={draft.title}
                                   onChange={(e) => updateDraft(draft.id, { title: e.target.value, titleTouched: true })}
                                   className={cn(
-                                    "h-9",
-                                    isEnriched && !draft.titleTouched && draft.title && "border-status-completed/25 bg-status-completed/[0.04]"
+                                    "h-9 rounded-xl",
+                                    isEnriched && !draft.titleTouched && draft.title && "border-status-completed/20 bg-status-completed/[0.03]"
                                   )}
                                 />
                               </div>
-                              <div className="space-y-1.5">
+                              <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <Label className="text-[11px] font-medium text-muted-foreground/70">Author</Label>
+                                  <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Author</Label>
                                   <AutoFilledHint visible={isEnriched && !draft.authorTouched && !!draft.author} />
                                 </div>
                                 <Input
                                   value={draft.author}
                                   onChange={(e) => updateDraft(draft.id, { author: e.target.value, authorTouched: true })}
                                   className={cn(
-                                    "h-9",
-                                    isEnriched && !draft.authorTouched && draft.author && "border-status-completed/25 bg-status-completed/[0.04]"
+                                    "h-9 rounded-xl",
+                                    isEnriched && !draft.authorTouched && draft.author && "border-status-completed/20 bg-status-completed/[0.03]"
                                   )}
                                 />
                               </div>
-                              <div className="space-y-1.5">
-                                <Label className="text-[11px] font-medium text-muted-foreground/70">Series</Label>
+                              <div className="space-y-2">
+                                <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Series</Label>
                                 <Input
                                   value={draft.series}
                                   onChange={(e) => updateDraft(draft.id, { series: e.target.value })}
-                                  className="h-9"
+                                  className="h-9 rounded-xl"
                                 />
                               </div>
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div className="space-y-2">
                               <div className="flex items-center justify-between">
-                                <Label className="text-[11px] font-medium text-muted-foreground/70">Description</Label>
+                                <Label className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-[0.06em]">Description</Label>
                                 <AutoFilledHint visible={isEnriched && !draft.descriptionTouched && !!draft.description} />
                               </div>
                               <Textarea
@@ -630,19 +650,19 @@ export const UploadsPage: React.FC = () => {
                                 value={draft.description}
                                 onChange={(e) => updateDraft(draft.id, { description: e.target.value, descriptionTouched: true })}
                                 className={cn(
-                                  "text-sm resize-none",
-                                  isEnriched && !draft.descriptionTouched && draft.description && "border-status-completed/25 bg-status-completed/[0.04]"
+                                  "text-sm resize-none rounded-xl",
+                                  isEnriched && !draft.descriptionTouched && draft.description && "border-status-completed/20 bg-status-completed/[0.03]"
                                 )}
                               />
                             </div>
 
                             {/* Bottom row: collections, favorite, quick add */}
-                            <div className="flex items-center justify-between gap-3 pt-1">
+                            <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/20">
                               <div className="flex items-center gap-2 flex-wrap">
-                                {/* Collections */}
+                                {/* Collections as pill-shaped tags */}
                                 {(collections.data ?? []).length > 0 && (
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50 mr-0.5">
+                                    <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/40 mr-1">
                                       Collections
                                     </span>
                                     {(collections.data ?? []).map((collection) => {
@@ -658,10 +678,10 @@ export const UploadsPage: React.FC = () => {
                                             updateDraft(draft.id, { collectionIds: next });
                                           }}
                                           className={cn(
-                                            "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium transition-all duration-200 border",
+                                            "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-200",
                                             selected
-                                              ? "bg-primary/10 text-primary border-primary/25"
-                                              : "bg-transparent text-muted-foreground/60 border-border/40 hover:border-primary/30 hover:text-foreground/80"
+                                              ? "bg-primary/12 text-primary ring-1 ring-primary/20"
+                                              : "bg-muted/30 text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground/70"
                                           )}
                                         >
                                           {collection.icon && <span className="mr-1">{collection.icon}</span>}
@@ -672,15 +692,15 @@ export const UploadsPage: React.FC = () => {
                                   </div>
                                 )}
 
-                                {/* Favorite toggle */}
+                                {/* Favorite toggle -- pill-shaped */}
                                 <button
                                   type="button"
                                   onClick={() => updateDraft(draft.id, { favorite: !draft.favorite })}
                                   className={cn(
-                                    "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-all duration-200 border",
+                                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all duration-200",
                                     draft.favorite
-                                      ? "bg-status-queued/15 text-status-queued border-status-queued/25"
-                                      : "bg-transparent text-muted-foreground/50 border-border/40 hover:border-status-queued/30 hover:text-status-queued/70"
+                                      ? "bg-status-queued/12 text-status-queued ring-1 ring-status-queued/20"
+                                      : "bg-muted/30 text-muted-foreground/40 hover:bg-muted/50 hover:text-status-queued/60"
                                   )}
                                 >
                                   <Star className={cn("size-3", draft.favorite && "fill-current")} />
@@ -692,7 +712,7 @@ export const UploadsPage: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="size-8 text-muted-foreground/40 hover:text-destructive"
+                                  className="size-8 text-muted-foreground/30 hover:text-destructive transition-colors duration-200"
                                   onClick={() => removeDraft(draft.id)}
                                   disabled={isUploading}
                                 >
@@ -702,7 +722,7 @@ export const UploadsPage: React.FC = () => {
                                   size="sm"
                                   onClick={() => void uploadDraft(draft)}
                                   disabled={isUploading || isLoading}
-                                  className="shadow-sm shadow-primary/20"
+                                  className="shadow-sm shadow-primary/15 active:scale-[0.97] transition-all duration-200"
                                 >
                                   {isUploading ? (
                                     <Loader2 className="size-3.5 animate-spin" />
@@ -718,78 +738,93 @@ export const UploadsPage: React.FC = () => {
 
                         {/* Error message */}
                         {draft.error && (
-                          <div className="flex items-center gap-2 rounded-lg bg-destructive/8 border border-destructive/15 px-3 py-2 mt-2">
+                          <div className="flex items-center gap-2 rounded-xl bg-destructive/6 border border-destructive/12 px-4 py-3 mt-2">
                             <XCircle className="size-3.5 text-destructive shrink-0" />
                             <p className="text-xs text-destructive">{draft.error}</p>
                           </div>
                         )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Upload jobs */}
+      {/* Upload jobs -- timeline-style feed */}
       {jobs.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
               <Upload className="size-3.5 text-primary" />
             </div>
-            <h2 className="text-base font-semibold">Import Progress</h2>
-            <Badge variant="secondary" className="text-[10px]">
+            <h2 className="text-base font-semibold tracking-tight">Import Progress</h2>
+            <Badge variant="secondary" className="text-[10px] tabular-nums">
               {jobs.filter((j) => j.status === "COMPLETED").length}/{jobs.length} done
             </Badge>
           </div>
 
-          <div className="grid gap-2">
-            {jobs.map((job, i) => {
-              const display = statusDisplay[job.status];
-              return (
-                <div
-                  key={job.id}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-200 animate-fade-up",
-                    job.status === "COMPLETED" && "border-status-completed/20 bg-status-completed/[0.04]",
-                    job.status === "FAILED" && "border-destructive/20 bg-destructive/[0.04]",
-                    job.status === "PROCESSING" && "border-status-processing/20 bg-status-processing/[0.04]",
-                    job.status === "QUEUED" && "border-border/40 bg-muted/10"
-                  )}
-                  style={{ animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
-                >
-                  <div className={cn(
-                    "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                    job.status === "COMPLETED" && "bg-status-completed/15 text-status-completed",
-                    job.status === "FAILED" && "bg-destructive/15 text-destructive",
-                    job.status === "PROCESSING" && "bg-status-processing/15 text-status-processing",
-                    job.status === "QUEUED" && "bg-status-queued/15 text-status-queued"
-                  )}>
-                    {display.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {job.status === "COMPLETED" ? "Book imported" : `Job ${job.id.slice(0, 8)}`}
-                    </p>
-                    {job.error && (
-                      <p className="text-xs text-destructive mt-0.5 truncate">{job.error}</p>
+          {/* Timeline container with vertical line */}
+          <div className="relative pl-4">
+            {/* Vertical connector line */}
+            <div className="absolute left-[1.1rem] top-2 bottom-2 w-px bg-border/40" />
+
+            <div className="space-y-2">
+              {jobs.map((job, i) => {
+                const display = statusDisplay[job.status];
+                return (
+                  <div
+                    key={job.id}
+                    className={cn(
+                      "relative flex items-center gap-3 rounded-xl border px-4 py-3 ml-4 transition-all duration-200 animate-fade-up",
+                      job.status === "COMPLETED" && "border-status-completed/15 bg-status-completed/[0.03]",
+                      job.status === "FAILED" && "border-destructive/15 bg-destructive/[0.03]",
+                      job.status === "PROCESSING" && "border-status-processing/15 bg-status-processing/[0.03]",
+                      job.status === "QUEUED" && "border-border/30 bg-muted/5"
                     )}
-                    {job.result?.bookId && (
-                      <p className="text-xs text-muted-foreground/60 mt-0.5">
-                        Book #{job.result.bookId}
+                    style={{ animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
+                  >
+                    {/* Timeline dot */}
+                    <div className={cn(
+                      "absolute -left-[1.65rem] flex size-3 items-center justify-center rounded-full ring-2 ring-background",
+                      job.status === "COMPLETED" && "bg-status-completed",
+                      job.status === "FAILED" && "bg-destructive",
+                      job.status === "PROCESSING" && "bg-status-processing",
+                      job.status === "QUEUED" && "bg-muted-foreground/30"
+                    )} />
+
+                    <div className={cn(
+                      "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                      job.status === "COMPLETED" && "bg-status-completed/10 text-status-completed",
+                      job.status === "FAILED" && "bg-destructive/10 text-destructive",
+                      job.status === "PROCESSING" && "bg-status-processing/10 text-status-processing",
+                      job.status === "QUEUED" && "bg-status-queued/10 text-status-queued"
+                    )}>
+                      {display.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {job.status === "COMPLETED" ? "Book imported" : `Job ${job.id.slice(0, 8)}`}
                       </p>
-                    )}
+                      {job.error && (
+                        <p className="text-xs text-destructive mt-0.5 truncate">{job.error}</p>
+                      )}
+                      {job.result?.bookId && (
+                        <p className="text-xs text-muted-foreground/50 mt-0.5">
+                          Book #{job.result.bookId}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant={display.variant} className="shrink-0 gap-1">
+                      {display.icon}
+                      {display.label}
+                    </Badge>
                   </div>
-                  <Badge variant={display.variant} className="shrink-0 gap-1">
-                    {display.icon}
-                    {display.label}
-                  </Badge>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

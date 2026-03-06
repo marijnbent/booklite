@@ -25,91 +25,76 @@ export const ProfilePage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-10 max-w-2xl">
       {/* Page header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-2 text-[13px] text-muted-foreground/70 leading-relaxed">
           Your account information
         </p>
       </div>
 
-      <Card className="border-border/40 overflow-hidden">
-        {/* Profile header with gradient banner */}
-        <div className="relative h-24 bg-gradient-to-r from-primary/10 via-primary/[0.06] to-transparent">
-          <div className="absolute -bottom-8 left-6">
-            <Avatar className="size-16 ring-4 ring-card shadow-lg">
-              <AvatarFallback className="text-lg bg-primary/15 text-primary">
+      <div className="rounded-2xl border border-border/30 bg-card shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden">
+        {/* Profile header with gradient banner -- richer, multi-stop gradient */}
+        <div className="relative h-32 bg-gradient-to-br from-primary/18 via-primary/[0.08] to-status-processing/[0.06] overflow-hidden">
+          {/* Subtle decorative circles */}
+          <div className="pointer-events-none absolute right-6 top-3 size-24 rounded-full bg-primary/[0.08] blur-3xl" />
+          <div className="pointer-events-none absolute right-24 bottom-0 size-16 rounded-full bg-status-completed/[0.08] blur-2xl" />
+          <div className="pointer-events-none absolute left-1/3 top-0 size-20 rounded-full bg-status-processing/[0.05] blur-2xl" />
+
+          {/* Avatar -- prominent with layered ring */}
+          <div className="absolute -bottom-11 left-7">
+            <Avatar className="size-22 ring-[3.5px] ring-card shadow-xl shadow-primary/[0.08]">
+              <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary/25 to-primary/10 text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>
           </div>
         </div>
 
-        <CardHeader className="pt-12 pb-2">
+        {/* Name + role badge */}
+        <div className="pt-15 px-7 pb-2">
           <div className="flex items-center gap-3">
-            <CardTitle className="text-xl">{me.username}</CardTitle>
-            <Badge variant={me.role === "OWNER" ? "default" : "secondary"}>
+            <h2 className="text-2xl font-bold tracking-tight">{me.username}</h2>
+            <Badge
+              variant={me.role === "OWNER" ? "default" : "secondary"}
+              className="text-[10px] font-semibold"
+            >
               {me.role}
             </Badge>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="space-y-0">
-          <Separator className="mb-5" />
+        {/* Separator -- warm gradient style */}
+        <div className="mx-7 mt-4 mb-1 h-px bg-gradient-to-r from-border/30 via-border/15 to-transparent" />
 
-          {/* Info rows */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-muted/50">
-                <User className="size-4 text-muted-foreground" />
+        {/* Info grid -- two-column on desktop */}
+        <div className="p-7 pt-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {[
+              { icon: User, label: "Username", value: me.username },
+              { icon: Mail, label: "Email", value: me.email },
+              { icon: Shield, label: "Role", value: me.role },
+              { icon: Calendar, label: "Member since", value: createdDate },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-3.5 rounded-xl px-4 py-3.5 transition-colors duration-200 hover:bg-muted/15"
+              >
+                <div className="flex size-10 items-center justify-center rounded-xl bg-muted/25 ring-1 ring-border/[0.06]">
+                  <item.icon className="size-4 text-muted-foreground/55" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-muted-foreground/45">
+                    {item.label}
+                  </p>
+                  <p className="text-[14px] font-medium truncate mt-0.5">{item.value}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
-                  Username
-                </p>
-                <p className="text-sm font-medium">{me.username}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-muted/50">
-                <Mail className="size-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
-                  Email
-                </p>
-                <p className="text-sm font-medium">{me.email}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-muted/50">
-                <Shield className="size-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
-                  Role
-                </p>
-                <p className="text-sm font-medium">{me.role}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-lg bg-muted/50">
-                <Calendar className="size-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
-                  Member since
-                </p>
-                <p className="text-sm font-medium">{createdDate}</p>
-              </div>
-            </div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

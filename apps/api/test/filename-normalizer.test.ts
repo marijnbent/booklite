@@ -144,4 +144,36 @@ describe("filename normalizer", () => {
       series: deterministic.series
     });
   });
+
+  it("includes language-preservation instructions in the LLM prompt", async () => {
+    settings.set("metadata_openrouter_enabled", true);
+    settings.set("metadata_openrouter_api_key", "key");
+    settings.set("metadata_openrouter_model", "google/gemini-2.0-flash-lite-001");
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as {
+          messages?: Array<{ content?: string }>;
+        };
+        const systemMessage = body.messages?.[0]?.content ?? "";
+
+        expect(systemMessage).toContain("Keep output in the same language/script as the raw filename.");
+        expect(systemMessage).toContain("Never translate fields into a different language.");
+        expect(systemMessage).toContain(
+          "Preserve accents/diacritics and non-Latin characters from the filename when they are clear."
+        );
+
+        return openRouterResponse(
+          JSON.stringify({
+            title: "Het achtste leven"
+          })
+        );
+      }
+    );
+
+    const result = await resolveFilenameMetadata("libgen_Het_achtste_leven_2014.epub");
+
+    expect(result.title).toBe("Het achtste leven");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
 });

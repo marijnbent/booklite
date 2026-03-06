@@ -119,6 +119,9 @@ Rules:
 - Return JSON object with optional keys: title, author, series.
 - Remove source/publisher/hash/ISBN/noise clutter from fields.
 - series format must be \"Series Name #N\" when a number is known.
+- Keep output in the same language/script as the raw filename.
+- Never translate fields into a different language.
+- Preserve accents/diacritics and non-Latin characters from the filename when they are clear.
 - Do not fabricate uncertain data. Omit fields you are not confident about.
 - Never include URLs.`;
 

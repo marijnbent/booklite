@@ -75,112 +75,109 @@ export const AppShell: React.FC = () => {
     navigate("/login");
   };
 
+  /* Shared nav link renderer for both primary and footer items */
+  const renderNavItem = (item: NavItem) => (
+    <Tooltip key={item.to}>
+      <TooltipTrigger asChild>
+        <NavLink
+          to={item.to}
+          onClick={() => setMobileOpen(false)}
+          className={({ isActive }) =>
+            cn(
+              "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-200",
+              "text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-muted/30",
+              isActive && "text-sidebar-foreground bg-transparent",
+              collapsed && "justify-center px-2"
+            )
+          }
+        >
+          {/* Active indicator bar */}
+          {({ isActive }: { isActive: boolean }) => (
+            <>
+              <span
+                className={cn(
+                  "absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-full bg-sidebar-accent transition-all duration-300",
+                  isActive ? "h-4 opacity-100" : "h-0 opacity-0"
+                )}
+              />
+              <span className={cn(
+                "shrink-0 transition-colors duration-200",
+                isActive ? "text-sidebar-accent" : "text-sidebar-foreground/60 group-hover:text-sidebar-foreground/80"
+              )}>
+                {item.icon}
+              </span>
+              {!collapsed && <span className={isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/75 group-hover:text-sidebar-foreground"}>{item.label}</span>}
+            </>
+          )}
+        </NavLink>
+      </TooltipTrigger>
+      {collapsed && (
+        <TooltipContent side="right">
+          {item.label}
+        </TooltipContent>
+      )}
+    </Tooltip>
+  );
+
   const sidebarContent = (
     <>
       {/* Brand */}
       <div className={cn(
-        "flex items-center gap-3 px-3 py-1",
+        "flex items-center gap-3 px-3 py-1.5",
         collapsed && "justify-center px-0"
       )}>
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15">
-          <Book className="size-4 text-primary" />
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sidebar-accent/25 to-sidebar-accent/10">
+          <Book className="size-4 text-sidebar-accent" />
         </div>
         {!collapsed && (
-          <span className="text-base font-bold tracking-tight text-sidebar-foreground">
+          <span className="text-[15px] font-bold tracking-tight text-sidebar-foreground">
             BookLite
           </span>
         )}
       </div>
 
-      <Separator className="my-3 bg-sidebar-muted/60" />
+      {/* Subtle divider */}
+      <div className="my-4 mx-3 h-px bg-gradient-to-r from-transparent via-sidebar-muted/50 to-transparent" />
 
-      {/* Navigation */}
-      <nav className="flex flex-1 flex-col gap-1">
-        {visiblePrimaryNavItems.map((item) => (
-          <Tooltip key={item.to}>
-            <TooltipTrigger asChild>
-              <NavLink
-                to={item.to}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-muted/50",
-                    isActive && "bg-sidebar-muted/70 text-sidebar-foreground shadow-sm",
-                    collapsed && "justify-center px-2"
-                  )
-                }
-              >
-                <span className="shrink-0">{item.icon}</span>
-                {!collapsed && <span>{item.label}</span>}
-              </NavLink>
-            </TooltipTrigger>
-            {collapsed && (
-              <TooltipContent side="right">
-                {item.label}
-              </TooltipContent>
-            )}
-          </Tooltip>
-        ))}
+      {/* Primary navigation */}
+      <nav className="flex flex-1 flex-col gap-0.5 px-1">
+        {visiblePrimaryNavItems.map(renderNavItem)}
       </nav>
 
       {/* Bottom section */}
-      <div className="mt-auto space-y-2">
-        <Separator className="bg-sidebar-muted/60" />
+      <div className="mt-auto space-y-1">
+        {/* Gradient divider */}
+        <div className="mx-3 h-px bg-gradient-to-r from-transparent via-sidebar-muted/50 to-transparent" />
 
-        {/* User info (expanded only) */}
+        {/* Footer nav */}
+        <nav className="flex flex-col gap-0.5 px-1 pt-2">
+          {visibleFooterNavItems.map(renderNavItem)}
+        </nav>
+
+        {/* User section -- integrated feel */}
         {!collapsed && (
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+          <div className="mx-2 mt-2 flex items-center gap-3 rounded-lg px-2 py-2.5 bg-sidebar-muted/20">
             <Avatar className="size-7">
-              <AvatarFallback className="bg-sidebar-accent/20 text-sidebar-foreground text-[10px]">
+              <AvatarFallback className="bg-sidebar-accent/15 text-sidebar-accent text-[10px] font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-sidebar-foreground truncate">
+              <span className="text-[12px] font-medium text-sidebar-foreground truncate leading-tight">
                 {me?.username}
               </span>
-              <span className="text-[10px] text-sidebar-foreground/40 uppercase tracking-wider">
+              <span className="text-[10px] text-sidebar-foreground/35 uppercase tracking-[0.08em] font-medium">
                 {me?.role}
               </span>
             </div>
           </div>
         )}
 
-        <nav className="flex flex-col gap-1">
-          {visibleFooterNavItems.map((item) => (
-            <Tooltip key={item.to}>
-              <TooltipTrigger asChild>
-                <NavLink
-                  to={item.to}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    cn(
-                      "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-muted/50",
-                      isActive && "bg-sidebar-muted/70 text-sidebar-foreground shadow-sm",
-                      collapsed && "justify-center px-2"
-                    )
-                  }
-                >
-                  <span className="shrink-0">{item.icon}</span>
-                  {!collapsed && <span>{item.label}</span>}
-                </NavLink>
-              </TooltipTrigger>
-              {collapsed && (
-                <TooltipContent side="right">
-                  {item.label}
-                </TooltipContent>
-              )}
-            </Tooltip>
-          ))}
-        </nav>
-
         {/* Collapse toggle -- desktop only */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "hidden md:flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 hover:text-sidebar-foreground/70 hover:bg-sidebar-muted/30 transition-colors cursor-pointer",
+            "hidden md:flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-foreground/50 hover:text-sidebar-foreground/70 hover:bg-sidebar-muted/20 transition-colors cursor-pointer mt-1",
             collapsed && "justify-center px-2"
           )}
         >
@@ -199,7 +196,7 @@ export const AppShell: React.FC = () => {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden animate-fade-in"
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm md:hidden animate-fade-in"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -207,8 +204,10 @@ export const AppShell: React.FC = () => {
       {/* Sidebar -- desktop */}
       <aside
         className={cn(
-          "hidden md:flex flex-col sticky top-0 h-screen bg-sidebar px-3 py-4 transition-all duration-300 ease-out border-r border-sidebar-muted/30",
-          collapsed ? "w-16" : "w-60"
+          "hidden md:flex flex-col sticky top-0 h-screen bg-sidebar px-2 py-4 transition-all duration-300 ease-out",
+          /* Subtle right edge instead of solid border */
+          "border-r border-sidebar-muted/20",
+          collapsed ? "w-[52px]" : "w-56"
         )}
       >
         {sidebarContent}
@@ -217,14 +216,15 @@ export const AppShell: React.FC = () => {
       {/* Sidebar -- mobile drawer */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-sidebar px-3 py-4 transition-transform duration-300 ease-out md:hidden border-r border-sidebar-muted/30",
+          "fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-sidebar px-2 py-4 transition-transform duration-300 ease-out md:hidden",
+          "border-r border-sidebar-muted/20 shadow-2xl shadow-black/30",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         {/* Close button for mobile */}
         <button
           onClick={() => setMobileOpen(false)}
-          className="absolute right-2 top-3 flex size-7 items-center justify-center rounded-md text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-muted/40 transition-colors cursor-pointer"
+          className="absolute right-2 top-3 flex size-7 items-center justify-center rounded-md text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-muted/30 transition-colors cursor-pointer"
         >
           <X className="size-4" />
         </button>
@@ -233,8 +233,8 @@ export const AppShell: React.FC = () => {
 
       {/* Main content area */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Top header bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/40 bg-background/80 px-4 backdrop-blur-xl md:px-6">
+        {/* Top header bar -- glass effect with gradient bottom border */}
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 bg-background/70 px-4 backdrop-blur-xl md:px-6 border-b border-border/30">
           {/* Mobile hamburger */}
           <Button
             variant="ghost"
@@ -251,7 +251,7 @@ export const AppShell: React.FC = () => {
           {/* Theme toggle */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="shrink-0">
+              <Button variant="ghost" size="icon" className="shrink-0 size-8 rounded-lg">
                 {resolved === "dark" ? (
                   <Moon className="size-4" />
                 ) : (
@@ -283,9 +283,9 @@ export const AppShell: React.FC = () => {
           {/* User dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="shrink-0 rounded-full">
+              <Button variant="ghost" size="icon" className="shrink-0 size-8 rounded-full">
                 <Avatar className="size-7">
-                  <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+                  <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -310,8 +310,8 @@ export const AppShell: React.FC = () => {
           </DropdownMenu>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 animate-fade-up">
+        {/* Page content -- generous spacing */}
+        <main className="flex-1 p-5 md:p-7 lg:p-8 animate-fade-up">
           <Outlet />
         </main>
       </div>

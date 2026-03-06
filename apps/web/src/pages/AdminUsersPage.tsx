@@ -167,7 +167,7 @@ function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex items-start gap-3 min-w-0">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted/25 ring-1 ring-border/[0.06]">
           {icon}
         </div>
         <div className="min-w-0">
@@ -176,7 +176,7 @@ function SectionHeader({
             {badge}
           </div>
           {description && (
-            <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground/60">
               {description}
             </p>
           )}
@@ -190,7 +190,7 @@ function SectionHeader({
 /** Small uppercase label used for field groups */
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground">
+    <span className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
       {children}
     </span>
   );
@@ -289,13 +289,13 @@ export const AdminUsersPage: React.FC = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-8">
+      <div className="space-y-10">
         {/* ================================================================
             PAGE HEADER
             ================================================================ */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Administration</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-2 text-[13px] text-muted-foreground/70 leading-relaxed">
             Manage users, metadata providers, and system configuration
           </p>
         </div>
@@ -303,11 +303,11 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             USERS SECTION
             ================================================================ */}
-        <Card className="border-border/40 overflow-hidden">
+        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden">
           {/* Gradient banner like ProfilePage */}
-          <div className="h-1.5 bg-gradient-to-r from-primary/40 via-primary/20 to-transparent" />
+          <div className="h-[2px] bg-gradient-to-r from-primary/50 via-primary/15 to-transparent" />
 
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-5 pt-6 px-6">
             <SectionHeader
               icon={<Users className="size-4 text-muted-foreground" />}
               title="Users"
@@ -342,15 +342,15 @@ export const AdminUsersPage: React.FC = () => {
             />
           </CardHeader>
 
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5 px-6 pb-6">
             {/* Create user form (collapsible) */}
             {showCreateForm && (
-              <div className="animate-scale-in rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.03] to-transparent p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
+              <div className="animate-scale-in rounded-xl border border-primary/12 bg-gradient-to-br from-primary/[0.04] via-primary/[0.015] to-transparent p-6">
+                <div className="mb-5 flex items-center gap-2.5">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
                     <UserPlus className="size-3.5 text-primary" />
                   </div>
-                  <span className="text-sm font-semibold">New User</span>
+                  <span className="text-sm font-semibold tracking-tight">New User</span>
                 </div>
                 <form
                   onSubmit={(e) => {
@@ -443,20 +443,20 @@ export const AdminUsersPage: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="rounded-lg border border-border/40 overflow-hidden">
+              <div className="rounded-xl border border-border/30 overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/20 hover:bg-muted/20">
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold">
+                    <TableRow className="bg-muted/15 hover:bg-muted/15 border-border/15">
+                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
                         User
                       </TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold">
+                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
                         Role
                       </TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold">
+                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50">
                         Status
                       </TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-right">
+                      <TableHead className="text-[11px] uppercase tracking-[0.08em] font-semibold text-muted-foreground/50 text-right">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -465,7 +465,7 @@ export const AdminUsersPage: React.FC = () => {
                     {(users.data ?? []).map((user, i) => (
                       <TableRow
                         key={user.id}
-                        className="group transition-colors duration-150"
+                        className="group transition-colors duration-150 border-border/12 hover:bg-muted/8"
                         style={{
                           animationDelay: `${i * 40}ms`,
                           animation: "fade-up 0.3s ease-out both",
@@ -474,12 +474,12 @@ export const AdminUsersPage: React.FC = () => {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             {/* Avatar circle with initials */}
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/8 text-[11px] font-bold text-primary uppercase">
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/12 to-primary/6 text-[11px] font-bold text-primary uppercase ring-1 ring-primary/8">
                               {user.username.slice(0, 2)}
                             </div>
                             <div>
                               <p className="font-medium text-sm">{user.username}</p>
-                              <p className="text-xs text-muted-foreground">{user.email}</p>
+                              <p className="text-[11px] text-muted-foreground/50">{user.email}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -490,9 +490,9 @@ export const AdminUsersPage: React.FC = () => {
                               patchUser.mutate({ id: user.id, payload: { role: v } })
                             }
                           >
-                            <SelectTrigger className="h-7 w-[6.5rem] text-xs">
+                            <SelectTrigger className="h-7 w-[6.5rem] text-xs rounded-lg">
                               <div className="flex items-center gap-1.5">
-                                <Shield className="size-3 text-muted-foreground" />
+                                <Shield className="size-3 text-muted-foreground/50" />
                                 <SelectValue />
                               </div>
                             </SelectTrigger>
@@ -504,13 +504,13 @@ export const AdminUsersPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           {user.disabledAt ? (
-                            <Badge variant="destructive" className="text-[10px]">
+                            <span className="inline-flex items-center rounded-full bg-destructive/8 px-2 py-0.5 text-[10px] font-semibold text-destructive">
                               Disabled
-                            </Badge>
+                            </span>
                           ) : (
-                            <Badge variant="success" className="text-[10px]">
+                            <span className="inline-flex items-center rounded-full bg-status-completed/8 px-2 py-0.5 text-[10px] font-semibold text-status-completed">
                               Active
-                            </Badge>
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
@@ -540,12 +540,12 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             METADATA PROVIDERS SECTION
             ================================================================ */}
-        <Card className="border-border/40 overflow-hidden">
-          <div className="h-1.5 bg-gradient-to-r from-status-processing/30 via-status-processing/10 to-transparent" />
+        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden">
+          <div className="h-[2px] bg-gradient-to-r from-status-processing/40 via-status-processing/12 to-transparent" />
 
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-4 pt-6 px-6">
             <SectionHeader
-              icon={<Library className="size-4 text-muted-foreground" />}
+              icon={<Library className="size-4 text-muted-foreground/70" />}
               title="Metadata Providers"
               description="BookLite fetches book data from multiple sources and intelligently merges the best result for each field. Enable the providers you want to use."
               badge={
@@ -558,7 +558,7 @@ export const AdminUsersPage: React.FC = () => {
             />
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="px-6 pb-6">
             {settings.isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="size-5 text-primary animate-spin" />
@@ -578,8 +578,8 @@ export const AdminUsersPage: React.FC = () => {
                         className={`
                           rounded-xl border transition-all duration-200
                           ${enabled
-                            ? "border-border/60 bg-card"
-                            : "border-border/30 bg-muted/20"
+                            ? "border-border/40 bg-card hover:border-border/60"
+                            : "border-border/20 bg-muted/10"
                           }
                         `}
                         style={{
@@ -588,16 +588,16 @@ export const AdminUsersPage: React.FC = () => {
                         }}
                       >
                         {/* Provider row */}
-                        <div className="flex items-center gap-3 px-4 py-3">
+                        <div className="flex items-center gap-3 px-4 py-3.5">
                           {/* Icon */}
                           <div
                             className={`
-                              flex size-8 shrink-0 items-center justify-center rounded-lg
-                              transition-colors duration-200
-                              ${enabled ? "bg-primary/8" : "bg-muted/60"}
+                              flex size-9 shrink-0 items-center justify-center rounded-xl
+                              transition-all duration-200
+                              ${enabled ? "bg-primary/6" : "bg-muted/40"}
                             `}
                           >
-                            <span className={enabled ? meta.color : "text-muted-foreground/50"}>
+                            <span className={enabled ? meta.color : "text-muted-foreground/40"}>
                               {meta.icon}
                             </span>
                           </div>
@@ -613,7 +613,7 @@ export const AdminUsersPage: React.FC = () => {
                                 {meta.label}
                               </span>
                             </div>
-                            <p className="text-[12px] leading-relaxed text-muted-foreground/70 hidden sm:block">
+                            <p className="text-[11px] leading-relaxed text-muted-foreground/50 hidden sm:block">
                               {meta.description}
                             </p>
                           </div>
@@ -652,7 +652,7 @@ export const AdminUsersPage: React.FC = () => {
 
                         {/* Expandable settings per provider */}
                         {hasSettings && enabled && isExpanded && (
-                          <div className="animate-scale-in border-t border-border/30 bg-muted/10 px-4 py-4">
+                          <div className="animate-scale-in border-t border-border/15 bg-muted/8 px-4 py-4 rounded-b-xl">
                             {key === "amazon" && (
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
@@ -798,13 +798,13 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             AI METADATA RESOLVER
             ================================================================ */}
-        <Card className="border-border/40 overflow-hidden relative">
-          {/* Subtle shimmer accent for AI section */}
-          <div className="h-1.5 bg-gradient-to-r from-purple-500/30 via-pink-500/20 to-amber-500/10" />
+        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden relative">
+          {/* Refined multi-color accent line */}
+          <div className="h-[2px] bg-gradient-to-r from-purple-500/25 via-pink-500/15 to-amber-500/8" />
 
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-4 pt-6 px-6">
             <SectionHeader
-              icon={<Sparkles className="size-4 text-muted-foreground" />}
+              icon={<Sparkles className="size-4 text-muted-foreground/70" />}
               title="AI Metadata Resolver"
               description="Uses a large language model via OpenRouter to intelligently merge results from all providers, correct mismatched metadata, and fill in missing series information."
               badge={
@@ -821,30 +821,30 @@ export const AdminUsersPage: React.FC = () => {
             />
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="px-6 pb-6">
             {settings.isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="size-5 text-primary animate-spin" />
               </div>
             ) : settings.data ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Toggle row */}
                 <div
                   className={`
-                    flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-all duration-200
+                    flex items-center justify-between gap-3 rounded-xl border px-4 py-3.5 transition-all duration-200
                     ${settings.data.metadataOpenrouterEnabled
-                      ? "border-purple-500/20 bg-purple-500/[0.03]"
-                      : "border-border/40"
+                      ? "border-purple-500/15 bg-purple-500/[0.02]"
+                      : "border-border/30"
                     }
                   `}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`
-                        flex size-8 items-center justify-center rounded-lg transition-colors duration-200
+                        flex size-9 items-center justify-center rounded-xl transition-all duration-200
                         ${settings.data.metadataOpenrouterEnabled
-                          ? "bg-purple-500/10"
-                          : "bg-muted/50"
+                          ? "bg-purple-500/8"
+                          : "bg-muted/30"
                         }
                       `}
                     >
@@ -858,7 +858,7 @@ export const AdminUsersPage: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-sm font-medium">Enable AI resolver</span>
-                      <p className="text-[12px] text-muted-foreground/70">
+                      <p className="text-[11px] text-muted-foreground/50">
                         Requires an OpenRouter API key with credits
                       </p>
                     </div>
@@ -875,7 +875,7 @@ export const AdminUsersPage: React.FC = () => {
 
                 {/* Settings (only when enabled) */}
                 {settings.data.metadataOpenrouterEnabled && (
-                  <div className="animate-scale-in grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-border/30 bg-muted/10 p-4">
+                  <div className="animate-scale-in grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-border/20 bg-muted/8 p-4">
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-1.5">
                         <Key className="size-3 text-muted-foreground" />
@@ -924,28 +924,28 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             STORAGE & LIMITS
             ================================================================ */}
-        <Card className="border-border/40 overflow-hidden">
-          <div className="h-1.5 bg-gradient-to-r from-status-completed/30 via-status-completed/10 to-transparent" />
+        <Card className="border-border/30 shadow-sm shadow-black/[0.02] dark:shadow-black/[0.08] overflow-hidden">
+          <div className="h-[2px] bg-gradient-to-r from-status-completed/30 via-status-completed/8 to-transparent" />
 
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-4 pt-6 px-6">
             <SectionHeader
-              icon={<HardDrive className="size-4 text-muted-foreground" />}
+              icon={<HardDrive className="size-4 text-muted-foreground/70" />}
               title="Storage"
               description="Configure upload limits and storage behavior"
             />
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="px-6 pb-6">
             {settings.isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="size-5 text-primary animate-spin" />
               </div>
             ) : settings.data ? (
               <div
-                className="flex items-start gap-4 rounded-xl border border-border/40 px-4 py-4"
+                className="flex items-start gap-4 rounded-xl border border-border/30 px-4 py-4 hover:border-border/50 transition-colors duration-150"
                 style={{ animation: "fade-up 0.35s ease-out both" }}
               >
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-status-completed/10">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-status-completed/8">
                   <Upload className="size-4 text-status-completed" />
                 </div>
                 <div className="flex-1 space-y-1.5">
@@ -961,7 +961,7 @@ export const AdminUsersPage: React.FC = () => {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-[12px] text-muted-foreground/70">
+                  <p className="text-[11px] text-muted-foreground/50">
                     The maximum file size for individual book uploads
                   </p>
                 </div>

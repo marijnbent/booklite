@@ -1141,7 +1141,9 @@ Rules:
 - author: The real author. If providers returned a study guide author or publisher, correct it.
 - series: Format as "Series Name #N" (e.g. "The Empyrean #1"). Include position number if known. If the book is standalone, omit or null.
 - description: Pick the most relevant and complete description from providers. Do not write your own.
-- coverPath: Pick the best cover URL from providers. Do not generate one.`;
+- coverPath: Pick the best cover URL from providers. Do not generate one.
+- Keep title/series in the same language/script as the query and matched provider records.
+- Never translate the title or series into a different language.`;
 
   const providerRows = candidates
     .map((candidate, index) => {
