@@ -149,6 +149,20 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value_json TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS admin_activity_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scope TEXT NOT NULL,
+  event TEXT NOT NULL,
+  level TEXT NOT NULL DEFAULT 'ERROR',
+  message TEXT NOT NULL,
+  details_json TEXT,
+  actor_user_id INTEGER,
+  target_user_id INTEGER,
+  book_id INTEGER,
+  job_id TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS book_search USING fts5(
   title,
   author,
@@ -180,6 +194,16 @@ sqlite.exec(`
 CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_user_slug
 ON collections(user_id, slug)
 WHERE slug IS NOT NULL;
+`);
+
+sqlite.exec(`
+CREATE INDEX IF NOT EXISTS idx_admin_activity_log_created_at
+ON admin_activity_log(created_at DESC, id DESC);
+`);
+
+sqlite.exec(`
+CREATE INDEX IF NOT EXISTS idx_admin_activity_log_scope_created_at
+ON admin_activity_log(scope, created_at DESC, id DESC);
 `);
 
 sqlite.exec(`

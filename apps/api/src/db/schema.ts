@@ -135,6 +135,20 @@ export const appSettings = sqliteTable("app_settings", {
   valueJson: text("value_json").notNull()
 });
 
+export const adminActivityLog = sqliteTable("admin_activity_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  scope: text("scope", { enum: ["metadata", "upload", "kobo"] }).notNull(),
+  event: text("event").notNull(),
+  level: text("level", { enum: ["ERROR", "WARN", "INFO"] }).notNull().default("ERROR"),
+  message: text("message").notNull(),
+  detailsJson: text("details_json"),
+  actorUserId: integer("actor_user_id"),
+  targetUserId: integer("target_user_id"),
+  bookId: integer("book_id"),
+  jobId: text("job_id"),
+  createdAt: text("created_at").notNull()
+});
+
 export const schema = {
   users,
   refreshTokens,
@@ -147,5 +161,6 @@ export const schema = {
   koboReadingState,
   koboSyncSnapshots,
   importJobs,
-  appSettings
+  appSettings,
+  adminActivityLog
 };

@@ -103,8 +103,53 @@ const extAllowed = (name: string): boolean => {
 
 const toInitialTitle = (name: string): string => name.replace(/\.[^.]+$/, "");
 
+const DEPLOYMENT_SAFE_UPLOAD_BATCH_BYTES = 8 * 1024 * 1024;
+const DEPLOYMENT_SAFE_UPLOAD_BATCH_FILES = 5;
+
+const createUploadBatches = (targets: UploadDraft[]): UploadDraft[][] => {
+  const batches: UploadDraft[][] = [];
+  let currentBatch: UploadDraft[] = [];
+  let currentBytes = 0;
+
+  for (const draft of targets) {
+    const exceedsFileCount = currentBatch.length >= DEPLOYMENT_SAFE_UPLOAD_BATCH_FILES;
+    const exceedsByteBudget =
+      currentBatch.length > 0 &&
+      currentBytes + draft.file.size > DEPLOYMENT_SAFE_UPLOAD_BATCH_BYTES;
+
+    if (exceedsFileCount || exceedsByteBudget) {
+      batches.push(currentBatch);
+      currentBatch = [];
+      currentBytes = 0;
+    }
+
+    currentBatch.push(draft);
+    currentBytes += draft.file.size;
+
+    if (currentBytes >= DEPLOYMENT_SAFE_UPLOAD_BATCH_BYTES) {
+      batches.push(currentBatch);
+      currentBatch = [];
+      currentBytes = 0;
+    }
+  }
+
+  if (currentBatch.length > 0) {
+    batches.push(currentBatch);
+  }
+
+  return batches;
+};
+
 const toErrorMessage = (error: unknown): string => {
   if (!(error instanceof Error)) return "Upload failed";
+
+  if (
+    error.message.includes("413") ||
+    error.message.toLowerCase().includes("request entity too large") ||
+    /<title>\s*413\b/i.test(error.message)
+  ) {
+    return "Request too large for the deployed server. Retry fewer files at once.";
+  }
 
   try {
     const parsed = JSON.parse(error.message) as { error?: string };
@@ -301,83 +346,90 @@ export const UploadsPage: React.FC = () => {
     );
 
     try {
-      const formData = new FormData();
-      formData.append(
-        "drafts",
-        JSON.stringify(
-          targets.map((draft) => ({
-            id: draft.id,
-            title: draft.title.trim() || undefined,
-            author: draft.author.trim() || undefined,
-            series: draft.series.trim() || undefined,
-            description: draft.description.trim() || undefined,
-            coverPath: draft.coverPath.trim() || undefined,
-            favorite: draft.favorite,
-            autoMetadata: true,
-            collectionIds: draft.collectionIds
-          }))
-        )
-      );
+      const batches = createUploadBatches(targets);
 
-      targets.forEach((draft) => {
-        formData.append(`file:${draft.id}`, draft.file, draft.file.name);
-      });
+      for (const batch of batches) {
+        const batchIds = batch.map((draft) => draft.id);
+        const formData = new FormData();
+        formData.append(
+          "drafts",
+          JSON.stringify(
+            batch.map((draft) => ({
+              id: draft.id,
+              title: draft.title.trim() || undefined,
+              author: draft.author.trim() || undefined,
+              series: draft.series.trim() || undefined,
+              description: draft.description.trim() || undefined,
+              coverPath: draft.coverPath.trim() || undefined,
+              favorite: draft.favorite,
+              autoMetadata: true,
+              collectionIds: draft.collectionIds
+            }))
+          )
+        );
 
-      const payload = await apiFetch<{ results: BatchUploadResult[] }>("/api/v1/uploads", {
-        method: "POST",
-        body: formData
-      });
+        batch.forEach((draft) => {
+          formData.append(`file:${draft.id}`, draft.file, draft.file.name);
+        });
 
-      const resultMap = new Map(payload.results.map((result) => [result.id, result]));
-      const queuedIds = new Set(
-        payload.results
-          .filter((result) => result.jobId && result.status)
-          .map((result) => result.id)
-      );
+        try {
+          const payload = await apiFetch<{ results: BatchUploadResult[] }>("/api/v1/uploads", {
+            method: "POST",
+            body: formData
+          });
 
-      const nextJobs = payload.results
-        .filter((result): result is BatchUploadResult & { jobId: string; status: UploadJob["status"] } =>
-          Boolean(result.jobId && result.status)
-        )
-        .map((result) => ({
-          id: result.jobId,
-          title: result.title,
-          status: result.status
-        }));
+          const resultMap = new Map(payload.results.map((result) => [result.id, result]));
+          const queuedIds = new Set(
+            payload.results
+              .filter((result) => result.jobId && result.status)
+              .map((result) => result.id)
+          );
 
-      if (nextJobs.length > 0) {
-        setJobs((prev) => [...prev, ...nextJobs]);
+          const nextJobs = payload.results
+            .filter((result): result is BatchUploadResult & { jobId: string; status: UploadJob["status"] } =>
+              Boolean(result.jobId && result.status)
+            )
+            .map((result) => ({
+              id: result.jobId,
+              title: result.title,
+              status: result.status
+            }));
+
+          if (nextJobs.length > 0) {
+            setJobs((prev) => [...prev, ...nextJobs]);
+          }
+
+          setDrafts((prev) =>
+            prev
+              .filter((draft) => !queuedIds.has(draft.id))
+              .map((draft) => {
+                if (!batchIds.includes(draft.id)) return draft;
+                const result = resultMap.get(draft.id);
+                if (!result) {
+                  return {
+                    ...draft,
+                    error: "Upload response was incomplete"
+                  };
+                }
+
+                if (!result.error) return draft;
+                return {
+                  ...draft,
+                  error: result.error
+                };
+              })
+          );
+        } catch (error) {
+          const message = toErrorMessage(error);
+          setDrafts((prev) =>
+            prev.map((draft) =>
+              batchIds.includes(draft.id)
+                ? { ...draft, error: message }
+                : draft
+            )
+          );
+        }
       }
-
-      setDrafts((prev) =>
-        prev
-          .filter((draft) => !queuedIds.has(draft.id))
-          .map((draft) => {
-            if (!targetIds.includes(draft.id)) return draft;
-            const result = resultMap.get(draft.id);
-            if (!result) {
-              return {
-                ...draft,
-                error: "Upload response was incomplete"
-              };
-            }
-
-            if (!result.error) return draft;
-            return {
-              ...draft,
-              error: result.error
-            };
-          })
-      );
-    } catch (error) {
-      const message = toErrorMessage(error);
-      setDrafts((prev) =>
-        prev.map((draft) =>
-          targetIds.includes(draft.id)
-            ? { ...draft, error: message }
-            : draft
-        )
-      );
     } finally {
       setUploadingIds((prev) => prev.filter((id) => !targetIds.includes(id)));
     }
