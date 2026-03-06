@@ -409,6 +409,8 @@ const buildProgressEntitlements = async (userId: number): Promise<Record<string,
       status: bookProgress.status,
       progressPercent: bookProgress.progressPercent,
       positionRef: bookProgress.positionRef,
+      positionType: bookProgress.positionType,
+      positionSource: bookProgress.positionSource,
       updatedAt: bookProgress.updatedAt
     })
     .from(bookProgress)
@@ -434,11 +436,15 @@ const buildProgressEntitlements = async (userId: number): Promise<Record<string,
         CurrentBookmark: {
           ProgressPercent: row.progressPercent,
           LastModified: row.updatedAt,
-          Location: {
-            Value: row.positionRef ?? "",
-            Type: "Unknown",
-            Source: "booklite"
-          }
+          ...(row.positionRef
+            ? {
+                Location: {
+                  Value: row.positionRef,
+                  Type: row.positionType ?? "Unknown",
+                  Source: row.positionSource ?? ""
+                }
+              }
+            : {})
         }
       }
     }
@@ -595,6 +601,14 @@ export const upsertKoboReadingStates = async (
       state.CurrentBookmark?.Location?.Value ??
       state.currentBookmark?.location?.value ??
       null;
+    const positionType =
+      state.CurrentBookmark?.Location?.Type ??
+      state.currentBookmark?.location?.type ??
+      null;
+    const positionSource =
+      state.CurrentBookmark?.Location?.Source ??
+      state.currentBookmark?.location?.source ??
+      null;
 
     const statusText = String(
       state.StatusInfo?.Status ?? state.statusInfo?.status ?? "ReadyToRead"
@@ -631,6 +645,8 @@ export const upsertKoboReadingStates = async (
           status: mappedStatus as "UNREAD" | "READING" | "DONE",
           progressPercent,
           positionRef,
+          positionType,
+          positionSource,
           updatedAt: lastModified
         })
         .onConflictDoUpdate({
@@ -639,6 +655,8 @@ export const upsertKoboReadingStates = async (
             status: mappedStatus as "UNREAD" | "READING" | "DONE",
             progressPercent,
             positionRef,
+            positionType,
+            positionSource,
             updatedAt: lastModified
           }
         });

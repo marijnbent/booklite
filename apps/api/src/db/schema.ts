@@ -43,6 +43,8 @@ export const bookProgress = sqliteTable(
     status: text("status", { enum: ["UNREAD", "READING", "DONE"] }).notNull().default("UNREAD"),
     progressPercent: real("progress_percent").notNull().default(0),
     positionRef: text("position_ref"),
+    positionType: text("position_type"),
+    positionSource: text("position_source"),
     updatedAt: text("updated_at").notNull()
   },
   (table) => ({

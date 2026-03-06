@@ -173,6 +173,17 @@ CREATE TRIGGER IF NOT EXISTS books_au AFTER UPDATE ON books BEGIN
 END;
 `);
 
+const progressCols = sqlite
+  .prepare("PRAGMA table_info(book_progress)")
+  .all() as Array<{ name: string }>;
+
+if (!progressCols.some((col) => col.name === "position_type")) {
+  sqlite.exec("ALTER TABLE book_progress ADD COLUMN position_type TEXT");
+}
+if (!progressCols.some((col) => col.name === "position_source")) {
+  sqlite.exec("ALTER TABLE book_progress ADD COLUMN position_source TEXT");
+}
+
 const collectionCols = sqlite
   .prepare("PRAGMA table_info(collections)")
   .all() as Array<{ name: string }>;
