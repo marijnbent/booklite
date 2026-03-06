@@ -40,6 +40,15 @@ interface UploadJob {
   result?: { bookId?: number } | null;
 }
 
+interface UploadJobStatusResponse {
+  jobs: Array<{
+    id: string;
+    status: UploadJob["status"];
+    error?: string | null;
+    result?: { bookId?: number } | null;
+  }>;
+}
+
 interface BatchUploadResult {
   id: string;
   title: string;
@@ -171,6 +180,7 @@ export const UploadsPage: React.FC = () => {
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const intervalRef = useRef<number | null>(null);
+  const pollingRef = useRef(false);
 
   const editingDraft = editingDraftId ? drafts.find((d) => d.id === editingDraftId) ?? null : null;
 
@@ -180,28 +190,40 @@ export const UploadsPage: React.FC = () => {
   });
 
   const pollJobs = async () => {
-    const pending = jobs.filter((job) => job.status === "QUEUED" || job.status === "PROCESSING");
-    if (pending.length === 0) return;
+    const pendingIds = jobs
+      .filter((job) => job.status === "QUEUED" || job.status === "PROCESSING")
+      .map((job) => job.id);
 
-    const updated = await Promise.all(
-      jobs.map(async (job) => {
-        if (job.status !== "QUEUED" && job.status !== "PROCESSING") return job;
-        try {
-          const response = await apiFetch<any>(`/api/v1/import-jobs/${job.id}`);
+    if (pendingIds.length === 0 || pollingRef.current) return;
+
+    pollingRef.current = true;
+
+    try {
+      const response = await apiFetch<UploadJobStatusResponse>("/api/v1/import-jobs/query", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids: pendingIds })
+      });
+
+      const updates = new Map(response.jobs.map((job) => [job.id, job]));
+      setJobs((current) =>
+        current.map((job) => {
+          const update = updates.get(job.id);
+          if (!update) return job;
+
           return {
-            id: response.id,
-            title: job.title,
-            status: response.status,
-            error: response.error,
-            result: response.result
-          } as UploadJob;
-        } catch {
-          return job;
-        }
-      })
-    );
-
-    setJobs(updated);
+            ...job,
+            status: update.status,
+            error: update.error,
+            result: update.result
+          };
+        })
+      );
+    } catch {
+      // Leave the current state intact and try again on the next interval.
+    } finally {
+      pollingRef.current = false;
+    }
   };
 
   useEffect(() => {
