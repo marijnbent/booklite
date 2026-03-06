@@ -21,6 +21,7 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
         source: result.source,
         title: result.title,
         author: result.author,
+        series: result.series,
         description: result.description,
         coverPath: result.coverPath
       };

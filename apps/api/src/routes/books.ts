@@ -76,6 +76,7 @@ type BookMetadataRefreshTarget = {
   id: number;
   title: string;
   author: string | null;
+  series: string | null;
   description: string | null;
   coverPath: string | null;
   filePath: string;
@@ -109,12 +110,14 @@ const refreshBookMetadata = async (
 
   const nextTitle = metadata.title ?? target.title;
   const nextAuthor = metadata.author ?? target.author;
+  const nextSeries = metadata.series ?? target.series ?? null;
   const nextDescription = metadata.description ?? null;
   const nextCoverPath = metadata.coverPath ?? null;
 
   const changed =
     nextTitle !== target.title ||
     nextAuthor !== target.author ||
+    nextSeries !== target.series ||
     nextDescription !== target.description ||
     nextCoverPath !== target.coverPath;
 
@@ -124,6 +127,7 @@ const refreshBookMetadata = async (
       .set({
         title: nextTitle,
         author: nextAuthor,
+        series: nextSeries,
         description: nextDescription,
         coverPath: nextCoverPath,
         updatedAt: nowIso()
@@ -485,6 +489,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           id: books.id,
           title: books.title,
           author: books.author,
+          series: books.series,
           description: books.description,
           coverPath: books.coverPath,
           filePath: books.filePath
@@ -536,6 +541,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           id: books.id,
           title: books.title,
           author: books.author,
+          series: books.series,
           description: books.description,
           coverPath: books.coverPath,
           filePath: books.filePath

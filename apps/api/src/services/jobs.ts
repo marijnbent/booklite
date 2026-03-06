@@ -73,7 +73,7 @@ const processUploadJob = async (job: {
       ownerUserId: job.userId,
       title: resolvedTitle,
       author: resolvedAuthor,
-      series: normalizedControlSeries ?? null,
+      series: normalizedControlSeries ?? defaults.series ?? null,
       description: normalizedControlDescription ?? null,
       coverPath: null,
       filePath: payload.filePath,
@@ -112,6 +112,10 @@ const processUploadJob = async (job: {
           metadata.description !== inserted.description
         ) {
           set.description = metadata.description;
+        }
+
+        if (!inserted.series && metadata.series) {
+          set.series = metadata.series;
         }
 
         if (!inserted.coverPath && metadata.coverPath) {

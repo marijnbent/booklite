@@ -4,6 +4,7 @@ import { getSetting } from "../db/client";
 export interface MetadataResult {
   title?: string;
   author?: string;
+  series?: string;
   description?: string;
   coverPath?: string;
   source:
@@ -118,7 +119,7 @@ const tokenize = (value: string): string[] =>
     .map((token) => token.trim())
     .filter((token) => token.length > 0);
 
-const tokenOverlapScore = (query: string, candidate: string): number => {
+const diceCoefficient = (query: string, candidate: string): number => {
   const queryTokens = new Set(tokenize(query));
   const candidateTokens = new Set(tokenize(candidate));
   if (queryTokens.size === 0 || candidateTokens.size === 0) return 0;
@@ -128,9 +129,7 @@ const tokenOverlapScore = (query: string, candidate: string): number => {
     if (candidateTokens.has(token)) intersection += 1;
   }
 
-  const union = queryTokens.size + candidateTokens.size - intersection;
-  if (union <= 0) return 0;
-  return intersection / union;
+  return (2 * intersection) / (queryTokens.size + candidateTokens.size);
 };
 
 const similarityScore = (query: string | undefined, candidate: string | undefined): number => {
@@ -142,7 +141,7 @@ const similarityScore = (query: string | undefined, candidate: string | undefine
   if (q === c) return 1;
   if (c.includes(q) || q.includes(c)) return 0.92;
 
-  return tokenOverlapScore(q, c);
+  return diceCoefficient(q, c);
 };
 
 const readMeta = (
@@ -167,11 +166,55 @@ const getFirstMatch = (html: string, patterns: RegExp[]): string | null => {
 const hasText = (value: string | undefined): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
+/** Detect "Summary of X", "Study Guide", "Workbook for X", etc. */
+const SPAM_TITLE_PATTERN =
+  /\b(summary|study\s*guide|workbook|analysis|cliff\s*notes|sparknotes|book\s*companion)\b/i;
+
+const isSpamTitle = (title: string | undefined, queryTitle: string): boolean => {
+  if (!title) return false;
+  // Only flag if the spam word is NOT in the original query
+  if (SPAM_TITLE_PATTERN.test(queryTitle)) return false;
+  return SPAM_TITLE_PATTERN.test(title);
+};
+
 const hasUsableMetadata = (result: MetadataResult): boolean =>
   hasText(result.title) ||
   hasText(result.author) ||
   hasText(result.description) ||
   hasText(result.coverPath);
+
+// --- Series extraction helpers ---
+
+/** Extract series from a title like "Fourth Wing (The Empyrean, 1)" → { title, series } */
+const extractSeriesFromTitle = (
+  rawTitle: string
+): { cleanTitle: string; series: string | null } => {
+  // Pattern: "Title (Series Name, N)" or "Title (Series Name #N)"
+  const parenMatch = rawTitle.match(/^(.+?)\s*\(([^)]+?),?\s*#?(\d+(?:\.\d+)?)\)\s*$/);
+  if (parenMatch) {
+    return {
+      cleanTitle: parenMatch[1].trim(),
+      series: `${parenMatch[2].trim()} #${parenMatch[3]}`
+    };
+  }
+
+  // Pattern: "Title (Series Name)"  — series without number
+  const parenNoNum = rawTitle.match(/^(.+?)\s*\(([^)]{3,})\)\s*$/);
+  if (parenNoNum && !/edition|vol|book/i.test(parenNoNum[2])) {
+    return { cleanTitle: parenNoNum[1].trim(), series: parenNoNum[2].trim() };
+  }
+
+  // Pattern: "Title - Series #N" or "Title: Series #N"
+  const suffixMatch = rawTitle.match(/^(.+?)\s*[-:–—]\s+(.+?)\s*#(\d+(?:\.\d+)?)\s*$/);
+  if (suffixMatch) {
+    return {
+      cleanTitle: suffixMatch[1].trim(),
+      series: `${suffixMatch[2].trim()} #${suffixMatch[3]}`
+    };
+  }
+
+  return { cleanTitle: rawTitle, series: null };
+};
 
 const resolveMetadataProviderSettings = async (): Promise<{
   providerEnabled: MetadataProviderEnabled;
@@ -204,30 +247,67 @@ const resolveMetadataProviderSettings = async (): Promise<{
   };
 };
 
+// ---------- Open Library ----------
+
 const scoreOpenLibraryDoc = (
   doc: {
     title?: string;
     author_name?: string[];
     cover_i?: number;
-    first_sentence?: string | string[];
+    key?: string;
   },
   queryTitle: string,
   queryAuthor?: string
 ): number => {
+  if (isSpamTitle(doc.title, queryTitle)) return -1;
+
   const titleScore = similarityScore(queryTitle, doc.title);
   const authorScore = similarityScore(queryAuthor, doc.author_name?.[0]);
-  const description =
-    typeof doc.first_sentence === "string"
-      ? doc.first_sentence
-      : Array.isArray(doc.first_sentence)
-        ? doc.first_sentence[0]
-        : undefined;
 
   let completeness = 0;
   if (doc.cover_i) completeness += 0.5;
-  if (hasText(description)) completeness += 0.5;
+  if (doc.key) completeness += 0.5;
 
   return titleScore * 0.58 + authorScore * 0.3 + completeness * 0.12;
+};
+
+interface OpenLibraryWorkDetails {
+  description?: string;
+  series?: string;
+}
+
+const fetchOpenLibraryWorkDetails = async (workKey: string): Promise<OpenLibraryWorkDetails> => {
+  try {
+    const url = `https://openlibrary.org${workKey}.json`;
+    const response = await fetch(url, {
+      method: "GET",
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) return {};
+
+    const json = (await response.json()) as {
+      description?: string | { value?: string };
+      subjects?: string[];
+    };
+
+    let description: string | undefined;
+    if (typeof json.description === "string") description = json.description;
+    else if (typeof json.description?.value === "string") description = json.description.value;
+
+    // Extract series from subjects: "Serie:The_Empyrean" or "series:name"
+    let series: string | undefined;
+    for (const subject of json.subjects ?? []) {
+      const serieMatch = subject.match(/^[Ss]erie[s]?:(.+)$/);
+      if (serieMatch) {
+        series = serieMatch[1].replace(/_/g, " ").trim();
+        break;
+      }
+    }
+
+    return { description, series };
+  } catch {
+    return {};
+  }
 };
 
 const getOpenLibraryMetadata = async (
@@ -235,10 +315,15 @@ const getOpenLibraryMetadata = async (
   author?: string
 ): Promise<MetadataResult | null> => {
   const searchUrl = new URL("https://openlibrary.org/search.json");
-  searchUrl.searchParams.set("q", toQuery(title, author));
-  searchUrl.searchParams.set("limit", "10");
+  searchUrl.searchParams.set("title", title);
+  if (author) searchUrl.searchParams.set("author", author);
+  searchUrl.searchParams.set("limit", "8");
+  searchUrl.searchParams.set("fields", "title,author_name,cover_i,key,first_sentence");
 
-  const response = await fetch(searchUrl, { method: "GET" });
+  const response = await fetch(searchUrl, {
+    method: "GET",
+    signal: AbortSignal.timeout(8000)
+  });
   if (!response.ok) return null;
 
   const json = (await response.json()) as {
@@ -246,11 +331,29 @@ const getOpenLibraryMetadata = async (
       title?: string;
       author_name?: string[];
       cover_i?: number;
-      first_sentence?: string | string[];
+      key?: string;
+      first_sentence?: string[];
     }>;
   };
 
-  const docs = json.docs ?? [];
+  let docs = json.docs ?? [];
+
+  if (docs.length === 0) {
+    const fallbackUrl = new URL("https://openlibrary.org/search.json");
+    fallbackUrl.searchParams.set("q", toQuery(title, author));
+    fallbackUrl.searchParams.set("limit", "8");
+    fallbackUrl.searchParams.set("fields", "title,author_name,cover_i,key,first_sentence");
+
+    const fallbackResponse = await fetch(fallbackUrl, {
+      method: "GET",
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!fallbackResponse.ok) return null;
+
+    const fallbackJson = (await fallbackResponse.json()) as typeof json;
+    docs = fallbackJson.docs ?? [];
+  }
+
   if (docs.length === 0) return null;
 
   const bestDoc = docs
@@ -259,21 +362,38 @@ const getOpenLibraryMetadata = async (
 
   if (!bestDoc) return null;
 
+  // Fetch description + series from works endpoint
+  let description: string | undefined;
+  let series: string | undefined;
+  if (bestDoc.key) {
+    const details = await fetchOpenLibraryWorkDetails(bestDoc.key);
+    description = details.description;
+    series = details.series;
+  }
+
+  if (!description) {
+    description = bestDoc.first_sentence?.[0];
+  }
+
+  // Also try extracting series from the title if OL embeds it
+  if (!series && bestDoc.title) {
+    const extracted = extractSeriesFromTitle(bestDoc.title);
+    series = extracted.series ?? undefined;
+  }
+
   return {
     title: bestDoc.title,
     author: bestDoc.author_name?.[0],
+    series,
     coverPath: bestDoc.cover_i
       ? `https://covers.openlibrary.org/b/id/${bestDoc.cover_i}-L.jpg`
       : undefined,
-    description:
-      typeof bestDoc.first_sentence === "string"
-        ? bestDoc.first_sentence
-        : Array.isArray(bestDoc.first_sentence)
-          ? bestDoc.first_sentence[0]
-          : undefined,
+    description,
     source: "OPEN_LIBRARY"
   };
 };
+
+// ---------- Google Books ----------
 
 const scoreVolumeInfo = (
   volume: {
@@ -285,6 +405,8 @@ const scoreVolumeInfo = (
   queryTitle: string,
   queryAuthor?: string
 ): number => {
+  if (isSpamTitle(volume.title, queryTitle)) return -1;
+
   const titleScore = similarityScore(queryTitle, volume.title);
   const authorScore = similarityScore(queryAuthor, volume.authors?.[0]);
 
@@ -298,39 +420,60 @@ const scoreVolumeInfo = (
   return titleScore * 0.56 + authorScore * 0.3 + completeness * 0.14;
 };
 
+type GoogleVolumeInfo = {
+  title?: string;
+  subtitle?: string;
+  authors?: string[];
+  description?: string;
+  imageLinks?: { thumbnail?: string; smallThumbnail?: string };
+  seriesInfo?: { bookDisplayNumber?: string; shortSeriesBookTitle?: string };
+};
+
+const fetchGoogleVolumes = async (
+  q: string,
+  apiKey: string,
+  language: string
+): Promise<GoogleVolumeInfo[]> => {
+  const searchUrl = new URL("https://www.googleapis.com/books/v1/volumes");
+  searchUrl.searchParams.set("q", q);
+  searchUrl.searchParams.set("maxResults", "8");
+  if (language) searchUrl.searchParams.set("langRestrict", language);
+  if (apiKey) searchUrl.searchParams.set("key", apiKey);
+
+  const response = await fetch(searchUrl, {
+    method: "GET",
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!response.ok) return [];
+
+  const json = (await response.json()) as {
+    items?: Array<{ volumeInfo?: GoogleVolumeInfo }>;
+  };
+
+  return (json.items ?? [])
+    .map((item) => item.volumeInfo)
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+};
+
 const getGoogleMetadata = async (
   title: string,
   author: string | undefined,
   apiKey: string,
   language: string
 ): Promise<MetadataResult | null> => {
-  const q = [title ? `intitle:${title}` : "", author ? `inauthor:${author}` : ""]
+  const structuredQ = [title ? `intitle:${title}` : "", author ? `inauthor:${author}` : ""]
     .filter(Boolean)
     .join("+");
 
-  const searchUrl = new URL("https://www.googleapis.com/books/v1/volumes");
-  searchUrl.searchParams.set("q", q || title);
-  searchUrl.searchParams.set("maxResults", "8");
-  if (language) searchUrl.searchParams.set("langRestrict", language);
-  if (apiKey) searchUrl.searchParams.set("key", apiKey);
+  let candidates = await fetchGoogleVolumes(structuredQ || title, apiKey, language);
 
-  const response = await fetch(searchUrl, { method: "GET" });
-  if (!response.ok) return null;
+  if (candidates.length === 0 && author) {
+    candidates = await fetchGoogleVolumes(toQuery(title, author), apiKey, language);
+  }
 
-  const json = (await response.json()) as {
-    items?: Array<{
-      volumeInfo?: {
-        title?: string;
-        authors?: string[];
-        description?: string;
-        imageLinks?: { thumbnail?: string; smallThumbnail?: string };
-      };
-    }>;
-  };
-
-  const candidates = (json.items ?? [])
-    .map((item) => item.volumeInfo)
-    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  if (candidates.length === 0 && title) {
+    candidates = await fetchGoogleVolumes(title, apiKey, language);
+  }
 
   if (candidates.length === 0) return null;
 
@@ -340,13 +483,56 @@ const getGoogleMetadata = async (
 
   if (!best) return null;
 
+  // Extract series from seriesInfo or from title
+  let series: string | undefined;
+  if (best.seriesInfo?.shortSeriesBookTitle) {
+    const num = best.seriesInfo.bookDisplayNumber;
+    series = num
+      ? `${best.seriesInfo.shortSeriesBookTitle} #${num}`
+      : best.seriesInfo.shortSeriesBookTitle;
+  }
+  if (!series && best.title) {
+    series = extractSeriesFromTitle(best.title).series ?? undefined;
+  }
+
   return {
     title: best.title,
     author: best.authors?.[0],
+    series,
     description: best.description,
     coverPath: best.imageLinks?.thumbnail ?? best.imageLinks?.smallThumbnail,
     source: "GOOGLE"
   };
+};
+
+// ---------- Amazon ----------
+
+/** Extract series from Amazon title like "Fourth Wing (The Empyrean, 1)" */
+const extractAmazonSeries = (detailHtml: string, titleText?: string): string | undefined => {
+  // Try the "Book N of M" pattern near series link
+  const bookOfMatch = detailHtml.match(
+    /id="seriesBullet"[\s\S]*?<a[^>]*>([^<]+)<\/a>[\s\S]*?Book\s+(\d+)\s+of/i
+  );
+  if (bookOfMatch) {
+    return `${cleanText(bookOfMatch[1])} #${bookOfMatch[2]}`;
+  }
+
+  // Try extracting from the title text: "Title (Series, N)"
+  if (titleText) {
+    const extracted = extractSeriesFromTitle(titleText);
+    if (extracted.series) return extracted.series;
+  }
+
+  // Try "Book N of M" standalone
+  const standaloneMatch = detailHtml.match(/Book\s+(\d+)\s+of\s+\d+/);
+  if (standaloneMatch) {
+    // Look for series name nearby in meta content
+    const metaTitle = readMeta(detailHtml, "og:title", "property") ?? "";
+    const metaExtracted = extractSeriesFromTitle(metaTitle);
+    if (metaExtracted.series) return metaExtracted.series;
+  }
+
+  return undefined;
 };
 
 const getAmazonMetadata = async (
@@ -366,7 +552,11 @@ const getAmazonMetadata = async (
   };
   if (cookie) headers.cookie = cookie;
 
-  const searchResponse = await fetch(searchUrl, { method: "GET", headers });
+  const searchResponse = await fetch(searchUrl, {
+    method: "GET",
+    headers,
+    signal: AbortSignal.timeout(10000)
+  });
   if (!searchResponse.ok) return null;
   const searchHtml = await searchResponse.text();
 
@@ -374,7 +564,11 @@ const getAmazonMetadata = async (
   if (!asinMatch) return null;
 
   const detailUrl = `https://www.amazon.${domain}/dp/${asinMatch[1]}`;
-  const detailResponse = await fetch(detailUrl, { method: "GET", headers });
+  const detailResponse = await fetch(detailUrl, {
+    method: "GET",
+    headers,
+    signal: AbortSignal.timeout(10000)
+  });
   if (!detailResponse.ok) return null;
   const detailHtml = await detailResponse.text();
 
@@ -407,14 +601,26 @@ const getAmazonMetadata = async (
 
   if (!parsedTitle) return null;
 
+  const series = extractAmazonSeries(detailHtml, parsedTitle);
+
+  // Clean series info out of the title if present
+  let cleanedTitle = parsedTitle;
+  if (series) {
+    const { cleanTitle } = extractSeriesFromTitle(parsedTitle);
+    if (cleanTitle !== parsedTitle) cleanedTitle = cleanTitle;
+  }
+
   return {
-    title: parsedTitle,
+    title: cleanedTitle,
     author: parsedAuthor,
+    series,
     description: parsedDescription,
     coverPath: parsedCover,
     source: "AMAZON"
   };
 };
+
+// ---------- Hardcover ----------
 
 const scoreHardcoverDoc = (
   doc: {
@@ -422,18 +628,25 @@ const scoreHardcoverDoc = (
     author_names?: string[];
     description?: string;
     image?: { url?: string };
+    ratings_count?: number;
   },
   queryTitle: string,
   queryAuthor?: string
 ): number => {
+  if (isSpamTitle(doc.title, queryTitle)) return -1;
+
   const titleScore = similarityScore(queryTitle, doc.title);
   const authorScore = similarityScore(queryAuthor, doc.author_names?.[0]);
 
   let completeness = 0;
-  if (hasText(doc.description)) completeness += 0.5;
-  if (hasText(doc.image?.url)) completeness += 0.5;
+  if (hasText(doc.description)) completeness += 0.4;
+  if (hasText(doc.image?.url)) completeness += 0.4;
+  // Prefer books with actual ratings (real books, not study guides)
+  const rc = doc.ratings_count ?? 0;
+  if (rc > 100) completeness += 0.2;
+  else if (rc > 0) completeness += 0.1;
 
-  return titleScore * 0.58 + authorScore * 0.3 + completeness * 0.12;
+  return titleScore * 0.5 + authorScore * 0.3 + completeness * 0.2;
 };
 
 const getHardcoverMetadata = async (
@@ -451,10 +664,12 @@ const getHardcoverMetadata = async (
       authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      query:
-        'query BookSearch($q: String!, $limit: Int!) { search(query: $q, query_type: "Book", per_page: $limit, page: 1) { results } }',
+      query: `query BookSearch($q: String!, $limit: Int!) {
+        search(query: $q, query_type: "Book", per_page: $limit, page: 1) { results }
+      }`,
       variables: { q: query, limit: 8 }
-    })
+    }),
+    signal: AbortSignal.timeout(8000)
   });
   if (!response.ok) return null;
 
@@ -468,6 +683,9 @@ const getHardcoverMetadata = async (
               author_names?: string[];
               description?: string;
               image?: { url?: string };
+              series_names?: string[];
+              series_position?: number;
+              ratings_count?: number;
             };
           }>;
         };
@@ -487,14 +705,28 @@ const getHardcoverMetadata = async (
 
   if (!best) return null;
 
+  let series: string | undefined;
+  const seriesName = best.series_names?.[0];
+  if (seriesName) {
+    series = best.series_position
+      ? `${seriesName} #${best.series_position}`
+      : seriesName;
+  }
+  if (!series && best.title) {
+    series = extractSeriesFromTitle(best.title).series ?? undefined;
+  }
+
   return {
     title: best.title,
     author: best.author_names?.[0],
+    series,
     description: best.description,
     coverPath: best.image?.url,
     source: "HARDCOVER"
   };
 };
+
+// ---------- Goodreads ----------
 
 interface GoodreadsSearchCandidate {
   href: string;
@@ -539,6 +771,24 @@ const extractGoodreadsCandidates = (searchHtml: string): GoodreadsSearchCandidat
   return deduped;
 };
 
+/** Extract series from Goodreads Apollo state JSON embedded in the detail page */
+const extractGoodreadsSeries = (detailHtml: string): string | undefined => {
+  // Apollo state: "Series:kca://...":{"title":"The Empyrean",...}
+  const seriesMatch = detailHtml.match(
+    /"Series:[^"]*":\{[^}]*"title":"([^"]+)"[^}]*\}/
+  );
+  const seriesName = seriesMatch?.[1];
+  if (!seriesName) return undefined;
+
+  // Position: "bookSeries":[{"userPosition":"1","series":...}]
+  const positionMatch = detailHtml.match(
+    /"bookSeries":\[\{[^}]*"userPosition":"(\d+(?:\.\d+)?)"/
+  );
+  const position = positionMatch?.[1];
+
+  return position ? `${seriesName} #${position}` : seriesName;
+};
+
 const getGoodreadsMetadata = async (
   title: string,
   author?: string
@@ -546,37 +796,51 @@ const getGoodreadsMetadata = async (
   const searchUrl = new URL("https://www.goodreads.com/search");
   searchUrl.searchParams.set("q", toQuery(title, author));
 
-  const searchResponse = await fetch(searchUrl, { method: "GET" });
+  const searchResponse = await fetch(searchUrl, {
+    method: "GET",
+    signal: AbortSignal.timeout(10000)
+  });
   if (!searchResponse.ok) return null;
   const searchHtml = await searchResponse.text();
 
   let candidates = extractGoodreadsCandidates(searchHtml);
   if (candidates.length === 0) {
-    const firstBookHref = getFirstMatch(searchHtml, [
-      /href="(\/book\/show\/[^"]+)"/i,
-      /href="(https:\/\/www\.goodreads\.com\/book\/show\/[^"]+)"/i
-    ]);
-    if (firstBookHref) {
-      candidates = [{ href: firstBookHref }];
+    // Fallback: grab all book links and pick one that isn't spam
+    const allHrefs = [...searchHtml.matchAll(/href="(\/book\/show\/[^"]+)"/gi)]
+      .map((m) => m[1])
+      .filter((href, i, arr) => arr.indexOf(href) === i);
+
+    for (const href of allHrefs) {
+      // Check if the URL slug looks like spam
+      const slug = href.replace(/.*\/book\/show\/\d+-?/, "");
+      if (!SPAM_TITLE_PATTERN.test(slug.replace(/-/g, " "))) {
+        candidates = [{ href }];
+        break;
+      }
     }
   }
 
   if (candidates.length === 0) return null;
 
-  const bestCandidate = candidates
+  const scored = candidates
     .map((candidate) => ({
       candidate,
-      score:
-        similarityScore(title, candidate.title) * 0.6 +
-        similarityScore(author, candidate.author) * 0.35 +
-        (hasText(candidate.author) ? 0.05 : 0)
+      score: isSpamTitle(candidate.title, title)
+        ? -1
+        : similarityScore(title, candidate.title) * 0.6 +
+          similarityScore(author, candidate.author) * 0.35 +
+          (hasText(candidate.author) ? 0.05 : 0)
     }))
-    .sort((a, b) => b.score - a.score)[0]?.candidate;
+    .sort((a, b) => b.score - a.score);
 
+  const bestCandidate = scored[0]?.score >= 0 ? scored[0].candidate : undefined;
   if (!bestCandidate) return null;
 
   const detailUrl = absoluteUrl("https://www.goodreads.com", bestCandidate.href);
-  const detailResponse = await fetch(detailUrl, { method: "GET" });
+  const detailResponse = await fetch(detailUrl, {
+    method: "GET",
+    signal: AbortSignal.timeout(10000)
+  });
   if (!detailResponse.ok) return null;
   const detailHtml = await detailResponse.text();
 
@@ -593,16 +857,21 @@ const getGoodreadsMetadata = async (
     readMeta(detailHtml, "description", "name");
   const parsedCover = readMeta(detailHtml, "og:image", "property");
 
+  const series = extractGoodreadsSeries(detailHtml);
+
   if (!parsedTitle) return null;
 
   return {
     title: parsedTitle,
     author: parsedAuthor,
+    series,
     description: parsedDescription,
     coverPath: parsedCover,
     source: "GOODREADS"
   };
 };
+
+// ---------- Douban ----------
 
 const getDoubanMetadata = async (
   title: string,
@@ -611,7 +880,10 @@ const getDoubanMetadata = async (
   const query = encodeURIComponent(toQuery(title, author)).replace(/%20/g, "+");
   const searchUrl = `https://search.douban.com/book/subject_search?search_text=${query}`;
 
-  const searchResponse = await fetch(searchUrl, { method: "GET" });
+  const searchResponse = await fetch(searchUrl, {
+    method: "GET",
+    signal: AbortSignal.timeout(10000)
+  });
   if (!searchResponse.ok) return null;
   const searchHtml = await searchResponse.text();
 
@@ -622,7 +894,10 @@ const getDoubanMetadata = async (
   if (!firstBookHref) return null;
 
   const detailUrl = normalizeUrl(firstBookHref);
-  const detailResponse = await fetch(detailUrl, { method: "GET" });
+  const detailResponse = await fetch(detailUrl, {
+    method: "GET",
+    signal: AbortSignal.timeout(10000)
+  });
   if (!detailResponse.ok) return null;
   const detailHtml = await detailResponse.text();
 
@@ -657,6 +932,8 @@ const getDoubanMetadata = async (
   };
 };
 
+// ---------- Provider orchestration ----------
+
 type MetadataSettings = Awaited<ReturnType<typeof resolveMetadataProviderSettings>>;
 
 type ProviderFetcher = (
@@ -686,7 +963,8 @@ const metadataCompleteness = (result: MetadataResult): number => {
   if (hasText(result.author)) presentFields += 1;
   if (hasText(result.description)) presentFields += 1;
   if (hasText(result.coverPath)) presentFields += 1;
-  return presentFields / 4;
+  if (hasText(result.series)) presentFields += 1;
+  return presentFields / 5;
 };
 
 const buildCandidate = (
@@ -746,21 +1024,22 @@ export const fetchMetadataWithFallback = async (
     return { source: "NONE" };
   }
 
+  // Fetch all enabled providers in parallel
+  const results = await Promise.allSettled(
+    providerOrder.map(async (provider) => {
+      const fetcher = providerFetchers[provider];
+      if (!fetcher) return { provider, result: null as MetadataResult | null };
+      const result = await fetcher(title, author, settings);
+      return { provider, result };
+    })
+  );
+
   const candidates: ProviderCandidate[] = [];
 
-  for (const provider of providerOrder) {
-    const fetcher = providerFetchers[provider];
-    if (!fetcher) continue;
-
-    let result: MetadataResult | null = null;
-    try {
-      result = await fetcher(title, author, settings);
-    } catch {
-      continue;
-    }
-
+  for (const settled of results) {
+    if (settled.status !== "fulfilled") continue;
+    const { provider, result } = settled.value;
     if (!result || !hasUsableMetadata(result)) continue;
-
     candidates.push(buildCandidate(provider, result, title, author));
   }
 
@@ -782,6 +1061,14 @@ export const fetchMetadataWithFallback = async (
     (metadata) => metadata.author,
     (candidate) =>
       candidate.authorScore * 0.75 + candidate.trust * 0.15 + candidate.completeness * 0.1
+  );
+  const mergedSeries = selectBestField(
+    candidates,
+    (metadata) => metadata.series,
+    (candidate) =>
+      candidate.titleScore * 0.4 +
+      candidate.trust * 0.3 +
+      candidate.completeness * 0.3
   );
   const mergedDescription = selectBestField(
     candidates,
@@ -815,6 +1102,7 @@ export const fetchMetadataWithFallback = async (
     source: bestSource,
     title: mergedTitle,
     author: mergedAuthor,
+    series: mergedSeries,
     description: mergedDescription,
     coverPath: mergedCoverPath
   };
