@@ -1,4 +1,5 @@
 import { integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { READ_STATUSES } from "@booklite/shared";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -40,7 +41,7 @@ export const bookProgress = sqliteTable(
   {
     userId: integer("user_id").notNull(),
     bookId: integer("book_id").notNull(),
-    status: text("status", { enum: ["UNREAD", "READING", "DONE"] }).notNull().default("UNREAD"),
+    status: text("status", { enum: READ_STATUSES }).notNull().default("UNSET"),
     progressPercent: real("progress_percent").notNull().default(0),
     positionRef: text("position_ref"),
     positionType: text("position_type"),
@@ -79,6 +80,7 @@ export const koboUserSettings = sqliteTable("kobo_user_settings", {
   userId: integer("user_id").primaryKey(),
   token: text("token").notNull().unique(),
   syncEnabled: integer("sync_enabled").notNull().default(0),
+  syncAllBooks: integer("sync_all_books").notNull().default(0),
   twoWayProgressSync: integer("two_way_progress_sync").notNull().default(0),
   markReadingThreshold: real("mark_reading_threshold").notNull().default(1),
   markFinishedThreshold: real("mark_finished_threshold").notNull().default(99),

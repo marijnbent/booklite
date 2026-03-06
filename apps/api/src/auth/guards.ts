@@ -33,6 +33,16 @@ export const requireAuth = async (
   }
 };
 
+export const getAuth = (
+  request: FastifyRequest
+): NonNullable<FastifyRequest["auth"]> => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new Error("requireAuth middleware not applied");
+  }
+  return auth;
+};
+
 export const requireOwner = async (
   request: FastifyRequest,
   reply: FastifyReply

@@ -7,7 +7,7 @@ import { verifyPassword } from "../auth/password";
 import { randomToken, sha256 } from "../utils/hash";
 import { nowIso } from "../utils/time";
 import { config } from "../config";
-import { requireAuth } from "../auth/guards";
+import { getAuth, requireAuth } from "../auth/guards";
 import { signAccessToken } from "../auth/jwt";
 
 const loginSchema = z.object({
@@ -156,7 +156,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.get("/api/v1/me", { preHandler: requireAuth }, async (request, reply) => {
-    if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+    const { userId } = getAuth(request);
 
     const found = await db
       .select({
@@ -168,7 +168,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         disabledAt: users.disabledAt
       })
       .from(users)
-      .where(and(eq(users.id, request.auth.userId), isNull(users.disabledAt)))
+      .where(and(eq(users.id, userId), isNull(users.disabledAt)))
       .limit(1);
 
     if (!found[0]) return reply.code(401).send({ error: "Unauthorized" });

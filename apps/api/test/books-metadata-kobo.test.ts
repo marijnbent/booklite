@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTempEnv } from "./helpers";
+import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
 const { fetchMetadataWithFallbackMock } = vi.hoisted(() => ({
   fetchMetadataWithFallbackMock: vi.fn()
@@ -19,29 +19,8 @@ let fallbackBookId = 0;
 
 describe("books metadata + kobo scope", () => {
   beforeAll(async () => {
-    const appModule = await import("../src/app");
-    app = appModule.buildApp();
-    await app.ready();
-
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/setup",
-      payload: {
-        email: "owner5@example.com",
-        username: "owner5",
-        password: "secret123"
-      }
-    });
-
-    const login = await app.inject({
-      method: "POST",
-      url: "/api/v1/auth/login",
-      payload: {
-        usernameOrEmail: "owner5",
-        password: "secret123"
-      }
-    });
-    accessToken = login.json().accessToken;
+    app = await setupTestApp();
+    accessToken = (await setupOwnerAndLogin(app, "owner5@example.com", "owner5")).accessToken;
 
     const dbModule = await import("../src/db/client");
     const schema = await import("../src/db/schema");
@@ -120,6 +99,7 @@ describe("books metadata + kobo scope", () => {
       headers: { authorization: `Bearer ${accessToken}` },
       payload: {
         syncEnabled: true,
+        syncAllBooks: false,
         twoWayProgressSync: true,
         markReadingThreshold: 1,
         markFinishedThreshold: 99,

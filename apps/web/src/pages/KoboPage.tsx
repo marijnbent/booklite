@@ -20,6 +20,7 @@ import {
 interface KoboSettings {
   token: string;
   syncEnabled: boolean;
+  syncAllBooks: boolean;
   twoWayProgressSync: boolean;
   markReadingThreshold: number;
   markFinishedThreshold: number;
@@ -141,9 +142,23 @@ export const KoboPage: React.FC = () => {
 
             <div className="flex items-center justify-between gap-4 px-4 py-3.5">
               <div>
+                <Label htmlFor="sync-all" className="text-sm font-medium cursor-pointer">Sync all books</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sync all EPUB books to Kobo instead of selecting collections
+                </p>
+              </div>
+              <Switch
+                id="sync-all"
+                checked={model.syncAllBooks}
+                onCheckedChange={(checked) => updateSettings({ syncAllBooks: checked })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+              <div>
                 <Label htmlFor="two-way-sync" className="text-sm font-medium cursor-pointer">Two-way progress sync</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Sync reading progress both directions
+                  Also push BookLite progress to Kobo (Kobo → BookLite always works)
                 </p>
               </div>
               <Switch
@@ -155,6 +170,7 @@ export const KoboPage: React.FC = () => {
           </div>
 
           {/* Collections to sync */}
+          {!model.syncAllBooks && (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -210,6 +226,7 @@ export const KoboPage: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Threshold settings */}
           <div className="border-t border-border/50 pt-6">

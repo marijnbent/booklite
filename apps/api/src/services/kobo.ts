@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { ReadStatus } from "@booklite/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { config } from "../config";
@@ -78,6 +79,21 @@ const parseBookIdFromImageId = (imageId: string): number | null => {
 
 export const resolveBookIdFromImageId = parseBookIdFromImageId;
 
+const statusToKoboStatus = (status: ReadStatus): "Finished" | "Reading" | "ReadyToRead" => {
+  if (status === "READ") return "Finished";
+  if (status === "READING" || status === "RE_READING" || status === "PARTIALLY_READ" || status === "PAUSED") {
+    return "Reading";
+  }
+  return "ReadyToRead";
+};
+
+const mapKoboStatusToReadStatus = (statusText: string): ReadStatus => {
+  if (statusText.includes("finish")) return "READ";
+  if (statusText.includes("ready")) return "UNREAD";
+  if (statusText.includes("reading")) return "READING";
+  return "UNREAD";
+};
+
 const isSqliteForeignKeyError = (error: unknown): boolean =>
   typeof error === "object" &&
   error !== null &&
@@ -87,6 +103,7 @@ const isSqliteForeignKeyError = (error: unknown): boolean =>
 export const getKoboUserByToken = async (token: string): Promise<{
   userId: number;
   syncEnabled: number;
+  syncAllBooks: number;
   twoWayProgressSync: number;
   markReadingThreshold: number;
   markFinishedThreshold: number;
@@ -95,6 +112,7 @@ export const getKoboUserByToken = async (token: string): Promise<{
     .select({
       userId: koboUserSettings.userId,
       syncEnabled: koboUserSettings.syncEnabled,
+      syncAllBooks: koboUserSettings.syncAllBooks,
       twoWayProgressSync: koboUserSettings.twoWayProgressSync,
       markReadingThreshold: koboUserSettings.markReadingThreshold,
       markFinishedThreshold: koboUserSettings.markFinishedThreshold
@@ -104,6 +122,15 @@ export const getKoboUserByToken = async (token: string): Promise<{
     .limit(1);
 
   return result[0] ?? null;
+};
+
+const isSyncAllBooks = async (userId: number): Promise<boolean> => {
+  const result = await db
+    .select({ syncAllBooks: koboUserSettings.syncAllBooks })
+    .from(koboUserSettings)
+    .where(eq(koboUserSettings.userId, userId))
+    .limit(1);
+  return Boolean(result[0]?.syncAllBooks);
 };
 
 const getSelectedSyncCollections = async (
@@ -125,19 +152,29 @@ const getSelectedSyncCollections = async (
     )
     .where(eq(koboSyncCollections.userId, userId));
 
-const getSyncedBooksForUser = async (
-  userId: number
-): Promise<
-  Array<{
-    id: number;
-    title: string;
-    author: string | null;
-    coverPath: string | null;
-    updatedAt: string;
-    filePath: string;
-    fileSize: number | null;
-  }>
-> => {
+type SyncedBook = {
+  id: number;
+  title: string;
+  author: string | null;
+  coverPath: string | null;
+  updatedAt: string;
+  filePath: string;
+  fileSize: number | null;
+};
+
+const getSyncedBooksForUser = async (userId: number): Promise<SyncedBook[]> => {
+  if (await isSyncAllBooks(userId)) {
+    const rows = await db.all(
+      sql`
+        SELECT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
+        FROM books b
+        WHERE b.owner_user_id = ${userId}
+          AND lower(b.file_ext) = 'epub'
+      `
+    );
+    return rows as SyncedBook[];
+  }
+
   const rows = await db.all(
     sql`
       SELECT DISTINCT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
@@ -150,19 +187,23 @@ const getSyncedBooksForUser = async (
         AND lower(b.file_ext) = 'epub'
     `
   );
-
-  return rows as Array<{
-    id: number;
-    title: string;
-    author: string | null;
-    coverPath: string | null;
-    updatedAt: string;
-    filePath: string;
-    fileSize: number | null;
-  }>;
+  return rows as SyncedBook[];
 };
 
 export const isBookInKoboSyncScope = async (userId: number, bookId: number): Promise<boolean> => {
+  if (await isSyncAllBooks(userId)) {
+    const rows = await db.all<{ id: number }>(
+      sql`
+        SELECT b.id FROM books b
+        WHERE b.owner_user_id = ${userId}
+          AND b.id = ${bookId}
+          AND lower(b.file_ext) = 'epub'
+        LIMIT 1
+      `
+    );
+    return Boolean(rows[0]);
+  }
+
   const rows = await db.all<{ id: number }>(
     sql`
       SELECT b.id
@@ -427,7 +468,7 @@ const buildProgressEntitlements = async (userId: number): Promise<Record<string,
         StatusInfo: {
           LastModified: row.updatedAt,
           Status:
-            row.status === "DONE"
+            row.status === "READ"
               ? "Finished"
               : row.status === "READING"
                 ? "Reading"
@@ -614,10 +655,10 @@ export const upsertKoboReadingStates = async (
       state.StatusInfo?.Status ?? state.statusInfo?.status ?? "ReadyToRead"
     ).toLowerCase();
 
-    const mappedStatus =
+    const mappedStatus: "UNREAD" | "READING" | "READ" =
       statusText.includes("finish")
-        ? "DONE"
-        : statusText.includes("read")
+        ? "READ"
+        : statusText.includes("reading")
           ? "READING"
           : "UNREAD";
 
@@ -642,7 +683,7 @@ export const upsertKoboReadingStates = async (
         .values({
           userId,
           bookId: entitlementId,
-          status: mappedStatus as "UNREAD" | "READING" | "DONE",
+          status: mappedStatus,
           progressPercent,
           positionRef,
           positionType,
@@ -652,7 +693,7 @@ export const upsertKoboReadingStates = async (
         .onConflictDoUpdate({
           target: [bookProgress.userId, bookProgress.bookId],
           set: {
-            status: mappedStatus as "UNREAD" | "READING" | "DONE",
+            status: mappedStatus,
             progressPercent,
             positionRef,
             positionType,
@@ -720,7 +761,7 @@ export const getKoboReadingState = async (
     StatusInfo: {
       LastModified: timestamp,
       Status:
-        progress[0].status === "DONE"
+        progress[0].status === "READ"
           ? "Finished"
           : progress[0].status === "READING"
             ? "Reading"

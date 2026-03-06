@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { createTempEnv } from "./helpers";
+import { createTempEnv, setupTestApp } from "./helpers";
 
 createTempEnv();
 
@@ -7,9 +7,7 @@ let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
 
 describe("auth", () => {
   beforeAll(async () => {
-    const mod = await import("../src/app");
-    app = mod.buildApp();
-    await app.ready();
+    app = await setupTestApp();
   });
 
   it("supports setup + login + me", async () => {

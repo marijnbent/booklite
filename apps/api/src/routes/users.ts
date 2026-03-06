@@ -1,13 +1,14 @@
 import { FastifyPluginAsync } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
-import { koboUserSettings, users } from "../db/schema";
+import { users } from "../db/schema";
 import { requireOwner } from "../auth/guards";
 import { hashPassword } from "../auth/password";
 import { nowIso } from "../utils/time";
-import { randomToken } from "../utils/hash";
+import { ensureKoboSettingsRow } from "../services/koboSettings";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
+import { idParams } from "../schemas";
 
 const createUserSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
@@ -58,15 +59,7 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
         disabledAt: users.disabledAt
       });
 
-    await db.insert(koboUserSettings).values({
-      userId: created.id,
-      token: randomToken(),
-      syncEnabled: 0,
-      twoWayProgressSync: 0,
-      markReadingThreshold: 1,
-      markFinishedThreshold: 99,
-      updatedAt: nowIso()
-    });
+    await ensureKoboSettingsRow(created.id);
 
     await ensureSystemCollectionsForUser(created.id, {
       preselectFavoritesForKobo: true
@@ -79,7 +72,7 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/users/:id",
     { preHandler: requireOwner },
     async (request, reply) => {
-      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+      const params = idParams.parse(request.params);
       const body = patchUserSchema.parse(request.body);
 
       const set: Record<string, unknown> = {};

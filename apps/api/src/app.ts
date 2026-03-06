@@ -36,7 +36,7 @@ export const buildApp = () => {
   app.register(multipart, {
     limits: {
       fileSize: config.uploadLimitMb * 1024 * 1024,
-      files: 1
+      files: 100
     }
   });
 

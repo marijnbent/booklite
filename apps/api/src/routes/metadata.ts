@@ -12,9 +12,7 @@ export const metadataRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/api/v1/metadata/preview",
     { preHandler: requireAuth },
-    async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-
+    async (request) => {
       const body = previewSchema.parse(request.body);
       const result = await fetchMetadataPreview(body.title, body.author);
       return {

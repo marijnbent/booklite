@@ -4,29 +4,12 @@ import { db, getSetting } from "../db/client";
 import { appSettings } from "../db/schema";
 import { requireOwner } from "../auth/guards";
 import { config } from "../config";
-
-const providerValues = [
-  "open_library",
-  "amazon",
-  "google",
-  "hardcover",
-  "goodreads",
-  "douban"
-] as const;
-
-type EnabledMetadataProvider = (typeof providerValues)[number];
-
-const metadataProviderEnabledSchema = z
-  .object({
-    open_library: z.boolean(),
-    amazon: z.boolean(),
-    google: z.boolean(),
-    hardcover: z.boolean(),
-    goodreads: z.boolean(),
-    douban: z.boolean()
-  })
-  .strict();
-type MetadataProviderEnabled = z.infer<typeof metadataProviderEnabledSchema>;
+import {
+  defaultMetadataProviderEnabled,
+  metadataProviderEnabledSchema,
+  type MetadataProviderEnabled,
+  toMetadataProviderEnabled
+} from "../utils/metadataProviders";
 
 const amazonDomainSchema = z.enum([
   "com",
@@ -40,15 +23,6 @@ const amazonDomainSchema = z.enum([
   "com.au"
 ]);
 type AmazonDomain = z.infer<typeof amazonDomainSchema>;
-
-const defaultMetadataProviderEnabled: MetadataProviderEnabled = {
-  open_library: true,
-  amazon: true,
-  google: true,
-  hardcover: false,
-  goodreads: true,
-  douban: false
-};
 
 const patchSettingsSchema = z
   .object({
@@ -64,24 +38,6 @@ const patchSettingsSchema = z
     uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional()
   })
   .strict();
-
-const toMetadataProviderEnabled = (
-  value: unknown,
-  fallback: MetadataProviderEnabled
-): MetadataProviderEnabled => {
-  if (!value || typeof value !== "object") return fallback;
-  const row = value as Record<EnabledMetadataProvider, unknown>;
-
-  return {
-    open_library:
-      typeof row.open_library === "boolean" ? row.open_library : fallback.open_library,
-    amazon: typeof row.amazon === "boolean" ? row.amazon : fallback.amazon,
-    google: typeof row.google === "boolean" ? row.google : fallback.google,
-    hardcover: typeof row.hardcover === "boolean" ? row.hardcover : fallback.hardcover,
-    goodreads: typeof row.goodreads === "boolean" ? row.goodreads : fallback.goodreads,
-    douban: typeof row.douban === "boolean" ? row.douban : fallback.douban
-  };
-};
 
 const toAmazonDomain = (value: unknown, fallback: AmazonDomain): AmazonDomain => {
   const parsed = amazonDomainSchema.safeParse(value);

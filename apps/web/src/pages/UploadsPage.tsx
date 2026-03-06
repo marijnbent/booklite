@@ -29,13 +29,24 @@ import {
   Trash2,
   Star,
   Pencil,
+  RotateCw,
 } from "lucide-react";
 
 interface UploadJob {
   id: string;
+  title: string;
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
   error?: string | null;
   result?: { bookId?: number } | null;
+}
+
+interface BatchUploadResult {
+  id: string;
+  title: string;
+  fileName: string;
+  jobId?: string;
+  status?: UploadJob["status"];
+  error?: string;
 }
 
 interface CollectionItem {
@@ -130,13 +141,18 @@ export const UploadsPage: React.FC = () => {
     const updated = await Promise.all(
       jobs.map(async (job) => {
         if (job.status !== "QUEUED" && job.status !== "PROCESSING") return job;
-        const response = await apiFetch<any>(`/api/v1/import-jobs/${job.id}`);
-        return {
-          id: response.id,
-          status: response.status,
-          error: response.error,
-          result: response.result
-        } as UploadJob;
+        try {
+          const response = await apiFetch<any>(`/api/v1/import-jobs/${job.id}`);
+          return {
+            id: response.id,
+            title: job.title,
+            status: response.status,
+            error: response.error,
+            result: response.result
+          } as UploadJob;
+        } catch {
+          return job;
+        }
       })
     );
 
@@ -271,47 +287,109 @@ export const UploadsPage: React.FC = () => {
     }
   };
 
-  const uploadDraft = async (draft: UploadDraft): Promise<boolean> => {
-    setUploadingIds((prev) => [...prev, draft.id]);
-    updateDraft(draft.id, { error: undefined });
+  const uploadDrafts = async (targets: UploadDraft[]): Promise<void> => {
+    if (targets.length === 0) return;
+
+    const targetIds = targets.map((draft) => draft.id);
+    setUploadingIds((prev) => [...new Set([...prev, ...targetIds])]);
+    setDrafts((prev) =>
+      prev.map((draft) =>
+        targetIds.includes(draft.id)
+          ? { ...draft, error: undefined }
+          : draft
+      )
+    );
 
     try {
       const formData = new FormData();
-      formData.append("file", draft.file);
+      formData.append(
+        "drafts",
+        JSON.stringify(
+          targets.map((draft) => ({
+            id: draft.id,
+            title: draft.title.trim() || undefined,
+            author: draft.author.trim() || undefined,
+            series: draft.series.trim() || undefined,
+            description: draft.description.trim() || undefined,
+            coverPath: draft.coverPath.trim() || undefined,
+            favorite: draft.favorite,
+            autoMetadata: true,
+            collectionIds: draft.collectionIds
+          }))
+        )
+      );
 
-      if (draft.title.trim()) formData.append("title", draft.title.trim());
-      if (draft.author.trim()) formData.append("author", draft.author.trim());
-      if (draft.series.trim()) formData.append("series", draft.series.trim());
-      if (draft.description.trim()) formData.append("description", draft.description.trim());
-      if (draft.coverPath.trim()) formData.append("coverPath", draft.coverPath.trim());
+      targets.forEach((draft) => {
+        formData.append(`file:${draft.id}`, draft.file, draft.file.name);
+      });
 
-      formData.append("favorite", String(draft.favorite));
-      formData.append("autoMetadata", "true");
-      formData.append("collectionIds", JSON.stringify(draft.collectionIds));
-
-      const payload = await apiFetch<{ jobId: string; status: UploadJob["status"] }>("/api/v1/uploads", {
+      const payload = await apiFetch<{ results: BatchUploadResult[] }>("/api/v1/uploads", {
         method: "POST",
         body: formData
       });
 
-      setJobs((prev) => [{ id: payload.jobId, status: payload.status }, ...prev]);
-      removeDraft(draft.id);
-      return true;
+      const resultMap = new Map(payload.results.map((result) => [result.id, result]));
+      const queuedIds = new Set(
+        payload.results
+          .filter((result) => result.jobId && result.status)
+          .map((result) => result.id)
+      );
+
+      const nextJobs = payload.results
+        .filter((result): result is BatchUploadResult & { jobId: string; status: UploadJob["status"] } =>
+          Boolean(result.jobId && result.status)
+        )
+        .map((result) => ({
+          id: result.jobId,
+          title: result.title,
+          status: result.status
+        }));
+
+      if (nextJobs.length > 0) {
+        setJobs((prev) => [...prev, ...nextJobs]);
+      }
+
+      setDrafts((prev) =>
+        prev
+          .filter((draft) => !queuedIds.has(draft.id))
+          .map((draft) => {
+            if (!targetIds.includes(draft.id)) return draft;
+            const result = resultMap.get(draft.id);
+            if (!result) {
+              return {
+                ...draft,
+                error: "Upload response was incomplete"
+              };
+            }
+
+            if (!result.error) return draft;
+            return {
+              ...draft,
+              error: result.error
+            };
+          })
+      );
     } catch (error) {
-      updateDraft(draft.id, {
-        error: toErrorMessage(error)
-      });
-      return false;
+      const message = toErrorMessage(error);
+      setDrafts((prev) =>
+        prev.map((draft) =>
+          targetIds.includes(draft.id)
+            ? { ...draft, error: message }
+            : draft
+        )
+      );
     } finally {
-      setUploadingIds((prev) => prev.filter((id) => id !== draft.id));
+      setUploadingIds((prev) => prev.filter((id) => !targetIds.includes(id)));
     }
   };
 
+  const uploadDraft = async (draft: UploadDraft): Promise<void> => {
+    await uploadDrafts([draft]);
+  };
+
   const handleAddSelected = async () => {
-    const selected = drafts.filter((draft) => draft.selected);
-    for (const draft of selected) {
-      await uploadDraft(draft);
-    }
+    const selected = drafts.filter((draft) => draft.selected && !uploadingIds.includes(draft.id));
+    await uploadDrafts(selected);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -321,7 +399,7 @@ export const UploadsPage: React.FC = () => {
   }, []);
 
   const uploadingAny = uploadingIds.length > 0;
-  const selectedCount = drafts.filter((draft) => draft.selected).length;
+  const selectedCount = drafts.filter((draft) => draft.selected && !uploadingIds.includes(draft.id)).length;
   const selectedLoadingMetadata = drafts.some(
     (draft) => draft.selected && draft.metadataState === "loading"
   );
@@ -514,6 +592,27 @@ export const UploadsPage: React.FC = () => {
                   <span className="hidden shrink-0 w-24 text-right text-[10px] text-muted-foreground/50 tabular-nums sm:inline whitespace-nowrap">
                     {fileExt} · {fileSizeMB} MB
                   </span>
+
+                  {/* Upload error */}
+                  {draft.error && (
+                    <span className="shrink-0 max-w-48 truncate text-[11px] text-destructive" title={draft.error}>
+                      {draft.error}
+                    </span>
+                  )}
+
+                  {/* Retry button */}
+                  {draft.error && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 shrink-0 text-destructive/60 hover:text-destructive"
+                      onClick={() => void uploadDraft(draft)}
+                      disabled={isUploading}
+                      title="Retry upload"
+                    >
+                      <RotateCw className="size-3.5" />
+                    </Button>
+                  )}
 
                   {/* Edit button */}
                   <Button
@@ -710,16 +809,9 @@ export const UploadsPage: React.FC = () => {
                   className="flex items-center gap-3 rounded-md border border-border/40 px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {job.status === "COMPLETED" ? "Book imported" : `Job ${job.id.slice(0, 8)}`}
-                    </p>
+                    <p className="text-sm font-medium truncate">{job.title}</p>
                     {job.error && (
                       <p className="text-xs text-destructive mt-0.5 truncate">{job.error}</p>
-                    )}
-                    {job.result?.bookId && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Book #{job.result.bookId}
-                      </p>
                     )}
                   </div>
                   <Badge variant={display.variant} className="shrink-0 gap-1">

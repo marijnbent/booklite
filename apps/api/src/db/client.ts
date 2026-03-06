@@ -61,9 +61,11 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE TABLE IF NOT EXISTS book_progress (
   user_id INTEGER NOT NULL,
   book_id INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'UNREAD',
+  status TEXT NOT NULL DEFAULT 'UNSET',
   progress_percent REAL NOT NULL DEFAULT 0,
   position_ref TEXT,
+  position_type TEXT,
+  position_source TEXT,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (user_id, book_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -95,6 +97,7 @@ CREATE TABLE IF NOT EXISTS kobo_user_settings (
   user_id INTEGER PRIMARY KEY,
   token TEXT NOT NULL UNIQUE,
   sync_enabled INTEGER NOT NULL DEFAULT 0,
+  sync_all_books INTEGER NOT NULL DEFAULT 0,
   two_way_progress_sync INTEGER NOT NULL DEFAULT 0,
   mark_reading_threshold REAL NOT NULL DEFAULT 1,
   mark_finished_threshold REAL NOT NULL DEFAULT 99,
@@ -173,33 +176,16 @@ CREATE TRIGGER IF NOT EXISTS books_au AFTER UPDATE ON books BEGIN
 END;
 `);
 
-const progressCols = sqlite
-  .prepare("PRAGMA table_info(book_progress)")
-  .all() as Array<{ name: string }>;
-
-if (!progressCols.some((col) => col.name === "position_type")) {
-  sqlite.exec("ALTER TABLE book_progress ADD COLUMN position_type TEXT");
-}
-if (!progressCols.some((col) => col.name === "position_source")) {
-  sqlite.exec("ALTER TABLE book_progress ADD COLUMN position_source TEXT");
-}
-
-const collectionCols = sqlite
-  .prepare("PRAGMA table_info(collections)")
-  .all() as Array<{ name: string }>;
-
-if (!collectionCols.some((col) => col.name === "slug")) {
-  sqlite.exec("ALTER TABLE collections ADD COLUMN slug TEXT");
-}
-
-if (!collectionCols.some((col) => col.name === "is_system")) {
-  sqlite.exec("ALTER TABLE collections ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0");
-}
-
 sqlite.exec(`
 CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_user_slug
 ON collections(user_id, slug)
 WHERE slug IS NOT NULL;
+`);
+
+sqlite.exec(`
+UPDATE book_progress
+SET status = 'READ'
+WHERE status = 'DONE';
 `);
 
 export const db = drizzle(sqlite, { schema });
@@ -207,10 +193,6 @@ export const db = drizzle(sqlite, { schema });
 const insertSetting = sqlite.prepare(
   "INSERT OR IGNORE INTO app_settings(key, value_json) VALUES (?, ?)"
 );
-insertSetting.run("metadata_provider_fallback", JSON.stringify("google"));
-insertSetting.run("metadata_provider_primary", JSON.stringify("open_library"));
-insertSetting.run("metadata_provider_secondary", JSON.stringify("google"));
-insertSetting.run("metadata_provider_tertiary", JSON.stringify("none"));
 insertSetting.run("metadata_amazon_domain", JSON.stringify(config.amazonBooksDomain));
 insertSetting.run("metadata_amazon_cookie", JSON.stringify(config.amazonBooksCookie));
 insertSetting.run("metadata_google_language", JSON.stringify(config.googleBooksLanguage));

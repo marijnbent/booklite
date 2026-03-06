@@ -1,6 +1,12 @@
 import { config } from "../config";
 import { getSetting } from "../db/client";
 import { callOpenRouterJsonObject } from "./openrouter";
+import {
+  defaultMetadataProviderEnabled,
+  toMetadataProviderEnabled,
+  type MetadataProviderEnabled,
+  type MetadataProviderKey
+} from "../utils/metadataProviders";
 
 export interface MetadataResult {
   title?: string;
@@ -33,15 +39,7 @@ export interface MetadataPreviewResult extends MetadataResult {
   coverOptions: MetadataCoverOption[];
 }
 
-type MetadataProvider =
-  | "open_library"
-  | "amazon"
-  | "google"
-  | "hardcover"
-  | "goodreads"
-  | "douban";
-
-type MetadataProviderEnabled = Record<MetadataProvider, boolean>;
+type MetadataProvider = MetadataProviderKey;
 
 interface ProviderCandidate {
   provider: MetadataProvider;
@@ -69,33 +67,6 @@ const providerTrustScore: Record<MetadataProvider, number> = {
   hardcover: 0.95,
   amazon: 0.92,
   douban: 0.9
-};
-
-const defaultProviderEnabled: MetadataProviderEnabled = {
-  open_library: true,
-  amazon: true,
-  google: true,
-  hardcover: false,
-  goodreads: true,
-  douban: false
-};
-
-const toProviderEnabled = (
-  value: unknown,
-  fallback: MetadataProviderEnabled
-): MetadataProviderEnabled => {
-  if (!value || typeof value !== "object") return fallback;
-  const row = value as Record<string, unknown>;
-
-  return {
-    open_library:
-      typeof row.open_library === "boolean" ? row.open_library : fallback.open_library,
-    amazon: typeof row.amazon === "boolean" ? row.amazon : fallback.amazon,
-    google: typeof row.google === "boolean" ? row.google : fallback.google,
-    hardcover: typeof row.hardcover === "boolean" ? row.hardcover : fallback.hardcover,
-    goodreads: typeof row.goodreads === "boolean" ? row.goodreads : fallback.goodreads,
-    douban: typeof row.douban === "boolean" ? row.douban : fallback.douban
-  };
 };
 
 const toQuery = (title: string, author?: string): string => {
@@ -244,9 +215,9 @@ const resolveMetadataProviderSettings = async (): Promise<{
   openrouterEnabled: boolean;
 }> => {
   return {
-    providerEnabled: toProviderEnabled(
-      await getSetting<unknown>("metadata_provider_enabled", defaultProviderEnabled),
-      defaultProviderEnabled
+    providerEnabled: toMetadataProviderEnabled(
+      await getSetting<unknown>("metadata_provider_enabled", defaultMetadataProviderEnabled),
+      defaultMetadataProviderEnabled
     ),
     amazonDomain: (
       await getSetting<string>("metadata_amazon_domain", config.amazonBooksDomain)

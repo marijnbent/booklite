@@ -1,12 +1,13 @@
 import { FastifyPluginAsync } from "fastify";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { collectionBooks, collections } from "../db/schema";
-import { requireAuth } from "../auth/guards";
+import { getAuth, requireAuth } from "../auth/guards";
+import { idParams } from "../schemas";
 import { nowIso } from "../utils/time";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
-import { mapBookRow, koboSyncableCase } from "./books";
+import { bookJoins, bookSelectFields, mapBookRow } from "./books";
 
 const createCollectionSchema = z.object({
   name: z.string().min(1),
@@ -30,9 +31,9 @@ const listCollectionsSchema = z.object({
 });
 
 export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/api/v1/collections", { preHandler: requireAuth }, async (request, reply) => {
-    if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-    await ensureSystemCollectionsForUser(request.auth.userId);
+  fastify.get("/api/v1/collections", { preHandler: requireAuth }, async (request) => {
+    const { userId } = getAuth(request);
+    await ensureSystemCollectionsForUser(userId);
 
     const query = listCollectionsSchema.parse(request.query);
     const includeVirtual =
@@ -42,7 +43,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       SELECT c.*, COUNT(cb.book_id) AS book_count
       FROM collections c
       LEFT JOIN collection_books cb ON cb.collection_id = c.id
-      WHERE c.user_id = ${request.auth.userId}
+      WHERE c.user_id = ${userId}
       GROUP BY c.id
       ORDER BY c.updated_at DESC
     `);
@@ -59,7 +60,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         FROM collection_books cb
         INNER JOIN collections c ON c.id = cb.collection_id
         WHERE cb.book_id = b.id
-          AND c.user_id = ${request.auth.userId}
+          AND c.user_id = ${userId}
           AND c.is_system = 0
       )
     `);
@@ -68,7 +69,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       ...rows,
       {
         id: -1,
-        user_id: request.auth.userId,
+        user_id: userId,
         name: "Uncollected",
         icon: "🗃️",
         slug: "uncollected",
@@ -85,15 +86,15 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/collections",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
       const body = createCollectionSchema.parse(request.body);
       const timestamp = nowIso();
 
       const [created] = await db
         .insert(collections)
         .values({
-          userId: request.auth.userId,
+          userId,
           name: body.name,
           icon: body.icon ?? null,
           slug: null,
@@ -111,15 +112,15 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/collections/:id",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
-      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
+      const params = idParams.parse(request.params);
       const body = patchCollectionSchema.parse(request.body);
 
       const existing = await db
         .select({ id: collections.id, isSystem: collections.isSystem })
         .from(collections)
-        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)))
+        .where(and(eq(collections.id, params.id), eq(collections.userId, userId)))
         .limit(1);
 
       if (!existing[0]) return reply.code(404).send({ error: "Collection not found" });
@@ -134,7 +135,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       const [updated] = await db
         .update(collections)
         .set(set)
-        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)))
+        .where(and(eq(collections.id, params.id), eq(collections.userId, userId)))
         .returning();
 
       if (!updated) return reply.code(404).send({ error: "Collection not found" });
@@ -146,14 +147,14 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/collections/:id",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
-      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
+      const params = idParams.parse(request.params);
 
       const found = await db
         .select({ id: collections.id, isSystem: collections.isSystem })
         .from(collections)
-        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)))
+        .where(and(eq(collections.id, params.id), eq(collections.userId, userId)))
         .limit(1);
       if (!found[0]) return reply.code(404).send({ error: "Collection not found" });
       if (found[0].isSystem === 1) {
@@ -162,7 +163,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
 
       await db
         .delete(collections)
-        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)));
+        .where(and(eq(collections.id, params.id), eq(collections.userId, userId)));
 
       return reply.code(204).send();
     }
@@ -172,8 +173,8 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/collections/:id/books/:bookId",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
       const params = z
         .object({
           id: z.coerce.number().int().positive(),
@@ -184,7 +185,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       const collectionExists = await db
         .select({ id: collections.id })
         .from(collections)
-        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)))
+        .where(and(eq(collections.id, params.id), eq(collections.userId, userId)))
         .limit(1);
 
       if (!collectionExists[0]) {
@@ -218,8 +219,8 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/collections/:id/books/:bookId",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
       const params = z
         .object({
           id: z.coerce.number().int().positive(),
@@ -239,7 +240,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       await db
         .update(collections)
         .set({ updatedAt: nowIso() })
-        .where(and(eq(collections.id, params.id), eq(collections.userId, request.auth.userId)));
+        .where(and(eq(collections.id, params.id), eq(collections.userId, userId)));
 
       return reply.code(204).send();
     }
@@ -249,14 +250,14 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/collections/reorder",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
       const body = reorderSchema.parse(request.body);
 
       const found = await db
         .select({ id: collections.id })
         .from(collections)
-        .where(and(eq(collections.id, body.collectionId), eq(collections.userId, request.auth.userId)))
+        .where(and(eq(collections.id, body.collectionId), eq(collections.userId, userId)))
         .limit(1);
       if (!found[0]) return reply.code(404).send({ error: "Collection not found" });
 
@@ -286,25 +287,20 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/api/v1/collections/uncollected/books",
     { preHandler: requireAuth },
-    async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
+    async (request) => {
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
 
       const rows = await db.all(sql`
-        SELECT b.id, b.owner_user_id, b.title, b.author, b.series, b.description, b.cover_path, b.file_path, b.file_ext, b.file_size,
-               ${koboSyncableCase(request.auth.userId)} AS kobo_syncable, b.created_at, b.updated_at,
-               bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
-               CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
+        SELECT ${bookSelectFields(userId)}
         FROM books b
-        LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
-        LEFT JOIN collections fav ON fav.user_id = ${request.auth.userId} AND fav.slug = 'favorites'
-        LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
+        ${bookJoins(userId)}
         WHERE NOT EXISTS (
           SELECT 1
           FROM collection_books cb2
           INNER JOIN collections c2 ON c2.id = cb2.collection_id
           WHERE cb2.book_id = b.id
-            AND c2.user_id = ${request.auth.userId}
+            AND c2.user_id = ${userId}
             AND c2.is_system = 0
         )
         ORDER BY b.updated_at DESC
@@ -317,24 +313,18 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/api/v1/collections/:id/books",
     { preHandler: requireAuth },
-    async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-      await ensureSystemCollectionsForUser(request.auth.userId);
-      const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params);
+    async (request) => {
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
+      const params = idParams.parse(request.params);
 
       const rows = await db.all(sql`
-        SELECT b.id, b.owner_user_id, b.title, b.author, b.series, b.description, b.cover_path, b.file_path, b.file_ext, b.file_size,
-               ${koboSyncableCase(request.auth.userId)} AS kobo_syncable, b.created_at, b.updated_at,
-               bp.status AS progress_status, bp.progress_percent, bp.position_ref, bp.updated_at AS progress_updated_at,
-               CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
-               cb.sort_order
+        SELECT ${bookSelectFields(userId)}, cb.sort_order
         FROM collection_books cb
         JOIN collections c ON c.id = cb.collection_id
         JOIN books b ON b.id = cb.book_id
-        LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${request.auth.userId}
-        LEFT JOIN collections fav ON fav.user_id = ${request.auth.userId} AND fav.slug = 'favorites'
-        LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
-        WHERE c.user_id = ${request.auth.userId} AND c.id = ${params.id}
+        ${bookJoins(userId)}
+        WHERE c.user_id = ${userId} AND c.id = ${params.id}
         ORDER BY cb.sort_order ASC
       `);
       return rows.map(mapBookRow);

@@ -3,14 +3,14 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { importJobs } from "../db/schema";
-import { requireAuth } from "../auth/guards";
+import { getAuth, requireAuth } from "../auth/guards";
 
 export const importJobRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/api/v1/import-jobs/:id",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
+      const { userId } = getAuth(request);
 
       const params = z.object({ id: z.string().min(1) }).parse(request.params);
 
@@ -27,7 +27,7 @@ export const importJobRoutes: FastifyPluginAsync = async (fastify) => {
           updatedAt: importJobs.updatedAt
         })
         .from(importJobs)
-        .where(and(eq(importJobs.id, params.id), eq(importJobs.userId, request.auth.userId)))
+        .where(and(eq(importJobs.id, params.id), eq(importJobs.userId, userId)))
         .limit(1);
 
       if (!rows[0]) return reply.code(404).send({ error: "Job not found" });

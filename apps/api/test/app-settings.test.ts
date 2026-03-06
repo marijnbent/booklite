@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { createTempEnv } from "./helpers";
+import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
 createTempEnv();
 
@@ -10,31 +10,8 @@ let schemaModule: typeof import("../src/db/schema");
 
 describe("app settings", () => {
   beforeAll(async () => {
-    const appMod = await import("../src/app");
-    app = appMod.buildApp();
-    await app.ready();
-
-    const setup = await app.inject({
-      method: "POST",
-      url: "/api/v1/setup",
-      payload: {
-        email: "owner@example.com",
-        username: "owner",
-        password: "secret123"
-      }
-    });
-    expect(setup.statusCode).toBe(201);
-
-    const login = await app.inject({
-      method: "POST",
-      url: "/api/v1/auth/login",
-      payload: {
-        usernameOrEmail: "owner",
-        password: "secret123"
-      }
-    });
-    expect(login.statusCode).toBe(200);
-    ownerAccessToken = login.json().accessToken as string;
+    app = await setupTestApp();
+    ownerAccessToken = (await setupOwnerAndLogin(app)).accessToken;
 
     dbModule = await import("../src/db/client");
     schemaModule = await import("../src/db/schema");

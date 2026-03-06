@@ -4,7 +4,7 @@ import { pipeline } from "node:stream/promises";
 import { FastifyPluginAsync } from "fastify";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth } from "../auth/guards";
+import { getAuth, requireAuth } from "../auth/guards";
 import { config } from "../config";
 import { isSupportedBookExt } from "../services/books";
 import { randomToken } from "../utils/hash";
@@ -48,22 +48,150 @@ const removeUploadedFileIfExists = (filePath: string | undefined): void => {
   }
 };
 
+const drainFile = async (stream: NodeJS.ReadableStream): Promise<void> => {
+  for await (const _chunk of stream) {
+    // Drain discarded parts so multipart parsing can continue.
+  }
+};
+
+type StoredUploadFile = {
+  clientId: string;
+  originalName: string;
+  fileExt: string;
+  targetPath: string;
+  fileSize: number;
+};
+
+type UploadDraftInput = {
+  id: string;
+  title?: string;
+  author?: string;
+  series?: string;
+  description?: string;
+  coverPath?: string;
+  favorite?: boolean;
+  autoMetadata?: boolean;
+  collectionIds?: number[];
+};
+
+const batchDraftSchema = z
+  .array(
+    z.object({
+      id: z.string().min(1),
+      title: z.string().optional(),
+      author: z.string().optional(),
+      series: z.string().optional(),
+      description: z.string().optional(),
+      coverPath: z.string().optional(),
+      favorite: z.boolean().optional(),
+      autoMetadata: z.boolean().optional(),
+      collectionIds: z.array(z.coerce.number().int().positive()).optional()
+    })
+  )
+  .superRefine((drafts, ctx) => {
+    const seen = new Set<string>();
+    drafts.forEach((draft, index) => {
+      if (!seen.has(draft.id)) {
+        seen.add(draft.id);
+        return;
+      }
+
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Duplicate draft id: ${draft.id}`,
+        path: [index, "id"]
+      });
+    });
+  });
+
+const validateCollectionIds = async (userId: number, collectionIds: number[]): Promise<number[]> => {
+  const uniqueCollectionIds = [...new Set(collectionIds)];
+  if (uniqueCollectionIds.length === 0) return uniqueCollectionIds;
+
+  const valid = await db
+    .select({ id: collections.id })
+    .from(collections)
+    .where(
+      and(
+        eq(collections.userId, userId),
+        inArray(collections.id, uniqueCollectionIds)
+      )
+    );
+
+  if (valid.length !== uniqueCollectionIds.length) {
+    throw new Error("One or more collectionIds are invalid for this user");
+  }
+
+  return uniqueCollectionIds;
+};
+
+const queueStoredUpload = async (input: {
+  userId: number;
+  storedFile: StoredUploadFile;
+  draft: Omit<UploadDraftInput, "id">;
+  maxBytes: number;
+}): Promise<{ jobId: string; status: "QUEUED" }> => {
+  if (input.storedFile.fileSize > input.maxBytes) {
+    removeUploadedFileIfExists(input.storedFile.targetPath);
+    throw new Error(`File exceeds ${input.maxBytes} bytes limit`);
+  }
+
+  const collectionIds = await validateCollectionIds(
+    input.userId,
+    input.draft.collectionIds ?? []
+  );
+
+  const titleField = input.draft.title?.trim();
+  const title = titleField ? titleField : undefined;
+  const author = normalizeOptionalText(input.draft.author);
+  const series = normalizeOptionalText(input.draft.series);
+  const description = normalizeOptionalText(input.draft.description);
+  const coverPath = normalizeOptionalText(input.draft.coverPath);
+  const favorite = input.draft.favorite ?? false;
+  const autoMetadata = input.draft.autoMetadata ?? true;
+
+  const jobId = randomToken();
+  const relativeFilePath = path.relative(config.booksDir, input.storedFile.targetPath);
+
+  try {
+    await queueUploadJob({
+      id: jobId,
+      userId: input.userId,
+      fileName: input.storedFile.originalName,
+      filePath: relativeFilePath,
+      fileSize: input.storedFile.fileSize,
+      fileExt: input.storedFile.fileExt,
+      controls: {
+        title,
+        author,
+        series,
+        description,
+        coverPath,
+        collectionIds,
+        favorite,
+        autoMetadata
+      }
+    });
+  } catch {
+    removeUploadedFileIfExists(input.storedFile.targetPath);
+    throw new Error("Failed to queue upload job");
+  }
+
+  return {
+    jobId,
+    status: "QUEUED"
+  };
+};
+
 export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/api/v1/uploads",
     { preHandler: requireAuth },
     async (request, reply) => {
-      if (!request.auth) return reply.code(401).send({ error: "Unauthorized" });
-
+      const { userId } = getAuth(request);
       const fields: Record<string, string> = {};
-      let uploadedFile:
-        | {
-            originalName: string;
-            fileExt: string;
-            targetPath: string;
-          }
-        | undefined;
-
+      const uploadedFiles = new Map<string, StoredUploadFile>();
+      const fileErrors = new Map<string, string>();
       const maxBytes = await getUploadLimitBytes();
 
       for await (const part of request.parts()) {
@@ -72,16 +200,28 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
           continue;
         }
 
-        if (uploadedFile) {
-          removeUploadedFileIfExists(uploadedFile.targetPath);
-          return reply.code(400).send({ error: "Only one file is supported per request" });
+        const clientId = part.fieldname.startsWith("file:")
+          ? part.fieldname.slice("file:".length).trim()
+          : "__single__";
+
+        if (clientId.length === 0) {
+          await drainFile(part.file);
+          continue;
+        }
+
+        if (uploadedFiles.has(clientId) || fileErrors.has(clientId)) {
+          await drainFile(part.file);
+          fileErrors.set(clientId, "Only one file is allowed per draft");
+          continue;
         }
 
         const originalName = sanitizeFileName(part.filename || "upload");
         const fileExt = path.extname(originalName).slice(1).toLowerCase();
 
         if (!isSupportedBookExt(fileExt)) {
-          return reply.code(400).send({ error: "Only EPUB and PDF are supported" });
+          await drainFile(part.file);
+          fileErrors.set(clientId, "Only EPUB and PDF are supported");
+          continue;
         }
 
         const datePrefix = new Date().toISOString().slice(0, 10);
@@ -94,93 +234,148 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
 
         await pipeline(part.file, writeStream);
 
-        uploadedFile = {
+        const stat = fs.statSync(targetPath);
+        uploadedFiles.set(clientId, {
+          clientId,
           originalName,
           fileExt,
-          targetPath
-        };
+          targetPath,
+          fileSize: stat.size
+        });
+      }
+
+      if (fields.drafts) {
+        let drafts: UploadDraftInput[];
+        try {
+          drafts = batchDraftSchema.parse(JSON.parse(fields.drafts));
+        } catch {
+          uploadedFiles.forEach((storedFile) => removeUploadedFileIfExists(storedFile.targetPath));
+          return reply.code(400).send({ error: "Invalid drafts payload" });
+        }
+
+        const results: Array<{
+          id: string;
+          title: string;
+          fileName: string;
+          jobId?: string;
+          status?: "QUEUED";
+          error?: string;
+        }> = [];
+
+        const referencedIds = new Set<string>();
+
+        for (const draft of drafts) {
+          referencedIds.add(draft.id);
+          const storedFile = uploadedFiles.get(draft.id);
+          const fileName = storedFile?.originalName ?? "upload";
+          const title = draft.title?.trim() || path.parse(fileName).name || "Untitled";
+
+          if (fileErrors.has(draft.id)) {
+            if (storedFile) removeUploadedFileIfExists(storedFile.targetPath);
+            results.push({
+              id: draft.id,
+              title,
+              fileName,
+              error: fileErrors.get(draft.id)
+            });
+            continue;
+          }
+
+          if (!storedFile) {
+            results.push({
+              id: draft.id,
+              title,
+              fileName,
+              error: "Missing file for draft"
+            });
+            continue;
+          }
+
+          try {
+            const queued = await queueStoredUpload({
+              userId,
+              storedFile,
+              draft,
+              maxBytes
+            });
+
+            results.push({
+              id: draft.id,
+              title,
+              fileName: storedFile.originalName,
+              jobId: queued.jobId,
+              status: queued.status
+            });
+          } catch (error) {
+            removeUploadedFileIfExists(storedFile.targetPath);
+            results.push({
+              id: draft.id,
+              title,
+              fileName: storedFile.originalName,
+              error: error instanceof Error ? error.message : "Upload failed"
+            });
+          }
+        }
+
+        uploadedFiles.forEach((storedFile, clientId) => {
+          if (referencedIds.has(clientId)) return;
+          removeUploadedFileIfExists(storedFile.targetPath);
+        });
+
+        return reply.code(202).send({ results });
+      }
+
+      const uploadedFile = uploadedFiles.get("__single__");
+      if (fileErrors.has("__single__")) {
+        if (uploadedFile) removeUploadedFileIfExists(uploadedFile.targetPath);
+        return reply.code(400).send({ error: fileErrors.get("__single__") });
       }
 
       if (!uploadedFile) {
         return reply.code(400).send({ error: "No file provided" });
       }
 
-      const stat = fs.statSync(uploadedFile.targetPath);
-      if (stat.size > maxBytes) {
-        fs.rmSync(uploadedFile.targetPath, { force: true });
-        return reply.code(413).send({ error: `File exceeds ${maxBytes} bytes limit` });
+      if (uploadedFiles.size > 1 || uploadedFiles.get("__single__") === undefined) {
+        uploadedFiles.forEach((storedFile) => {
+          if (storedFile.clientId !== "__single__") {
+            removeUploadedFileIfExists(storedFile.targetPath);
+          }
+        });
       }
 
-      let collectionIds: number[] = [];
-      if (fields.collectionIds) {
+      let collectionIds: number[] | undefined;
+      if (fields.collectionIds !== undefined) {
         try {
           collectionIds = z.array(z.coerce.number().int().positive()).parse(JSON.parse(fields.collectionIds));
         } catch {
           removeUploadedFileIfExists(uploadedFile.targetPath);
           return reply.code(400).send({ error: "Invalid collectionIds payload" });
         }
-
-        const uniqueCollectionIds = [...new Set(collectionIds)];
-        if (uniqueCollectionIds.length > 0) {
-          const valid = await db
-            .select({ id: collections.id })
-            .from(collections)
-            .where(
-              and(
-                eq(collections.userId, request.auth.userId),
-                inArray(collections.id, uniqueCollectionIds)
-              )
-            );
-
-          if (valid.length !== uniqueCollectionIds.length) {
-            removeUploadedFileIfExists(uploadedFile.targetPath);
-            return reply.code(400).send({ error: "One or more collectionIds are invalid for this user" });
-          }
-        }
-
-        collectionIds = uniqueCollectionIds;
       }
-
-      const titleField = fields.title?.trim();
-      const title = titleField ? titleField : undefined;
-      const author = normalizeOptionalText(fields.author);
-      const series = normalizeOptionalText(fields.series);
-      const description = normalizeOptionalText(fields.description);
-      const coverPath = normalizeOptionalText(fields.coverPath);
-      const favorite = parseBooleanField(fields.favorite, false);
-      const autoMetadata = parseBooleanField(fields.autoMetadata, true);
-
-      const jobId = randomToken();
-      const relativeFilePath = path.relative(config.booksDir, uploadedFile.targetPath);
 
       try {
-        await queueUploadJob({
-          id: jobId,
-          userId: request.auth.userId,
-          fileName: uploadedFile.originalName,
-          filePath: relativeFilePath,
-          fileSize: stat.size,
-          fileExt: uploadedFile.fileExt,
-          controls: {
-            title,
-            author,
-            series,
-            description,
-            coverPath,
+        const queued = await queueStoredUpload({
+          userId,
+          storedFile: uploadedFile,
+          draft: {
+            title: fields.title,
+            author: fields.author,
+            series: fields.series,
+            description: fields.description,
+            coverPath: fields.coverPath,
             collectionIds,
-            favorite,
-            autoMetadata
-          }
+            favorite: parseBooleanField(fields.favorite, false),
+            autoMetadata: parseBooleanField(fields.autoMetadata, true)
+          },
+          maxBytes
         });
-      } catch {
-        removeUploadedFileIfExists(uploadedFile.targetPath);
-        throw new Error("Failed to queue upload job");
-      }
 
-      return reply.code(202).send({
-        jobId,
-        status: "QUEUED"
-      });
+        return reply.code(202).send(queued);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Upload failed";
+        const statusCode = message.startsWith("File exceeds ") ? 413 : 400;
+        return reply.code(statusCode).send({ error: message });
+      }
     }
   );
 };

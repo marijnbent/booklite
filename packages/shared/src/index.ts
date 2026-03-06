@@ -1,6 +1,18 @@
 export type Role = "OWNER" | "MEMBER";
 
-export type ReadStatus = "UNREAD" | "READING" | "DONE";
+export const READ_STATUSES = [
+  "UNSET",
+  "UNREAD",
+  "READING",
+  "RE_READING",
+  "READ",
+  "PARTIALLY_READ",
+  "PAUSED",
+  "ABANDONED",
+  "WONT_READ"
+] as const;
+
+export type ReadStatus = (typeof READ_STATUSES)[number];
 
 export interface ApiUser {
   id: number;
@@ -55,6 +67,7 @@ export interface CollectionItem {
 export interface KoboSettings {
   token: string;
   syncEnabled: boolean;
+  syncAllBooks: boolean;
   twoWayProgressSync: boolean;
   markReadingThreshold: number;
   markFinishedThreshold: number;

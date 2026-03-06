@@ -1,10 +1,9 @@
 import { eq } from "drizzle-orm";
+import type { ReadStatus } from "@booklite/shared";
 import { db } from "../db/client";
 import { koboUserSettings } from "../db/schema";
 import { randomToken } from "../utils/hash";
 import { nowIso } from "../utils/time";
-
-export type ReadingStatus = "UNREAD" | "READING" | "DONE";
 
 export type KoboThresholds = {
   markReadingThreshold: number;
@@ -26,6 +25,7 @@ export const ensureKoboSettingsRow = async (userId: number) => {
       userId,
       token: randomToken(),
       syncEnabled: 0,
+      syncAllBooks: 0,
       twoWayProgressSync: 0,
       markReadingThreshold: 1,
       markFinishedThreshold: 99,
@@ -49,8 +49,8 @@ export const getKoboThresholdsForUser = async (
 export const inferStatusFromProgress = (
   progressPercent: number,
   thresholds: KoboThresholds
-): ReadingStatus => {
-  if (progressPercent >= thresholds.markFinishedThreshold) return "DONE";
+): ReadStatus => {
+  if (progressPercent >= thresholds.markFinishedThreshold) return "READ";
   if (progressPercent >= thresholds.markReadingThreshold) return "READING";
-  return "UNREAD";
+  return "UNSET";
 };

@@ -1,9 +1,9 @@
 import { count } from "drizzle-orm";
 import { db } from "./db/client";
-import { koboUserSettings, users } from "./db/schema";
+import { users } from "./db/schema";
 import { hashPassword } from "./auth/password";
 import { nowIso } from "./utils/time";
-import { randomToken } from "./utils/hash";
+import { ensureKoboSettingsRow } from "./services/koboSettings";
 import {
   ensureSystemCollectionsForAllUsers,
   ensureSystemCollectionsForUser
@@ -34,15 +34,7 @@ export const bootstrapOwnerFromEnv = async (): Promise<void> => {
     })
     .returning({ id: users.id });
 
-  await db.insert(koboUserSettings).values({
-    userId: owner.id,
-    token: randomToken(),
-    syncEnabled: 0,
-    twoWayProgressSync: 0,
-    markReadingThreshold: 1,
-    markFinishedThreshold: 99,
-    updatedAt: timestamp
-  });
+  await ensureKoboSettingsRow(owner.id);
 
   await ensureSystemCollectionsForUser(owner.id, {
     preselectFavoritesForKobo: true

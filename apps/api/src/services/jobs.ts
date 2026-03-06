@@ -218,7 +218,7 @@ const processUploadJob = async (job: {
     .where(eq(importJobs.id, job.id));
 };
 
-const processOneQueuedJob = async (): Promise<void> => {
+const processOneQueuedJob = async (): Promise<boolean> => {
   const jobs = await db
     .select({
       id: importJobs.id,
@@ -232,7 +232,7 @@ const processOneQueuedJob = async (): Promise<void> => {
     .limit(1);
 
   const job = jobs[0];
-  if (!job) return;
+  if (!job) return false;
 
   await db
     .update(importJobs)
@@ -255,6 +255,8 @@ const processOneQueuedJob = async (): Promise<void> => {
       })
       .where(eq(importJobs.id, job.id));
   }
+
+  return true;
 };
 
 export const startJobRunner = (): void => {
@@ -262,7 +264,10 @@ export const startJobRunner = (): void => {
     if (running) return;
     running = true;
     try {
-      await processOneQueuedJob();
+      for (;;) {
+        const hadJob = await processOneQueuedJob();
+        if (!hadJob) break;
+      }
       walCheckpoint();
     } finally {
       running = false;
@@ -296,6 +301,7 @@ export const queueUploadJob = async (input: {
         author: input.controls?.author,
         series: input.controls?.series,
         description: input.controls?.description,
+        coverPath: input.controls?.coverPath,
         collectionIds: input.controls?.collectionIds ?? [],
         favorite: input.controls?.favorite ?? false,
         autoMetadata: input.controls?.autoMetadata ?? true

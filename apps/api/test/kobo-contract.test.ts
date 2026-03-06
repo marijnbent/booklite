@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import fixture from "./fixtures/kobo/library-sync-response.json";
-import { createTempEnv } from "./helpers";
+import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
 createTempEnv();
 
@@ -12,33 +12,12 @@ let bookId = 0;
 
 describe("kobo contract", () => {
   beforeAll(async () => {
-    const appModule = await import("../src/app");
-    app = appModule.buildApp();
-    await app.ready();
+    app = await setupTestApp();
 
     const dbModule = await import("../src/db/client");
     const schema = await import("../src/db/schema");
 
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/setup",
-      payload: {
-        email: "owner4@example.com",
-        username: "owner4",
-        password: "secret123"
-      }
-    });
-
-    const login = await app.inject({
-      method: "POST",
-      url: "/api/v1/auth/login",
-      payload: {
-        usernameOrEmail: "owner4",
-        password: "secret123"
-      }
-    });
-
-    accessToken = login.json().accessToken;
+    accessToken = (await setupOwnerAndLogin(app, "owner4@example.com", "owner4")).accessToken;
 
     const inserted = await dbModule.db.insert(schema.books).values({
       ownerUserId: 1,
@@ -77,6 +56,7 @@ describe("kobo contract", () => {
       headers: { authorization: `Bearer ${accessToken}` },
       payload: {
         syncEnabled: true,
+        syncAllBooks: false,
         twoWayProgressSync: true,
         markReadingThreshold: 1,
         markFinishedThreshold: 99,

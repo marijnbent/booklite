@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { createTempEnv } from "./helpers";
+import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
 createTempEnv();
 
@@ -10,30 +10,8 @@ let bookId = 0;
 
 describe("collections", () => {
   beforeAll(async () => {
-    const appModule = await import("../src/app");
-    app = appModule.buildApp();
-    await app.ready();
-
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/setup",
-      payload: {
-        email: "owner3@example.com",
-        username: "owner3",
-        password: "secret123"
-      }
-    });
-
-    const login = await app.inject({
-      method: "POST",
-      url: "/api/v1/auth/login",
-      payload: {
-        usernameOrEmail: "owner3",
-        password: "secret123"
-      }
-    });
-
-    accessToken = login.json().accessToken;
+    app = await setupTestApp();
+    accessToken = (await setupOwnerAndLogin(app, "owner3@example.com", "owner3")).accessToken;
 
     const dbModule = await import("../src/db/client");
     const schema = await import("../src/db/schema");
