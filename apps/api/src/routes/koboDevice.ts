@@ -17,6 +17,7 @@ import {
   isBookInKoboSyncScope,
   koboHeaders,
   parseSyncTokenHeader,
+  queueKoboBookRedelivery,
   resolveBookIdFromImageId,
   upsertKoboReadingStates
 } from "../services/kobo";
@@ -726,11 +727,16 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     const auth = await koboAuth(params.token);
     if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
 
-    if (Number.isFinite(Number.parseInt(params.bookId, 10))) {
-      return {};
+    const bookId = Number.parseInt(params.bookId, 10);
+    if (!Number.isFinite(bookId) || bookId <= 0) {
+      return reply.code(400).send({ error: "Invalid book id" });
     }
 
-    return reply.code(400).send({ error: "Invalid book id" });
+    if (await isBookInKoboSyncScope(auth.userId, bookId)) {
+      await queueKoboBookRedelivery(auth.userId, bookId);
+    }
+
+    return {};
   });
 
   fastify.get("/api/kobo/:token/v1/books/:bookId/download", async (request, reply) => {

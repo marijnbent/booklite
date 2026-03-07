@@ -9,6 +9,7 @@ import {
   books,
   collectionBooks,
   collections,
+  koboPendingRedeliveries,
   koboReadingState,
   koboSyncCollections,
   koboSyncSnapshots,
@@ -188,6 +189,31 @@ const getSyncedBooksForUser = async (userId: number): Promise<SyncedBook[]> => {
     `
   );
   return rows as SyncedBook[];
+};
+
+const getPendingKoboRedeliveryBookIds = async (userId: number): Promise<number[]> => {
+  const rows = await db
+    .select({ bookId: koboPendingRedeliveries.bookId })
+    .from(koboPendingRedeliveries)
+    .where(eq(koboPendingRedeliveries.userId, userId));
+
+  return rows.map((row) => row.bookId);
+};
+
+const clearPendingKoboRedeliveries = async (
+  userId: number,
+  bookIds: number[]
+): Promise<void> => {
+  if (bookIds.length === 0) return;
+
+  await db
+    .delete(koboPendingRedeliveries)
+    .where(
+      and(
+        eq(koboPendingRedeliveries.userId, userId),
+        inArray(koboPendingRedeliveries.bookId, bookIds)
+      )
+    );
 };
 
 export const isBookInKoboSyncScope = async (userId: number, bookId: number): Promise<boolean> => {
@@ -503,6 +529,7 @@ export const getLibrarySyncPayload = async (
 }> => {
   const currentBooks = await getSyncedBooksForUser(userId);
   const prevMap = await getSnapshotBookMap(userId, options);
+  const pendingRedeliveryIds = new Set(await getPendingKoboRedeliveryBookIds(userId));
 
   const currentMap = new Map<number, string>();
   for (const book of currentBooks) {
@@ -510,8 +537,15 @@ export const getLibrarySyncPayload = async (
   }
 
   const payload: Record<string, unknown>[] = [];
+  const consumedRedeliveryIds: number[] = [];
 
   for (const book of currentBooks) {
+    if (pendingRedeliveryIds.has(book.id)) {
+      payload.push(buildEntitlement(token, baseUrl, book, "new"));
+      consumedRedeliveryIds.push(book.id);
+      continue;
+    }
+
     if (!prevMap.has(book.id)) {
       payload.push(buildEntitlement(token, baseUrl, book, "new"));
       continue;
@@ -552,7 +586,31 @@ export const getLibrarySyncPayload = async (
     createdAt: nowIso()
   });
 
+  const staleRedeliveryIds = [...pendingRedeliveryIds].filter((bookId) => !currentMap.has(bookId));
+  await clearPendingKoboRedeliveries(userId, [
+    ...new Set([...consumedRedeliveryIds, ...staleRedeliveryIds])
+  ]);
+
   return { payload, snapshotId };
+};
+
+export const queueKoboBookRedelivery = async (
+  userId: number,
+  bookId: number
+): Promise<void> => {
+  await db
+    .insert(koboPendingRedeliveries)
+    .values({
+      userId,
+      bookId,
+      createdAt: nowIso()
+    })
+    .onConflictDoUpdate({
+      target: [koboPendingRedeliveries.userId, koboPendingRedeliveries.bookId],
+      set: {
+        createdAt: nowIso()
+      }
+    });
 };
 
 export const koboHeaders = {

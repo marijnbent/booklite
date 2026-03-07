@@ -9,6 +9,15 @@ let accessToken = "";
 let koboToken = "";
 let favoritesCollectionId = 0;
 let bookId = 0;
+let unsyncedBookId = 0;
+
+const getEntriesByKey = (payload: unknown, key: string): Array<Record<string, unknown>> => {
+  if (!Array.isArray(payload)) return [];
+  return payload.filter(
+    (entry): entry is Record<string, unknown> =>
+      typeof entry === "object" && entry !== null && key in entry
+  );
+};
 
 describe("kobo contract", () => {
   beforeAll(async () => {
@@ -19,22 +28,43 @@ describe("kobo contract", () => {
 
     accessToken = (await setupOwnerAndLogin(app, "owner4@example.com", "owner4")).accessToken;
 
-    const inserted = await dbModule.db.insert(schema.books).values({
-      ownerUserId: 1,
-      title: "Kobo Sample",
-      author: "Author",
-      series: null,
-      description: null,
-      coverPath: null,
-      filePath: "kobo.epub",
-      fileExt: "epub",
-      fileSize: 100,
-      koboSyncable: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }).returning({ id: schema.books.id });
+    const timestamp = new Date().toISOString();
+    const inserted = await dbModule.db
+      .insert(schema.books)
+      .values([
+        {
+          ownerUserId: 1,
+          title: "Kobo Sample",
+          author: "Author",
+          series: null,
+          description: null,
+          coverPath: null,
+          filePath: "kobo.epub",
+          fileExt: "epub",
+          fileSize: 100,
+          koboSyncable: 1,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        },
+        {
+          ownerUserId: 1,
+          title: "Kobo Unsynced",
+          author: "Author",
+          series: null,
+          description: null,
+          coverPath: null,
+          filePath: "kobo-unsynced.epub",
+          fileExt: "epub",
+          fileSize: 100,
+          koboSyncable: 1,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        }
+      ])
+      .returning({ id: schema.books.id, title: schema.books.title });
 
-    bookId = inserted[0].id;
+    bookId = inserted.find((row) => row.title === "Kobo Sample")!.id;
+    unsyncedBookId = inserted.find((row) => row.title === "Kobo Unsynced")!.id;
 
     const collectionsRes = await app.inject({
       method: "GET",
@@ -105,6 +135,89 @@ describe("kobo contract", () => {
 
     expect(second.statusCode).toBe(200);
     expect(JSON.stringify(second.json()).includes("Entitlement")).toBe(true);
+  });
+
+  it("re-delivers a deleted synced book on the next incremental sync only once", async () => {
+    const first = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`
+    });
+
+    expect(first.statusCode).toBe(200);
+    const firstSyncToken = String(first.headers["x-kobo-synctoken"]);
+
+    const second = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`,
+      headers: { "x-kobo-synctoken": firstSyncToken }
+    });
+
+    expect(second.statusCode).toBe(200);
+    expect(getEntriesByKey(second.json(), "NewEntitlement")).toHaveLength(0);
+    const secondSyncToken = String(second.headers["x-kobo-synctoken"]);
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/kobo/${koboToken}/v1/library/${bookId}`,
+      headers: { "content-type": "application/json" }
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
+
+    const third = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`,
+      headers: { "x-kobo-synctoken": secondSyncToken }
+    });
+
+    expect(third.statusCode).toBe(200);
+    const redelivered = getEntriesByKey(third.json(), "NewEntitlement");
+    expect(redelivered).toHaveLength(1);
+    expect(
+      (redelivered[0].NewEntitlement as { BookEntitlement: { EntitlementId: string } }).BookEntitlement.EntitlementId
+    ).toBe(String(bookId));
+
+    const thirdSyncToken = String(third.headers["x-kobo-synctoken"]);
+    const fourth = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`,
+      headers: { "x-kobo-synctoken": thirdSyncToken }
+    });
+
+    expect(fourth.statusCode).toBe(200);
+    expect(getEntriesByKey(fourth.json(), "NewEntitlement")).toHaveLength(0);
+  });
+
+  it("ignores delete requests for books outside the sync scope", async () => {
+    const first = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`
+    });
+    const firstSyncToken = String(first.headers["x-kobo-synctoken"]);
+
+    const incremental = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`,
+      headers: { "x-kobo-synctoken": firstSyncToken }
+    });
+    const incrementalSyncToken = String(incremental.headers["x-kobo-synctoken"]);
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/kobo/${koboToken}/v1/library/${unsyncedBookId}`,
+      headers: { "content-type": "application/json" }
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
+
+    const afterDelete = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`,
+      headers: { "x-kobo-synctoken": incrementalSyncToken }
+    });
+
+    expect(afterDelete.statusCode).toBe(200);
+    expect(getEntriesByKey(afterDelete.json(), "NewEntitlement")).toHaveLength(0);
   });
 
   it("supports local affiliate, refresh and analytics endpoints", async () => {

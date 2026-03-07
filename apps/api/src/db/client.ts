@@ -131,6 +131,15 @@ CREATE TABLE IF NOT EXISTS kobo_sync_snapshots (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS kobo_pending_redeliveries (
+  user_id INTEGER NOT NULL,
+  book_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, book_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS import_jobs (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,

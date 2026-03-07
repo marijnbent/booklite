@@ -118,6 +118,18 @@ export const koboSyncSnapshots = sqliteTable("kobo_sync_snapshots", {
   createdAt: text("created_at").notNull()
 });
 
+export const koboPendingRedeliveries = sqliteTable(
+  "kobo_pending_redeliveries",
+  {
+    userId: integer("user_id").notNull(),
+    bookId: integer("book_id").notNull(),
+    createdAt: text("created_at").notNull()
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.bookId] })
+  })
+);
+
 export const importJobs = sqliteTable("import_jobs", {
   id: text("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -160,6 +172,7 @@ export const schema = {
   koboSyncCollections,
   koboReadingState,
   koboSyncSnapshots,
+  koboPendingRedeliveries,
   importJobs,
   appSettings,
   adminActivityLog
