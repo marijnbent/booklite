@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import type { Contents as ReaderContents } from "epubjs";
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Loader2,
-  Minus,
-  Plus,
-  Settings,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { apiFetch, apiFetchRaw } from "@/lib/api";
@@ -36,7 +35,7 @@ const SAVE_DEBOUNCE_MS = 1500;
 const READER_SETTINGS_KEY = "booklite_reader_settings_v2";
 const MIN_SPREAD_WIDTH = 950;
 
-type FontSizeOption = "small" | "medium" | "large" | "xlarge";
+type FontSizeOption = "small" | "medium" | "large" | "xlarge" | "xxlarge";
 type FontFamilyOption = "publisher" | "serif" | "sans";
 type ThemeOption = "paper" | "sepia" | "night";
 
@@ -52,12 +51,21 @@ const defaultReaderSettings: ReaderSettings = {
   theme: "paper",
 };
 
-const fontSizeValues: FontSizeOption[] = ["small", "medium", "large", "xlarge"];
+const fontSizeValues: FontSizeOption[] = ["small", "medium", "large", "xlarge", "xxlarge"];
 const fontSizeMap: Record<FontSizeOption, string> = {
-  small: "88%",
+  small: "90%",
   medium: "100%",
-  large: "115%",
-  xlarge: "130%",
+  large: "110%",
+  xlarge: "125%",
+  xxlarge: "150%",
+};
+
+const fontSizeLabelMap: Record<FontSizeOption, string> = {
+  small: "0.9",
+  medium: "1.0",
+  large: "1.1",
+  xlarge: "1.25",
+  xxlarge: "1.5",
 };
 
 const fontFamilyMap: Record<FontFamilyOption, string | null> = {
@@ -84,6 +92,27 @@ const readStoredSettings = (): ReaderSettings => {
 
 const clampPercent = (value: number): number =>
   Math.max(0, Math.min(100, Math.round(value)));
+
+const getEventTargetElement = (target: EventTarget | null): HTMLElement | null => {
+  if (!target || typeof target !== "object" || !("nodeType" in target)) return null;
+
+  const node = target as Node;
+  if (node.nodeType === 3) return node.parentElement;
+  if (node.nodeType !== 1) return null;
+
+  const element = node as HTMLElement;
+  return typeof element.tagName === "string" ? element : null;
+};
+
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  const element = getEventTargetElement(target);
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+
+  return element.closest(
+    "input, textarea, select, [contenteditable=''], [contenteditable='true'], [contenteditable='plaintext-only']"
+  ) !== null;
+};
 
 export const ReaderPage: React.FC = () => {
   const params = useParams<{ bookId: string }>();
@@ -114,6 +143,7 @@ export const ReaderPage: React.FC = () => {
 
   // Touch/swipe state
   const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const contentKeydownCleanupsRef = useRef<Array<() => void>>([]);
 
   const bookId = Number(params.bookId);
   const hasValidBookId = Number.isInteger(bookId) && bookId > 0;
@@ -218,6 +248,22 @@ export const ReaderPage: React.FC = () => {
     [scheduleFlush]
   );
 
+  const handleReaderKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (isEditableTarget(e.target)) return;
+
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      void renditionRef.current?.prev();
+    } else if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === " ") {
+      e.preventDefault();
+      void renditionRef.current?.next();
+    } else if (e.key === "Escape") {
+      setShowControls(false);
+      setShowSettings(false);
+    }
+  }, []);
+
   const applyReaderSettings = useCallback((rendition: ReaderRendition) => {
     const palette =
       settings.theme === "night"
@@ -297,6 +343,22 @@ export const ReaderPage: React.FC = () => {
         renditionRef.current = localRendition;
         applyReaderSettings(localRendition);
 
+        const attachedDocuments = new WeakSet<Document>();
+        const attachContentKeydownListener = (contents: ReaderContents) => {
+          const contentDocument = contents.document;
+          if (attachedDocuments.has(contentDocument)) return;
+
+          attachedDocuments.add(contentDocument);
+          contentDocument.addEventListener("keydown", handleReaderKeyDown, true);
+          contentKeydownCleanupsRef.current.push(() => {
+            contentDocument.removeEventListener("keydown", handleReaderKeyDown, true);
+          });
+        };
+
+        localRendition.hooks.content.register((contents: ReaderContents) => {
+          attachContentKeydownListener(contents);
+        });
+
         localRendition.on("relocated", handleRelocated);
         await localRendition.display(
           lastSavedPercentRef.current > 0 ? lastSavedPercentRef.current / 100 : undefined
@@ -322,6 +384,7 @@ export const ReaderPage: React.FC = () => {
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      contentKeydownCleanupsRef.current.splice(0).forEach((cleanup) => cleanup());
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
@@ -340,6 +403,7 @@ export const ReaderPage: React.FC = () => {
     bookId,
     bookQuery.data,
     flushProgress,
+    handleReaderKeyDown,
     handleRelocated,
     hasValidBookId,
     invalidateLibraryQueries,
@@ -360,20 +424,9 @@ export const ReaderPage: React.FC = () => {
 
   // Keyboard navigation
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        void renditionRef.current?.prev();
-      } else if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === " ") {
-        if (e.key === " ") e.preventDefault();
-        void renditionRef.current?.next();
-      } else if (e.key === "Escape") {
-        setShowControls(false);
-        setShowSettings(false);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+    document.addEventListener("keydown", handleReaderKeyDown, true);
+    return () => document.removeEventListener("keydown", handleReaderKeyDown, true);
+  }, [handleReaderKeyDown]);
 
   // Touch/swipe handling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -428,14 +481,6 @@ export const ReaderPage: React.FC = () => {
     navigate("/library");
   }, [flushProgress, invalidateLibraryQueries, navigate]);
 
-  const cycleFontSize = useCallback((dir: 1 | -1) => {
-    setSettings((s) => {
-      const idx = fontSizeValues.indexOf(s.fontSize);
-      const next = Math.max(0, Math.min(fontSizeValues.length - 1, idx + dir));
-      return { ...s, fontSize: fontSizeValues[next] };
-    });
-  }, []);
-
   const cycleTheme = useCallback(() => {
     const order: ThemeOption[] = ["paper", "sepia", "night"];
     setSettings((s) => {
@@ -451,6 +496,11 @@ export const ReaderPage: React.FC = () => {
       return { ...s, fontFamily: order[(idx + 1) % order.length] };
     });
   }, []);
+
+  const paginationLabel =
+    pageNumber !== null && totalPages !== null
+      ? `Page ${pageNumber} of ${totalPages}`
+      : `${progressPercent}%`;
 
   // Status indicator
   const statusText = saveError
@@ -577,8 +627,22 @@ export const ReaderPage: React.FC = () => {
               onClick={(e) => { e.stopPropagation(); setShowSettings(true); setShowControls(true); }}
               title="Appearance settings"
             >
-              <Settings className="size-5" />
+              <SlidersHorizontal className="size-5" />
             </button>
+          </div>
+        )}
+
+        {isReady && (
+          <div
+            className={cn(
+              "pointer-events-none absolute right-4 z-20 hidden items-center rounded-full px-3 py-1.5 text-xs font-medium tabular-nums backdrop-blur-md transition-all duration-200 md:flex",
+              showControls ? "top-14" : "top-4",
+              settings.theme === "night"
+                ? "bg-white/10 text-white/70"
+                : "bg-black/5 text-black/55"
+            )}
+          >
+            {paginationLabel}
           </div>
         )}
       </div>
@@ -629,11 +693,9 @@ export const ReaderPage: React.FC = () => {
                 : "bg-white/95 backdrop-blur-md"
           )}>
             {/* Page info + progress */}
-            <div className="flex items-center justify-between text-xs mb-3">
-              <span className={cn("tabular-nums", settings.theme === "night" ? "text-white/50" : "text-black/40")}>
-                {pageNumber !== null && totalPages !== null
-                  ? `Page ${pageNumber} of ${totalPages}`
-                  : `${progressPercent}%`}
+            <div className="mb-3 flex items-center justify-between text-xs md:justify-end">
+              <span className={cn("tabular-nums md:hidden", settings.theme === "night" ? "text-white/50" : "text-black/40")}>
+                {paginationLabel}
               </span>
               <span className={cn("tabular-nums", settings.theme === "night" ? "text-white/50" : "text-black/40")}>
                 {progressPercent}%
@@ -684,40 +746,50 @@ export const ReaderPage: React.FC = () => {
                 )}
                 onClick={() => setShowSettings(true)}
               >
-                <Settings className="size-3.5" />
+                <SlidersHorizontal className="size-3.5" />
                 Settings
               </button>
             ) : (
               <div className="space-y-3 pt-1">
-                {/* Font size */}
                 <div className="flex items-center justify-between">
+                  <span className={cn("text-xs font-medium", settings.theme === "night" ? "text-white/70" : "text-black/60")}>
+                    Reading settings
+                  </span>
+                  <button
+                    className={cn(
+                      "rounded-lg px-2.5 py-1 text-xs transition-colors",
+                      settings.theme === "night"
+                        ? "bg-white/10 text-white/70 hover:bg-white/15"
+                        : "bg-black/5 text-black/60 hover:bg-black/10"
+                    )}
+                    onClick={() => setShowSettings(false)}
+                  >
+                    Done
+                  </button>
+                </div>
+
+                {/* Font size */}
+                <div className="flex items-center justify-between gap-3">
                   <span className={cn("text-xs", settings.theme === "night" ? "text-white/50" : "text-black/40")}>
                     Size
                   </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      className={cn(
-                        "rounded-md p-1.5 transition-colors",
-                        settings.theme === "night" ? "hover:bg-white/10 text-white/60" : "hover:bg-black/5 text-black/50"
-                      )}
-                      onClick={() => cycleFontSize(-1)}
-                      disabled={settings.fontSize === "small"}
-                    >
-                      <Minus className="size-3.5" />
-                    </button>
-                    <span className={cn("w-16 text-center text-xs tabular-nums", settings.theme === "night" ? "text-white/70" : "text-black/60")}>
-                      {fontSizeMap[settings.fontSize]}
-                    </span>
-                    <button
-                      className={cn(
-                        "rounded-md p-1.5 transition-colors",
-                        settings.theme === "night" ? "hover:bg-white/10 text-white/60" : "hover:bg-black/5 text-black/50"
-                      )}
-                      onClick={() => cycleFontSize(1)}
-                      disabled={settings.fontSize === "xlarge"}
-                    >
-                      <Plus className="size-3.5" />
-                    </button>
+                  <div className="grid flex-1 grid-cols-5 gap-1.5">
+                    {fontSizeValues.map((option) => (
+                      <button
+                        key={option}
+                        className={cn(
+                          "rounded-lg px-0 py-1.5 text-xs tabular-nums transition-colors",
+                          settings.fontSize === option
+                            ? "bg-primary text-primary-foreground"
+                            : settings.theme === "night"
+                              ? "bg-white/5 text-white/65 hover:bg-white/10"
+                              : "bg-black/5 text-black/55 hover:bg-black/10"
+                        )}
+                        onClick={() => setSettings((s) => ({ ...s, fontSize: option }))}
+                      >
+                        {fontSizeLabelMap[option]}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
