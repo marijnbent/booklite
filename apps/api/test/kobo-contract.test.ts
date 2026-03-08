@@ -182,7 +182,20 @@ describe("kobo contract", () => {
     const redelivered = getEntriesByKey(third.json(), "NewEntitlement");
     expect(redelivered).toHaveLength(1);
     expect(
-      (redelivered[0].NewEntitlement as { BookEntitlement: { EntitlementId: string } }).BookEntitlement.EntitlementId
+      (
+        redelivered[0].NewEntitlement as {
+          BookEntitlement: { Id: string };
+          BookMetadata: { EntitlementId: string };
+        }
+      ).BookEntitlement.Id
+    ).toBe(String(bookId));
+    expect(
+      (
+        redelivered[0].NewEntitlement as {
+          BookEntitlement: { Id: string };
+          BookMetadata: { EntitlementId: string };
+        }
+      ).BookMetadata.EntitlementId
     ).toBe(String(bookId));
 
     const thirdSyncToken = String(third.headers["x-kobo-synctoken"]);
@@ -253,6 +266,38 @@ describe("kobo contract", () => {
       payload: {}
     });
     expect(analytics.statusCode).toBe(200);
+  });
+
+  it("returns booklore-style Kobo metadata for a synced book", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/${bookId}/metadata`
+    });
+
+    expect(response.statusCode).toBe(200);
+    const payload = response.json() as Array<Record<string, unknown>>;
+    expect(payload).toHaveLength(1);
+    expect(payload[0]).toMatchObject({
+      CrossRevisionId: String(bookId),
+      RevisionId: String(bookId),
+      EntitlementId: String(bookId),
+      WorkId: String(bookId),
+      Title: "Kobo Café Sample",
+      Contributors: ["Author"],
+      CoverImageId: `BL-${bookId}`,
+      DownloadUrls: [
+        {
+          DrmType: "None",
+          Format: "EPUB3",
+          Platform: "Generic"
+        }
+      ]
+    });
+    expect(payload[0]).not.toHaveProperty("Attribution");
+    expect(payload[0]).not.toHaveProperty("ImageId");
+    expect(payload[0]).not.toHaveProperty("ThumbnailUrl");
+    expect(payload[0]).not.toHaveProperty("IsPurchasedContent");
+    expect(payload[0]).not.toHaveProperty("IsMysteryPreview");
   });
 
   it("ignores unknown entitlement reading-state updates", async () => {

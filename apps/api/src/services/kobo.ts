@@ -157,7 +157,10 @@ type SyncedBook = {
   id: number;
   title: string;
   author: string | null;
+  series: string | null;
+  description: string | null;
   coverPath: string | null;
+  createdAt: string;
   updatedAt: string;
   filePath: string;
   fileSize: number | null;
@@ -167,7 +170,7 @@ const getSyncedBooksForUser = async (userId: number): Promise<SyncedBook[]> => {
   if (await isSyncAllBooks(userId)) {
     const rows = await db.all(
       sql`
-        SELECT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
+        SELECT b.id, b.title, b.author, b.series, b.description, b.cover_path AS coverPath, b.created_at AS createdAt, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
         FROM books b
         WHERE b.owner_user_id = ${userId}
           AND lower(b.file_ext) = 'epub'
@@ -177,8 +180,8 @@ const getSyncedBooksForUser = async (userId: number): Promise<SyncedBook[]> => {
   }
 
   const rows = await db.all(
-    sql`
-      SELECT DISTINCT b.id, b.title, b.author, b.cover_path AS coverPath, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
+      sql`
+      SELECT DISTINCT b.id, b.title, b.author, b.series, b.description, b.cover_path AS coverPath, b.created_at AS createdAt, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
       FROM kobo_sync_collections ksc
       JOIN collections c ON c.id = ksc.collection_id
       JOIN collection_books cb ON cb.collection_id = c.id
@@ -255,7 +258,10 @@ const buildBookMetadata = (
     id: number;
     title: string;
     author: string | null;
+    series?: string | null;
+    description?: string | null;
     coverPath: string | null;
+    createdAt?: string;
     updatedAt: string;
     filePath?: string;
     fileSize?: number | null;
@@ -279,39 +285,38 @@ const buildBookMetadata = (
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
+  const series = book.series
+    ? {
+        Id: `series_${book.series.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+        Name: book.series,
+        Number: "1",
+        NumberFloat: 1
+      }
+    : {
+        Id: "",
+        Name: "",
+        Number: "",
+        NumberFloat: 0
+      };
+
   return {
     CrossRevisionId: String(book.id),
     RevisionId: String(book.id),
     EntitlementId: String(book.id),
     WorkId: String(book.id),
-    Publisher: {
-      Name: "Unknown",
-      Imprint: "Unknown"
-    },
-    Genre: "00000000-0000-0000-0000-000000000001",
-    Slug: slug,
+    ...(slug ? { Slug: slug } : {}),
     Title: book.title,
-    Attribution: book.author ?? "Unknown",
-    Contributors: [book.author ?? "Unknown"],
+    ...(book.description ? { Description: book.description } : {}),
+    Contributors: book.author ? [book.author] : [],
     ContributorRoles: [],
     ExternalIds: [],
     Language: "en",
-    Series: {
-      Id: "",
-      Name: "",
-      Number: "",
-      NumberFloat: 0
-    },
+    Series: series,
     Categories: ["00000000-0000-0000-0000-000000000001"],
-    Description: "",
     IsPreOrder: false,
     IsSocialEnabled: true,
-    IsPurchasedContent: true,
-    IsHiddenFromArchive: false,
     IsInternetArchive: false,
-    IsMysteryPreview: false,
     IsEligibleForKoboLove: false,
-    ImageId: imageId,
     CoverImageId: imageId,
     DownloadUrls: [
       {
@@ -320,16 +325,8 @@ const buildBookMetadata = (
         Url: `${baseUrl}/api/kobo/${token}/v1/books/${book.id}/download`,
         Size: fileSize,
         Platform: "Generic"
-      },
-      {
-        DrmType: "None",
-        Format: "EPUB3",
-        Url: `${baseUrl}/api/kobo/${token}/v1/books/${book.id}/download`,
-        Size: fileSize,
-        Platform: "Android"
       }
     ],
-    ThumbnailUrl: `${baseUrl}/api/kobo/${token}/v1/books/${imageId}/thumbnail/120/180/false/image.jpg`,
     CurrentDisplayPrice: {
       TotalAmount: 0,
       CurrencyCode: "USD"
@@ -338,9 +335,17 @@ const buildBookMetadata = (
       TotalAmount: 0
     },
     PhoneticPronunciations: {},
-    DateModified: book.updatedAt
   };
 };
+
+const buildRemovedBookMetadata = (bookId: number): Record<string, unknown> => ({
+  CrossRevisionId: String(bookId),
+  RevisionId: String(bookId),
+  EntitlementId: String(bookId),
+  WorkId: String(bookId),
+  CoverImageId: `BL-${bookId}`,
+  Title: String(bookId)
+});
 
 const buildDefaultReadingState = (
   bookId: number,
@@ -376,35 +381,39 @@ const buildEntitlement = (
     id: number;
     title: string;
     author: string | null;
+    series?: string | null;
+    description?: string | null;
     coverPath: string | null;
+    createdAt?: string;
     updatedAt: string;
     fileSize?: number | null;
   },
   type: "new" | "changed" | "removed"
 ): Record<string, unknown> => {
   const modifiedAt = book.updatedAt || nowIso();
+  const createdAt = book.createdAt || modifiedAt;
   const payload = {
     BookEntitlement: {
       ActivePeriod: {
-        From: modifiedAt
+        From: nowIso()
       },
       Status: "Active",
       Accessibility: "Full",
-      Id: String(book.id),
-      EntitlementId: String(book.id),
       CrossRevisionId: String(book.id),
       RevisionId: String(book.id),
-      ProductId: String(book.id),
-      Created: modifiedAt,
+      Id: String(book.id),
+      Created: createdAt,
       LastModified: modifiedAt,
-      DateModified: modifiedAt,
       IsHiddenFromArchive: false,
       IsLocked: false,
       OriginCategory: "Imported",
       IsRemoved: type === "removed",
-      IsDeleted: type === "removed"
+      ...(type === "removed" ? { IsDeleted: true } : {})
     },
-    BookMetadata: buildBookMetadata(token, baseUrl, book)
+    BookMetadata:
+      type === "removed"
+        ? buildRemovedBookMetadata(book.id)
+        : buildBookMetadata(token, baseUrl, book)
   };
 
   if (type === "new") {
@@ -567,7 +576,10 @@ export const getLibrarySyncPayload = async (
           id: prevBookId,
           title: `Book ${prevBookId}`,
           author: null,
+          series: null,
+          description: null,
           coverPath: null,
+          createdAt: prevUpdatedAt,
           updatedAt: prevUpdatedAt
         },
         "removed"
@@ -652,7 +664,10 @@ export const getBookMetadataForKobo = async (
       id: books.id,
       title: books.title,
       author: books.author,
+      series: books.series,
+      description: books.description,
       coverPath: books.coverPath,
+      createdAt: books.createdAt,
       updatedAt: books.updatedAt,
       filePath: books.filePath,
       fileSize: books.fileSize
