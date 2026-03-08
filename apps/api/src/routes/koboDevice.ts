@@ -43,6 +43,9 @@ const remoteCoverCache = new Map<
   { bytes: Buffer; contentType: string; expiresAt: number }
 >();
 
+const isExpectedInitializationFallbackStatus = (status: number | null): boolean =>
+  status === 401 || status === 403;
+
 const sendPlaceholderCover = (reply: any): any => {
   reply.header("content-type", "image/jpeg");
   reply.header("cache-control", "public, max-age=600");
@@ -263,7 +266,10 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
       // fall back to static resource list
     }
 
-    if (usedFallback && (upstreamStatus !== null || upstreamError)) {
+    if (
+      usedFallback &&
+      (upstreamError || (upstreamStatus !== null && !isExpectedInitializationFallbackStatus(upstreamStatus)))
+    ) {
       await logAdminActivity({
         scope: "kobo",
         event: "kobo.initialization_fallback_used",
@@ -328,6 +334,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       AccessToken: crypto.randomUUID(),
       RefreshToken: crypto.randomUUID(),
+      TokenType: "Bearer",
       UserKey: body.UserKey ?? "booklite",
       TrackingId: crypto.randomUUID()
     };
@@ -347,6 +354,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       AccessToken: crypto.randomUUID(),
       RefreshToken: body.RefreshToken ?? body.refresh_token ?? crypto.randomUUID(),
+      TokenType: "Bearer",
       UserKey: body.UserKey ?? "booklite",
       TrackingId: crypto.randomUUID()
     };

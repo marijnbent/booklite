@@ -245,6 +245,7 @@ describe("kobo contract", () => {
     });
     expect(refresh.statusCode).toBe(200);
     expect(refresh.json().AccessToken).toBeTruthy();
+    expect(refresh.json().TokenType).toBe("Bearer");
 
     const analytics = await app.inject({
       method: "POST",
@@ -323,6 +324,72 @@ describe("kobo contract", () => {
     expect(response.headers["content-disposition"]).toContain(
       "filename*=UTF-8''Kobo%20Caf%C3%A9%20Sample.epub"
     );
+  });
+
+  it("does not warn when Kobo initialization falls back after an upstream 401", async () => {
+    await app.inject({
+      method: "DELETE",
+      url: "/api/v1/admin/activity-log",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        scope: "kobo"
+      }
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input, init) => {
+      if (String(input) === "https://storeapi.kobo.com/v1/initialization") {
+        return new Response("{}", {
+          status: 401,
+          headers: { "content-type": "application/json" }
+        });
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/kobo/${koboToken}/v1/initialization`
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["x-kobo-apitoken"]).toBe("e30=");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    const activityResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/activity-log?scope=kobo&limit=20",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+
+    expect(activityResponse.statusCode).toBe(200);
+    expect(
+      (activityResponse.json() as Array<{ event: string }>).some(
+        (entry) => entry.event === "kobo.initialization_fallback_used"
+      )
+    ).toBe(false);
+  });
+
+  it("returns bearer token metadata from device auth", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/kobo/${koboToken}/v1/auth/device`,
+      payload: {
+        UserKey: "booklite"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().AccessToken).toBeTruthy();
+    expect(response.json().RefreshToken).toBeTruthy();
+    expect(response.json().TokenType).toBe("Bearer");
+    expect(response.json().UserKey).toBe("booklite");
   });
 
   it("accepts empty json body on kobo delete passthrough", async () => {
