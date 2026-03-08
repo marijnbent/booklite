@@ -23,6 +23,7 @@ import {
 } from "../services/kobo";
 import { koboFallbackResources } from "../services/koboFallbackResources";
 import { logAdminActivity } from "../services/adminActivityLog";
+import { applyDownloadHeaders } from "../services/downloadHeaders";
 
 const koboAuth = async (token: string) => {
   const user = await getKoboUserByToken(token);
@@ -776,8 +777,6 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const stats = fs.statSync(absolute);
-    const contentType =
-      (lookupMime(row[0].fileExt) as string | false) || "application/octet-stream";
 
     fastify.log.info(
       {
@@ -789,13 +788,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
       "kobo download requested"
     );
 
-    reply.header(
-      "content-disposition",
-      `attachment; filename=\"${row[0].title}.${row[0].fileExt}\"`
-    );
-    reply.header("content-type", contentType);
-    reply.header("content-length", String(stats.size));
-    reply.header("accept-ranges", "bytes");
+    applyDownloadHeaders(reply, `${row[0].title}.${row[0].fileExt}`, stats.size);
     return reply.send(fs.createReadStream(absolute));
   });
 

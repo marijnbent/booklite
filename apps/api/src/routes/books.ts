@@ -3,7 +3,6 @@ import fs from "node:fs";
 import { READ_STATUSES } from "@booklite/shared";
 import { FastifyPluginAsync } from "fastify";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { lookup as lookupMime } from "mime-types";
 import { z } from "zod";
 import { db } from "../db/client";
 import { bookProgress, books, collectionBooks, collections } from "../db/schema";
@@ -14,6 +13,7 @@ import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "../services/metadata";
 import { resolveFilenameMetadata } from "../services/filenameNormalizer";
 import { logAdminActivity } from "../services/adminActivityLog";
+import { applyDownloadHeaders } from "../services/downloadHeaders";
 import {
   getKoboThresholdsForUser,
   inferStatusFromProgress
@@ -679,15 +679,8 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const stats = fs.statSync(absolutePath);
-      const contentType =
-        (lookupMime(row.fileExt) as string | false) || "application/octet-stream";
-
-      return reply
-        .header("content-type", contentType)
-        .header("content-length", String(stats.size))
-        .header("accept-ranges", "bytes")
-        .header("content-disposition", `attachment; filename=\"${row.title}.${row.fileExt}\"`)
-        .send(fs.createReadStream(absolutePath));
+      applyDownloadHeaders(reply, `${row.title}.${row.fileExt}`, stats.size);
+      return reply.send(fs.createReadStream(absolutePath));
     }
   );
 };

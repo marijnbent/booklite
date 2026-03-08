@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import fixture from "./fixtures/kobo/library-sync-response.json";
 import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
-createTempEnv();
+const { booksDir } = createTempEnv();
 
 let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
 let accessToken = "";
@@ -10,6 +12,7 @@ let koboToken = "";
 let favoritesCollectionId = 0;
 let bookId = 0;
 let unsyncedBookId = 0;
+const koboBookBody = "dummy-epub-content";
 
 const getEntriesByKey = (payload: unknown, key: string): Array<Record<string, unknown>> => {
   if (!Array.isArray(payload)) return [];
@@ -29,12 +32,13 @@ describe("kobo contract", () => {
     accessToken = (await setupOwnerAndLogin(app, "owner4@example.com", "owner4")).accessToken;
 
     const timestamp = new Date().toISOString();
+    fs.writeFileSync(path.join(booksDir, "kobo.epub"), koboBookBody);
     const inserted = await dbModule.db
       .insert(schema.books)
       .values([
         {
           ownerUserId: 1,
-          title: "Kobo Sample",
+          title: "Kobo Café Sample",
           author: "Author",
           series: null,
           description: null,
@@ -63,7 +67,7 @@ describe("kobo contract", () => {
       ])
       .returning({ id: schema.books.id, title: schema.books.title });
 
-    bookId = inserted.find((row) => row.title === "Kobo Sample")!.id;
+    bookId = inserted.find((row) => row.title === "Kobo Café Sample")!.id;
     unsyncedBookId = inserted.find((row) => row.title === "Kobo Unsynced")!.id;
 
     const collectionsRes = await app.inject({
@@ -101,6 +105,10 @@ describe("kobo contract", () => {
     });
 
     koboToken = settings.json().token;
+  });
+
+  afterAll(async () => {
+    await app.close();
   });
 
   it("returns Kobo sync headers and entitlement-like payload", async () => {
@@ -277,6 +285,44 @@ describe("kobo contract", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().RequestResult).toBe("Success");
+  });
+
+  it("downloads Kobo books with booklore-style attachment headers", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/books/${bookId}/download`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe(koboBookBody);
+    expect(response.headers["content-type"]).toBe("application/octet-stream");
+    expect(response.headers["content-length"]).toBe(String(Buffer.byteLength(koboBookBody)));
+    expect(response.headers["accept-ranges"]).toBeUndefined();
+    expect(response.headers["content-disposition"]).toContain(
+      `filename="Kobo Caf_ Sample.epub"`
+    );
+    expect(response.headers["content-disposition"]).toContain(
+      "filename*=UTF-8''Kobo%20Caf%C3%A9%20Sample.epub"
+    );
+  });
+
+  it("supports HEAD probes for Kobo book downloads without a response body", async () => {
+    const response = await app.inject({
+      method: "HEAD",
+      url: `/api/kobo/${koboToken}/v1/books/${bookId}/download`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe("");
+    expect(response.headers["content-type"]).toBe("application/octet-stream");
+    expect(response.headers["content-length"]).toBe(String(Buffer.byteLength(koboBookBody)));
+    expect(response.headers["accept-ranges"]).toBeUndefined();
+    expect(response.headers["content-disposition"]).toContain(
+      `filename="Kobo Caf_ Sample.epub"`
+    );
+    expect(response.headers["content-disposition"]).toContain(
+      "filename*=UTF-8''Kobo%20Caf%C3%A9%20Sample.epub"
+    );
   });
 
   it("accepts empty json body on kobo delete passthrough", async () => {
