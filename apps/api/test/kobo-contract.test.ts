@@ -284,7 +284,6 @@ describe("kobo contract", () => {
       WorkId: String(bookId),
       Title: "Kobo Café Sample",
       Contributors: ["Author"],
-      CoverImageId: `BL-${bookId}`,
       DownloadUrls: [
         {
           DrmType: "None",
@@ -293,11 +292,32 @@ describe("kobo contract", () => {
         }
       ]
     });
+    expect(payload[0].CoverImageId).toMatch(new RegExp(`^BL-${bookId}-[a-f0-9]{12}$`));
     expect(payload[0]).not.toHaveProperty("Attribution");
     expect(payload[0]).not.toHaveProperty("ImageId");
     expect(payload[0]).not.toHaveProperty("ThumbnailUrl");
     expect(payload[0]).not.toHaveProperty("IsPurchasedContent");
     expect(payload[0]).not.toHaveProperty("IsMysteryPreview");
+  });
+
+  it("serves cover thumbnails for versioned cover image ids", async () => {
+    const metadataResponse = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/${bookId}/metadata`
+    });
+
+    expect(metadataResponse.statusCode).toBe(200);
+    const metadataPayload = metadataResponse.json() as Array<{ CoverImageId: string }>;
+    const coverImageId = metadataPayload[0]?.CoverImageId;
+    expect(coverImageId).toBeTruthy();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/books/${coverImageId}/thumbnail/300/400/false/image.jpg`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/jpeg");
   });
 
   it("builds Kobo metadata download URLs from the incoming request host", async () => {

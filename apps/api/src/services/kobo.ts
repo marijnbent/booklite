@@ -69,13 +69,30 @@ const getSnapshotBookMap = async (
   return parseSnapshotJsonToMap(latest[0].snapshotJson);
 };
 
+const buildCoverImageId = (bookId: number, updatedAt?: string): string => {
+  if (!updatedAt) return `BL-${bookId}`;
+  const version = crypto
+    .createHash("sha1")
+    .update(updatedAt)
+    .digest("hex")
+    .slice(0, 12);
+  return `BL-${bookId}-${version}`;
+};
+
 const parseBookIdFromImageId = (imageId: string): number | null => {
-  if (imageId.startsWith("BL-")) {
-    const asNum = Number.parseInt(imageId.slice(3), 10);
+  const prefixedMatch = /^BL-(\d+)(?:[-/].*)?$/.exec(imageId);
+  if (prefixedMatch) {
+    const asNum = Number.parseInt(prefixedMatch[1], 10);
     return Number.isFinite(asNum) ? asNum : null;
   }
-  const asNum = Number.parseInt(imageId, 10);
-  return Number.isFinite(asNum) ? asNum : null;
+
+  const numericMatch = /^(\d+)(?:[-/].*)?$/.exec(imageId);
+  if (numericMatch) {
+    const asNum = Number.parseInt(numericMatch[1], 10);
+    return Number.isFinite(asNum) ? asNum : null;
+  }
+
+  return null;
 };
 
 export const resolveBookIdFromImageId = parseBookIdFromImageId;
@@ -279,7 +296,7 @@ const buildBookMetadata = (
     }
   }
 
-  const imageId = `BL-${book.id}`;
+  const imageId = buildCoverImageId(book.id, book.updatedAt);
   const slug = book.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -343,7 +360,7 @@ const buildRemovedBookMetadata = (bookId: number): Record<string, unknown> => ({
   RevisionId: String(bookId),
   EntitlementId: String(bookId),
   WorkId: String(bookId),
-  CoverImageId: `BL-${bookId}`,
+  CoverImageId: buildCoverImageId(bookId),
   Title: String(bookId)
 });
 
