@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { toRenderableCoverSrc } from "@/lib/covers";
 import type { MetadataCoverOption, MetadataSource } from "@/lib/metadata";
 import { sourceLabel } from "@/lib/metadata";
 import { cn } from "@/lib/utils";
@@ -612,7 +613,7 @@ export const UploadsPage: React.FC = () => {
                   >
                     {draft.coverPath ? (
                       <img
-                        src={draft.coverPath}
+                        src={toRenderableCoverSrc(draft.coverPath) ?? draft.coverPath}
                         alt=""
                         className="size-full object-cover"
                       />
@@ -736,7 +737,7 @@ export const UploadsPage: React.FC = () => {
                 <div className="shrink-0 w-24">
                   {editingDraft.coverPath ? (
                     <img
-                      src={editingDraft.coverPath}
+                      src={toRenderableCoverSrc(editingDraft.coverPath) ?? editingDraft.coverPath}
                       alt=""
                       className="w-full rounded-lg border border-border/40 object-cover aspect-[2/3]"
                     />

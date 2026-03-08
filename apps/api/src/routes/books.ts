@@ -15,6 +15,13 @@ import { resolveFilenameMetadata } from "../services/filenameNormalizer";
 import { logAdminActivity } from "../services/adminActivityLog";
 import { applyDownloadHeaders } from "../services/downloadHeaders";
 import {
+  deleteManagedCoverIfPresent,
+  resolveManagedCoverPath,
+  resolveStoredCoverPathForWrite,
+  serializeBookCoverPath
+} from "../services/coverAssets";
+import { verifyAccessToken } from "../auth/jwt";
+import {
   getKoboThresholdsForUser,
   inferStatusFromProgress
 } from "../services/koboSettings";
@@ -42,6 +49,11 @@ const favoriteSchema = z.object({
   favorite: z.boolean()
 });
 
+const coverQuerySchema = z.object({
+  token: z.string().min(1).optional(),
+  v: z.string().optional()
+});
+
 export const mapBookRow = (row: any) => ({
   id: row.id,
   ownerUserId: row.owner_user_id,
@@ -49,7 +61,7 @@ export const mapBookRow = (row: any) => ({
   author: row.author,
   series: row.series,
   description: row.description,
-  coverPath: row.cover_path,
+  coverPath: serializeBookCoverPath(row.id, row.cover_path, row.updated_at),
   filePath: row.file_path,
   fileExt: row.file_ext,
   fileSize: row.file_size,
@@ -156,7 +168,32 @@ const refreshBookMetadata = async (
   const nextAuthor = metadata.author ?? target.author;
   const nextSeries = metadata.series ?? target.series ?? null;
   const nextDescription = metadata.description ?? null;
-  const nextCoverPath = metadata.coverPath ?? null;
+  let nextCoverPath = metadata.coverPath ?? null;
+
+  if (metadata.coverPath) {
+    try {
+      nextCoverPath = await resolveStoredCoverPathForWrite({
+        bookId: target.id,
+        coverPath: metadata.coverPath,
+        currentStoredCoverPath: target.coverPath
+      });
+    } catch (error) {
+      await logAdminActivity({
+        scope: "metadata",
+        event: "metadata.cover_localization_failed",
+        level: "WARN",
+        message: "Metadata refresh cover localization failed",
+        bookId: target.id,
+        details: {
+          title: target.title,
+          author: target.author,
+          requestedCoverPath: metadata.coverPath,
+          error
+        }
+      });
+      nextCoverPath = target.coverPath;
+    }
+  }
 
   const changed =
     nextTitle !== target.title ||
@@ -166,6 +203,7 @@ const refreshBookMetadata = async (
     nextCoverPath !== target.coverPath;
 
   if (changed) {
+    const previousCoverPath = target.coverPath;
     await db
       .update(books)
       .set({
@@ -177,6 +215,12 @@ const refreshBookMetadata = async (
         updatedAt: nowIso()
       })
       .where(eq(books.id, target.id));
+
+    if (previousCoverPath !== nextCoverPath) {
+      deleteManagedCoverIfPresent(
+        previousCoverPath && previousCoverPath !== nextCoverPath ? previousCoverPath : null
+      );
+    }
   }
 
   return { source: metadata.source, updated: changed };
@@ -229,6 +273,44 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
     return rows.map(mapBookRow);
   });
 
+  fastify.get("/api/v1/books/:id/cover", async (request, reply) => {
+    const params = idParams.parse(request.params);
+    const query = coverQuerySchema.parse(request.query);
+
+    const bearerToken = request.headers.authorization?.startsWith("Bearer ")
+      ? request.headers.authorization.slice(7)
+      : null;
+    const token = bearerToken ?? query.token ?? null;
+
+    if (!token) {
+      return reply.code(401).send({ error: "Missing bearer token" });
+    }
+
+    try {
+      verifyAccessToken(token);
+    } catch {
+      return reply.code(401).send({ error: "Invalid token" });
+    }
+
+    const found = await db
+      .select({ coverPath: books.coverPath })
+      .from(books)
+      .where(eq(books.id, params.id))
+      .limit(1);
+
+    const resolved = resolveManagedCoverPath(found[0]?.coverPath);
+    if (!resolved || resolved.bookId !== params.id || !fs.existsSync(resolved.absolutePath)) {
+      return reply.code(404).send({ error: "Cover not found" });
+    }
+
+    reply.header(
+      "cache-control",
+      query.v ? "public, max-age=31536000, immutable" : "private, no-cache"
+    );
+    reply.header("content-type", "image/jpeg");
+    return reply.send(fs.createReadStream(resolved.absolutePath));
+  });
+
   fastify.get(
     "/api/v1/books/:id",
     { preHandler: requireAuth },
@@ -265,7 +347,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       const body = patchBookSchema.parse(request.body);
 
       const existing = await db
-        .select({ id: books.id })
+        .select({ id: books.id, coverPath: books.coverPath })
         .from(books)
         .where(eq(books.id, params.id))
         .limit(1);
@@ -277,11 +359,35 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       if (body.author !== undefined) bookSet.author = body.author;
       if (body.series !== undefined) bookSet.series = body.series;
       if (body.description !== undefined) bookSet.description = body.description;
-      if (body.coverPath !== undefined) bookSet.coverPath = body.coverPath;
+      if (body.coverPath !== undefined) {
+        try {
+          bookSet.coverPath = await resolveStoredCoverPathForWrite({
+            bookId: params.id,
+            coverPath: body.coverPath,
+            currentStoredCoverPath: existing[0].coverPath
+          });
+        } catch (error) {
+          return reply.code(400).send({
+            error: error instanceof Error ? error.message : "Failed to update cover"
+          });
+        }
+      }
 
       if (Object.keys(bookSet).length > 0) {
+        const nextStoredCoverPath =
+          body.coverPath !== undefined
+            ? (bookSet.coverPath as string | null | undefined) ?? null
+            : existing[0].coverPath;
         bookSet.updatedAt = nowIso();
         await db.update(books).set(bookSet).where(eq(books.id, params.id));
+
+        if (body.coverPath !== undefined && existing[0].coverPath !== nextStoredCoverPath) {
+          deleteManagedCoverIfPresent(
+            existing[0].coverPath && existing[0].coverPath !== nextStoredCoverPath
+              ? existing[0].coverPath
+              : null
+          );
+        }
       }
 
       if (

@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { apiFetch, apiFetchRaw } from "@/lib/api";
+import { toRenderableCoverSrc } from "@/lib/covers";
 import type { MetadataCoverOption, MetadataSource } from "@/lib/metadata";
 import { sourceLabel } from "@/lib/metadata";
 import { cn } from "@/lib/utils";
@@ -220,15 +221,16 @@ const BookCover: React.FC<{
 }> = ({ book, className, showTitle = true }) => {
   const [imgError, setImgError] = useState(false);
   const hue = coverHue(book.id);
+  const renderableCoverSrc = toRenderableCoverSrc(book.coverPath);
 
   useEffect(() => {
     setImgError(false);
   }, [book.coverPath]);
 
-  if (book.coverPath && !imgError) {
+  if (renderableCoverSrc && !imgError) {
     return (
       <img
-        src={book.coverPath}
+        src={renderableCoverSrc}
         alt={book.title}
         loading="lazy"
         onError={() => setImgError(true)}

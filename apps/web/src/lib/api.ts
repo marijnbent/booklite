@@ -9,6 +9,8 @@ const BASE = "";
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 
+export const getAccessToken = (): string | null => accessToken;
+
 export const setTokens = (tokens: AuthTokens | null): void => {
   if (!tokens) {
     accessToken = null;

@@ -8,6 +8,9 @@ import { filenameToBasicMetadata } from "./books";
 import { resolveFilenameMetadata } from "./filenameNormalizer";
 import { getFavoritesCollectionId } from "./systemCollections";
 import { logAdminActivity } from "./adminActivityLog";
+import {
+  resolveStoredCoverPathForWrite
+} from "./coverAssets";
 
 let running = false;
 
@@ -103,6 +106,11 @@ const processUploadJob = async (job: {
     ? normalizedControlAuthor ?? null
     : defaults.author;
 
+  const initialStoredCoverPath =
+    normalizedControlCoverPath && !normalizedControlCoverPath.startsWith("http://") && !normalizedControlCoverPath.startsWith("https://")
+      ? normalizedControlCoverPath
+      : null;
+
   const [inserted] = await db
     .insert(books)
     .values({
@@ -111,7 +119,7 @@ const processUploadJob = async (job: {
       author: resolvedAuthor,
       series: normalizedControlSeries ?? defaults.series ?? null,
       description: normalizedControlDescription ?? null,
-      coverPath: normalizedControlCoverPath ?? null,
+      coverPath: initialStoredCoverPath,
       filePath: payload.filePath,
       fileExt: payload.fileExt,
       fileSize: payload.fileSize,
@@ -127,6 +135,44 @@ const processUploadJob = async (job: {
       description: books.description,
       coverPath: books.coverPath
     });
+
+  let effectiveCoverPath = inserted.coverPath;
+
+  if (normalizedControlCoverPath && !effectiveCoverPath) {
+    try {
+      effectiveCoverPath = await resolveStoredCoverPathForWrite({
+        bookId: inserted.id,
+        coverPath: normalizedControlCoverPath,
+        currentStoredCoverPath: inserted.coverPath
+      });
+
+      if (effectiveCoverPath) {
+        await db
+          .update(books)
+          .set({
+            coverPath: effectiveCoverPath,
+            updatedAt: nowIso()
+          })
+          .where(eq(books.id, inserted.id));
+      }
+    } catch (error) {
+      await logAdminActivity({
+        scope: "upload",
+        event: "upload.cover_localization_failed",
+        level: "WARN",
+        message: "Upload cover localization failed",
+        actorUserId: job.userId,
+        bookId: inserted.id,
+        jobId: job.id,
+        details: {
+          title: inserted.title,
+          author: inserted.author,
+          requestedCoverPath: normalizedControlCoverPath,
+          error
+        }
+      });
+    }
+  }
 
   if (controls.autoMetadata) {
     try {
@@ -154,8 +200,34 @@ const processUploadJob = async (job: {
           set.series = metadata.series;
         }
 
-        if (!inserted.coverPath && metadata.coverPath) {
-          set.coverPath = metadata.coverPath;
+        if (!effectiveCoverPath && metadata.coverPath) {
+          try {
+            const localizedCoverPath = await resolveStoredCoverPathForWrite({
+              bookId: inserted.id,
+              coverPath: metadata.coverPath,
+              currentStoredCoverPath: effectiveCoverPath
+            });
+            if (localizedCoverPath) {
+              set.coverPath = localizedCoverPath;
+              effectiveCoverPath = localizedCoverPath;
+            }
+          } catch (error) {
+            await logAdminActivity({
+              scope: "metadata",
+              event: "metadata.upload_cover_localization_failed",
+              level: "WARN",
+              message: "Metadata enrichment cover localization failed during upload processing",
+              actorUserId: job.userId,
+              bookId: inserted.id,
+              jobId: job.id,
+              details: {
+                title: inserted.title,
+                author: inserted.author,
+                requestedCoverPath: metadata.coverPath,
+                error
+              }
+            });
+          }
         }
 
         if (Object.keys(set).length > 0) {

@@ -24,6 +24,7 @@ import {
 import { koboFallbackResources } from "../services/koboFallbackResources";
 import { logAdminActivity } from "../services/adminActivityLog";
 import { applyDownloadHeaders } from "../services/downloadHeaders";
+import { resolveManagedCoverPath } from "../services/coverAssets";
 import {
   isKoboDebugRoute,
   logKoboDebugEvent,
@@ -161,6 +162,30 @@ const respondCover = async (
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  const managedCover = resolveManagedCoverPath(coverPath);
+  if (managedCover) {
+    if (!fs.existsSync(managedCover.absolutePath)) {
+      await logAdminActivity({
+        scope: "kobo",
+        event: "kobo.cover_file_missing",
+        level: "WARN",
+        message: "Managed Kobo cover file is missing",
+        actorUserId: userId,
+        bookId,
+        details: {
+          imageId,
+          coverPath,
+          absolutePath: managedCover.absolutePath
+        }
+      });
+      return sendPlaceholderCover(reply);
+    }
+
+    reply.header("content-type", "image/jpeg");
+    reply.header("cache-control", "public, max-age=600");
+    return reply.send(fs.readFileSync(managedCover.absolutePath));
   }
 
   const absolutePath = path.isAbsolute(coverPath) ? coverPath : path.join(config.booksDir, coverPath);

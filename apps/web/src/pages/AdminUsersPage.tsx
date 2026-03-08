@@ -866,26 +866,22 @@ export const AdminUsersPage: React.FC = () => {
 
         <Card className="rounded-lg border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <TerminalSquare className="size-4 text-muted-foreground" />
-                  <h2 className="text-lg font-semibold tracking-tight">Diagnostics</h2>
-                  {settings.data?.koboDebugLogging ? (
-                    <Badge className="text-[11px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-                      Debug on
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-[11px]">
-                      Debug off
-                    </Badge>
-                  )}
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  Enable verbose Kobo tracing only while diagnosing sync or download problems.
-                </p>
-              </div>
+            <div className="flex items-center gap-2.5">
+              <TerminalSquare className="size-4 text-muted-foreground" />
+              <h2 className="text-lg font-semibold tracking-tight">Diagnostics</h2>
+              {settings.data?.koboDebugLogging ? (
+                <Badge className="text-[11px] bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                  Debug on
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[11px]">
+                  Debug off
+                </Badge>
+              )}
             </div>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Enable verbose Kobo tracing only while diagnosing sync or download problems.
+            </p>
           </CardHeader>
 
           <CardContent className="px-6 pb-6">
@@ -895,33 +891,57 @@ export const AdminUsersPage: React.FC = () => {
               </div>
             ) : (
               settings.data && (
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-                  <div className="rounded-md border border-border bg-muted/20 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-medium">Verbose Kobo activity logging</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Records Kobo requests, response headers, payload summaries, sync counts,
-                          and download file details at <code>INFO</code> level.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={settings.data.koboDebugLogging}
-                        onCheckedChange={(checked) =>
-                          patchSettings.mutate({
-                            koboDebugLogging: Boolean(checked),
-                          })
-                        }
-                      />
+                <div
+                  className={[
+                    "rounded-md border p-4 transition-colors duration-300",
+                    settings.data.koboDebugLogging
+                      ? "border-amber-300/50 bg-amber-500/[0.06] dark:border-amber-500/30 dark:bg-amber-500/[0.08]"
+                      : "border-border bg-muted/20",
+                  ].join(" ")}
+                >
+                  {/* Toggle row */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">Verbose Kobo activity logging</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Records Kobo requests, response headers, payload summaries, sync counts,
+                        and download file details at <code>INFO</code> level.
+                      </p>
                     </div>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Use the dedicated activity page to inspect the trace and clear it when done.
-                    </p>
+                    <Switch
+                      checked={settings.data.koboDebugLogging}
+                      onCheckedChange={(checked) =>
+                        patchSettings.mutate({
+                          koboDebugLogging: Boolean(checked),
+                        })
+                      }
+                    />
                   </div>
 
-                  <Button variant="outline" asChild className="lg:self-center">
-                    <Link to="/admin-activity">Open activity page</Link>
-                  </Button>
+                  {/* Footer row — reminder text + action link */}
+                  <div className="mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between
+                    border-amber-300/30 dark:border-amber-500/20"
+                    style={settings.data.koboDebugLogging ? {} : { borderColor: "var(--color-border)" }}
+                  >
+                    <p className="text-xs text-muted-foreground">
+                      {settings.data.koboDebugLogging
+                        ? "Debug mode is active. Inspect the trace and disable it when you're done."
+                        : "Use the dedicated activity page to inspect the trace and clear it when done."}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className={[
+                        "shrink-0 text-xs",
+                        settings.data.koboDebugLogging
+                          ? "border-amber-400/40 bg-amber-500/10 text-amber-800 hover:bg-amber-500/15 dark:border-amber-500/30 dark:text-amber-300"
+                          : "",
+                      ].join(" ")}
+                    >
+                      <Link to="/admin-activity">Open activity page</Link>
+                    </Button>
+                  </div>
                 </div>
               )
             )}

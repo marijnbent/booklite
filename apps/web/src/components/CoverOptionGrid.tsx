@@ -1,6 +1,7 @@
 import React from "react";
 import { Check, Image as ImageIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { toRenderableCoverSrc } from "@/lib/covers";
 import { cn } from "@/lib/utils";
 import type { MetadataCoverOption } from "@/lib/metadata";
 
@@ -85,7 +86,7 @@ export const CoverOptionGrid: React.FC<CoverOptionGridProps> = ({
               >
                 <div className="relative aspect-[2/3] bg-muted/60">
                   <img
-                    src={option.coverPath}
+                    src={toRenderableCoverSrc(option.coverPath) ?? option.coverPath}
                     alt={`Cover option ${index + 1}`}
                     className="size-full object-cover"
                     loading="lazy"
