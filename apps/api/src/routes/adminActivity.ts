@@ -4,11 +4,13 @@ import { requireOwner } from "../auth/guards";
 import {
   clearAdminActivity,
   listAdminActivity,
+  type AdminActivityLevel,
   type AdminActivityScope
 } from "../services/adminActivityLog";
 
 const querySchema = z.object({
   scope: z.enum(["metadata", "upload", "kobo"]).optional(),
+  level: z.enum(["ERROR", "WARN", "INFO"]).optional(),
   limit: z.coerce.number().int().min(1).max(250).default(100)
 });
 
@@ -23,6 +25,7 @@ export const adminActivityRoutes: FastifyPluginAsync = async (fastify) => {
     const query = querySchema.parse(request.query);
     return listAdminActivity({
       scope: query.scope as AdminActivityScope | undefined,
+      level: query.level as AdminActivityLevel | undefined,
       limit: query.limit
     });
   });

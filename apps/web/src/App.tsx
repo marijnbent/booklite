@@ -9,6 +9,7 @@ import { LibraryPage } from "@/pages/LibraryPage";
 import { UploadsPage } from "@/pages/UploadsPage";
 import { KoboPage } from "@/pages/KoboPage";
 import { ProfilePage } from "@/pages/ProfilePage";
+import { AdminActivityPage } from "@/pages/AdminActivityPage";
 import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { DocsPage } from "@/pages/DocsPage";
 import { ReaderPage } from "@/pages/ReaderPage";
@@ -30,6 +31,7 @@ export const App: React.FC = () => (
 
         <Route element={<ProtectedRoute ownerOnly />}>
           <Route path="/admin-users" element={<AdminUsersPage />} />
+          <Route path="/admin-activity" element={<AdminActivityPage />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/library" replace />} />

@@ -99,6 +99,7 @@ describe("app settings", () => {
       douban: false
     });
     expect(body.metadataOpenrouterModel).toBe("");
+    expect(body.koboDebugLogging).toBe(false);
     expect(body).not.toHaveProperty("metadataProviderPrimary");
     expect(body).not.toHaveProperty("metadataProviderSecondary");
     expect(body).not.toHaveProperty("metadataProviderTertiary");
@@ -161,6 +162,38 @@ describe("app settings", () => {
     expect(publicResponse.statusCode).toBe(200);
     expect(publicResponse.json()).toEqual({
       ebookDownloadUrl: "https://example.com/ebooks"
+    });
+  });
+
+  it("stores the Kobo debug logging flag", async () => {
+    const patchResponse = await app.inject({
+      method: "PATCH",
+      url: "/api/v1/app-settings",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        koboDebugLogging: true
+      }
+    });
+
+    expect(patchResponse.statusCode).toBe(200);
+    expect(patchResponse.json()).toMatchObject({
+      koboDebugLogging: true
+    });
+
+    const getResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/app-settings",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      }
+    });
+
+    expect(getResponse.statusCode).toBe(200);
+    expect(getResponse.json()).toMatchObject({
+      koboDebugLogging: true
     });
   });
 });

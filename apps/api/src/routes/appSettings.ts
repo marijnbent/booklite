@@ -43,6 +43,7 @@ const patchSettingsSchema = z
     metadataOpenrouterApiKey: z.string().trim().optional(),
     metadataOpenrouterModel: z.string().trim().max(100).optional(),
     metadataOpenrouterEnabled: z.boolean().optional(),
+    koboDebugLogging: z.boolean().optional(),
     uploadLimitMb: z.coerce.number().int().min(1).max(1000).optional(),
     ebookDownloadUrl: optionalUrlSchema.optional()
   })
@@ -68,6 +69,7 @@ const resolveSettings = async (): Promise<{
   metadataOpenrouterApiKey: string;
   metadataOpenrouterModel: string;
   metadataOpenrouterEnabled: boolean;
+  koboDebugLogging: boolean;
   uploadLimitMb: number;
   ebookDownloadUrl: string;
 }> => ({
@@ -104,6 +106,7 @@ const resolveSettings = async (): Promise<{
     ""
   ),
   metadataOpenrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false),
+  koboDebugLogging: await getSetting<boolean>("kobo_debug_logging", false),
   uploadLimitMb: await getSetting<number>("upload_limit_mb", 100),
   ebookDownloadUrl: toOptionalUrl(await getSetting<unknown>("ebook_download_url", ""))
 });
@@ -173,6 +176,9 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       }
       if (body.metadataOpenrouterEnabled !== undefined) {
         await upsert("metadata_openrouter_enabled", body.metadataOpenrouterEnabled);
+      }
+      if (body.koboDebugLogging !== undefined) {
+        await upsert("kobo_debug_logging", body.koboDebugLogging);
       }
       if (body.uploadLimitMb !== undefined) {
         await upsert("upload_limit_mb", body.uploadLimitMb);

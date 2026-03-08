@@ -99,6 +99,7 @@ export interface AppSettings {
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
+  koboDebugLogging: boolean;
   uploadLimitMb: number;
 }
 

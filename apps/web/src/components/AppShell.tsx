@@ -28,6 +28,7 @@ import {
   CircleHelp,
   ChevronsUpDown,
   Download,
+  TerminalSquare,
 } from "lucide-react";
 
 const navItems = [
@@ -39,6 +40,7 @@ const navItems = [
 
 const adminItems = [
   { to: "/admin-users", label: "Admin", icon: Shield, ownerOnly: true },
+  { to: "/admin-activity", label: "Activity", icon: TerminalSquare, ownerOnly: true },
 ];
 
 interface PublicAppSettings {

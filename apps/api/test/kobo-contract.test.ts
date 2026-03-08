@@ -376,6 +376,83 @@ describe("kobo contract", () => {
     ).toBe(false);
   });
 
+  it("writes detailed Kobo info logs only when debug logging is enabled", async () => {
+    await app.inject({
+      method: "DELETE",
+      url: "/api/v1/admin/activity-log",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        scope: "kobo"
+      }
+    });
+
+    const enableResponse = await app.inject({
+      method: "PATCH",
+      url: "/api/v1/app-settings",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        koboDebugLogging: true
+      }
+    });
+
+    expect(enableResponse.statusCode).toBe(200);
+
+    const downloadResponse = await app.inject({
+      method: "HEAD",
+      url: `/api/kobo/${koboToken}/v1/books/${bookId}/download`,
+      headers: {
+        range: "bytes=0-127"
+      }
+    });
+
+    expect(downloadResponse.statusCode).toBe(200);
+
+    const activityResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/activity-log?scope=kobo&level=INFO&limit=20",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+
+    expect(activityResponse.statusCode).toBe(200);
+    expect(activityResponse.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "kobo.debug.request",
+          details: expect.objectContaining({
+            method: "HEAD",
+            headers: expect.objectContaining({
+              range: "bytes=0-127"
+            })
+          })
+        }),
+        expect.objectContaining({
+          event: "kobo.debug.download",
+          bookId,
+          details: expect.objectContaining({
+            bytes: Buffer.byteLength(koboBookBody),
+            headRequest: true,
+            range: "bytes=0-127"
+          })
+        }),
+        expect.objectContaining({
+          event: "kobo.debug.response",
+          details: expect.objectContaining({
+            statusCode: 200,
+            headers: expect.objectContaining({
+              "content-type": "application/octet-stream"
+            })
+          })
+        })
+      ])
+    );
+  });
+
   it("returns bearer token metadata from device auth", async () => {
     const response = await app.inject({
       method: "POST",

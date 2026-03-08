@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { adminActivityLog } from "../db/schema";
 import { nowIso } from "../utils/time";
@@ -116,14 +116,24 @@ export const logAdminActivity = async (input: {
 
 export const listAdminActivity = async (options: {
   scope?: AdminActivityScope;
+  level?: AdminActivityLevel;
   limit?: number;
 }) => {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 250);
-  const rows = options.scope
+  const whereClause =
+    options.scope && options.level
+      ? and(eq(adminActivityLog.scope, options.scope), eq(adminActivityLog.level, options.level))
+      : options.scope
+        ? eq(adminActivityLog.scope, options.scope)
+        : options.level
+          ? eq(adminActivityLog.level, options.level)
+          : undefined;
+
+  const rows = whereClause
     ? await db
         .select()
         .from(adminActivityLog)
-        .where(eq(adminActivityLog.scope, options.scope))
+        .where(whereClause)
         .orderBy(desc(adminActivityLog.createdAt), desc(adminActivityLog.id))
         .limit(limit)
     : await db
