@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
 import { lookup as lookupMime } from "mime-types";
 import { z } from "zod";
@@ -53,6 +53,46 @@ const remoteCoverCache = new Map<
 
 const isExpectedInitializationFallbackStatus = (status: number | null): boolean =>
   status === 401 || status === 403;
+
+const getFirstHeaderValue = (
+  value: string | string[] | undefined
+): string | undefined => {
+  if (Array.isArray(value)) return value[0];
+  return typeof value === "string" ? value : undefined;
+};
+
+const getLeadingHeaderValue = (
+  value: string | string[] | undefined
+): string | undefined => {
+  const first = getFirstHeaderValue(value);
+  if (!first) return undefined;
+  const [leading] = first.split(",");
+  return leading?.trim() || undefined;
+};
+
+const getBaseUrlFromRequest = (request: FastifyRequest): string => {
+  const forwardedProto = getLeadingHeaderValue(request.headers["x-forwarded-proto"]);
+  const forwardedHost = getLeadingHeaderValue(request.headers["x-forwarded-host"]);
+  const protocol = forwardedProto || request.protocol || "http";
+
+  if (forwardedHost) {
+    return `${protocol}://${forwardedHost}`;
+  }
+
+  const host = getLeadingHeaderValue(request.headers.host);
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+
+  const hostname = request.hostname || "localhost";
+  const forwardedPort = getLeadingHeaderValue(request.headers["x-forwarded-port"]);
+  const localPort = request.socket.localPort ? String(request.socket.localPort) : "";
+  const port = forwardedPort || localPort;
+  const isDefaultPort =
+    (protocol === "http" && port === "80") || (protocol === "https" && port === "443");
+
+  return port && !isDefaultPort ? `${protocol}://${hostname}:${port}` : `${protocol}://${hostname}`;
+};
 
 const sendPlaceholderCover = (reply: any): any => {
   reply.header("content-type", "image/jpeg");
@@ -270,7 +310,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
     const auth = await koboAuth(params.token);
     if (!auth) return reply.code(401).send({ error: "Invalid Kobo token" });
 
-    const baseUrl = process.env.BASE_URL ?? "http://localhost:6060";
+    const baseUrl = getBaseUrlFromRequest(request);
     const localImageBase = `${baseUrl}/api/kobo/${params.token}/v1/books/{ImageId}`;
 
     let resources: Record<string, unknown> = { ...koboFallbackResources };
@@ -526,7 +566,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
       auth.userId,
       bookId,
       params.token,
-      process.env.BASE_URL ?? "http://localhost:6060"
+      getBaseUrlFromRequest(request)
     );
     if (!metadata) return reply.code(404).send({ error: "Book not found" });
 
@@ -591,7 +631,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
       .map((value) => Number.parseInt(String(value), 10))
       .filter((id) => Number.isFinite(id));
 
-    const baseUrl = process.env.BASE_URL ?? "http://localhost:6060";
+    const baseUrl = getBaseUrlFromRequest(request);
     const links = ids.map((id) => ({
       RevisionId: String(id),
       EntitlementId: String(id),
@@ -665,7 +705,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
       const result = await getLibrarySyncPayload(
         auth.userId,
         params.token,
-        process.env.BASE_URL ?? "http://localhost:6060",
+        getBaseUrlFromRequest(request),
         {
           baselineSnapshotId: baselineSnapshotId ?? undefined,
           forceFullSync
@@ -768,7 +808,7 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
         auth.userId,
         id,
         params.token,
-        process.env.BASE_URL ?? "http://localhost:6060"
+        getBaseUrlFromRequest(request)
       );
       if (metadata) results.push(metadata);
     }

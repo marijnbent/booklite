@@ -11,11 +11,18 @@ vi.mock("../src/services/metadata", () => ({
 
 createTempEnv();
 
+const tinyPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1sAAAAASUVORK5CYII=",
+  "base64"
+);
+
 let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
 let accessToken = "";
 let syncedBookId = 0;
 let unsyncedBookId = 0;
 let fallbackBookId = 0;
+const fetchMock = vi.fn<typeof fetch>();
+vi.stubGlobal("fetch", fetchMock);
 
 describe("books metadata + kobo scope", () => {
   beforeAll(async () => {
@@ -110,6 +117,7 @@ describe("books metadata + kobo scope", () => {
 
   beforeEach(() => {
     fetchMetadataWithFallbackMock.mockReset();
+    fetchMock.mockReset();
   });
 
   afterAll(async () => {
@@ -149,6 +157,17 @@ describe("books metadata + kobo scope", () => {
   });
 
   it("can refresh metadata for all books and reports a summary", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (String(input) === "https://example.test/covers/synced.jpg") {
+        return new Response(tinyPng, {
+          status: 200,
+          headers: { "content-type": "image/png" }
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${String(input)}`);
+    });
+
     fetchMetadataWithFallbackMock.mockImplementation(async (title: string) => {
       if (title === "Synced Target") {
         return {
@@ -210,7 +229,7 @@ describe("books metadata + kobo scope", () => {
       title: "Synced Updated",
       author: "Remote Author",
       description: "Remote description",
-      coverPath: "https://example.test/covers/synced.jpg"
+      coverPath: expect.stringMatching(new RegExp(`^/api/v1/books/${syncedBookId}/cover\\?v=`))
     });
 
     const fallbackDetail = await app.inject({

@@ -300,6 +300,26 @@ describe("kobo contract", () => {
     expect(payload[0]).not.toHaveProperty("IsMysteryPreview");
   });
 
+  it("builds Kobo metadata download URLs from the incoming request host", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/${bookId}/metadata`,
+      headers: {
+        host: "reader.example.test",
+        "x-forwarded-proto": "https"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    const payload = response.json() as Array<{
+      DownloadUrls: Array<{ Url: string }>;
+    }>;
+    expect(payload).toHaveLength(1);
+    expect(payload[0].DownloadUrls[0]?.Url).toBe(
+      `https://reader.example.test/api/kobo/${koboToken}/v1/books/${bookId}/download`
+    );
+  });
+
   it("ignores unknown entitlement reading-state updates", async () => {
     const timestamp = new Date().toISOString();
     const response = await app.inject({
@@ -419,6 +439,27 @@ describe("kobo contract", () => {
         (entry) => entry.event === "kobo.initialization_fallback_used"
       )
     ).toBe(false);
+  });
+
+  it("builds initialization resource URLs from the incoming request host", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/initialization`,
+      headers: {
+        host: "reader.example.test",
+        "x-forwarded-proto": "https"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      Resources: {
+        image_host: "https://reader.example.test",
+        library_sync: `https://reader.example.test/api/kobo/${koboToken}/v1/library/sync`,
+        library_metadata: `https://reader.example.test/api/kobo/${koboToken}/v1/library/{Ids}/metadata`,
+        library_book: `https://reader.example.test/api/kobo/${koboToken}/v1/user/library/books/{LibraryItemId}`
+      }
+    });
   });
 
   it("writes detailed Kobo info logs only when debug logging is enabled", async () => {
