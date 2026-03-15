@@ -18,6 +18,7 @@ export interface MetadataResult {
   source:
     | "OPEN_LIBRARY"
     | "AMAZON"
+    | "BOL"
     | "GOOGLE"
     | "HARDCOVER"
     | "GOODREADS"
@@ -30,6 +31,7 @@ export interface MetadataCoverOption {
   source:
     | "OPEN_LIBRARY"
     | "AMAZON"
+    | "BOL"
     | "GOOGLE"
     | "HARDCOVER"
     | "GOODREADS"
@@ -58,6 +60,17 @@ const providerPreference: MetadataProvider[] = [
   "goodreads",
   "hardcover",
   "amazon",
+  "bol",
+  "douban"
+];
+
+const coverProviderPreference: MetadataProvider[] = [
+  "goodreads",
+  "hardcover",
+  "google",
+  "amazon",
+  "bol",
+  "open_library",
   "douban"
 ];
 
@@ -67,6 +80,7 @@ const providerTrustScore: Record<MetadataProvider, number> = {
   goodreads: 0.95,
   hardcover: 0.95,
   amazon: 0.92,
+  bol: 0.91,
   douban: 0.9
 };
 
@@ -534,6 +548,261 @@ const extractAmazonSeries = (detailHtml: string, titleText?: string): string | u
   return undefined;
 };
 
+const extractBolSeries = (detailHtml: string): string | undefined => {
+  const match =
+    detailHtml.match(/aria-label="Serie:\s*([^"]+)"/i) ??
+    detailHtml.match(/>\s*Serie:\s*<\/span>\s*<a[^>]*>([\s\S]*?)<\/a>/i);
+  return match?.[1] ? stripTags(match[1]) : undefined;
+};
+
+const extractBolSeriesFromTitle = (
+  rawTitle: string
+): { cleanTitle: string; series: string | undefined } => {
+  const prefixedSeriesMatch = rawTitle.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*[-:–—]\s+(.+)$/);
+  if (prefixedSeriesMatch) {
+    return {
+      cleanTitle: prefixedSeriesMatch[3].trim(),
+      series: `${prefixedSeriesMatch[1].trim()} #${prefixedSeriesMatch[2]}`
+    };
+  }
+
+  const extracted = extractSeriesFromTitle(rawTitle);
+  return {
+    cleanTitle: extracted.cleanTitle,
+    series: extracted.series ?? undefined
+  };
+};
+
+interface BolLdImage {
+  url?: string;
+}
+
+interface BolLdOfferSeller {
+  name?: string;
+}
+
+interface BolLdOffer {
+  price?: string;
+  priceCurrency?: string;
+  availability?: string;
+  seller?: BolLdOfferSeller;
+}
+
+interface BolLdWorkExample {
+  url?: string;
+  name?: string;
+  description?: string;
+  ["@description"]?: string;
+  bookFormat?: string;
+  isbn?: string;
+  numberOfPages?: string;
+  datePublished?: string;
+  offers?: BolLdOffer;
+}
+
+interface BolLdBookProduct {
+  ["@type"]?: string | string[];
+  name?: string;
+  description?: string;
+  image?: string | BolLdImage;
+  url?: string;
+  inLanguage?: string;
+  bookEdition?: string;
+  author?: { name?: string };
+  publisher?: { name?: string };
+  workExample?: BolLdWorkExample[];
+}
+
+const parseJsonScriptBlocks = (html: string): unknown[] => {
+  const scripts = html.match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/gi) ?? [];
+  const values: unknown[] = [];
+
+  for (const script of scripts) {
+    const body = script
+      .replace(/^<script type="application\/ld\+json">/i, "")
+      .replace(/<\/script>$/i, "")
+      .trim();
+    if (!body) continue;
+
+    try {
+      values.push(JSON.parse(body));
+    } catch {
+      continue;
+    }
+  }
+
+  return values;
+};
+
+const isBolBookProduct = (value: unknown): value is BolLdBookProduct => {
+  if (!value || typeof value !== "object") return false;
+
+  const entry = value as BolLdBookProduct;
+  const types = Array.isArray(entry["@type"]) ? entry["@type"] : [entry["@type"]];
+  return types.includes("Book") && types.includes("Product");
+};
+
+const extractBolProductId = (value: string): string | null => {
+  const match = value.match(/\/(\d{10,})\/?$/);
+  return match?.[1] ?? null;
+};
+
+const getBolImageUrl = (image: string | BolLdImage | undefined): string | undefined => {
+  if (typeof image === "string") return image;
+  return image?.url;
+};
+
+const getBolDescription = (
+  detail: BolLdBookProduct,
+  matchedWorkExample: BolLdWorkExample | undefined
+): string | undefined => {
+  const rawDescription =
+    matchedWorkExample?.description ??
+    matchedWorkExample?.["@description"] ??
+    detail.description;
+
+  return hasText(rawDescription) ? stripTags(rawDescription) : undefined;
+};
+
+const extractBolAuthor = (detailHtml: string): string | undefined => {
+  const match =
+    detailHtml.match(/aria-label="Auteur:\s*([^"]+)"/i) ??
+    detailHtml.match(/>\s*Auteur:\s*<\/span>\s*<a[^>]*>([\s\S]*?)<\/a>/i);
+  return match?.[1] ? stripTags(match[1]) : undefined;
+};
+
+const extractBolCandidates = (searchHtml: string): string[] => {
+  const matches = searchHtml.match(/href="([^"]*\/nl\/nl\/p\/[^"]+\/\d+\/)"/gi) ?? [];
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+
+  for (const match of matches) {
+    const hrefMatch = match.match(/href="([^"]+)"/i);
+    const href = hrefMatch?.[1];
+    if (!href) continue;
+
+    const absolute = absoluteUrl("https://www.bol.com", href);
+    if (seen.has(absolute)) continue;
+    seen.add(absolute);
+    candidates.push(absolute);
+  }
+
+  return candidates;
+};
+
+const scoreBolSearchCandidate = (candidateUrl: string, queryTitle: string): number => {
+  const match = candidateUrl.match(/\/nl\/nl\/p\/([^/]+)\/\d+\/?$/i);
+  const slug = match?.[1];
+  if (!slug) return 0;
+  return similarityScore(queryTitle, slug.replace(/-/g, " "));
+};
+
+const parseBolDetailMetadata = (
+  detailHtml: string,
+  detailUrl: string
+): MetadataResult | null => {
+  const bookProduct = parseJsonScriptBlocks(detailHtml).find(isBolBookProduct);
+  if (!bookProduct) return null;
+
+  const detailProductId = extractBolProductId(detailUrl);
+  const matchedWorkExample =
+    bookProduct.workExample?.find((entry) => {
+      if (!entry.url || !detailProductId) return false;
+      return extractBolProductId(entry.url) === detailProductId;
+    }) ?? bookProduct.workExample?.[0];
+
+  const rawTitle = matchedWorkExample?.name ?? bookProduct.name;
+  if (!hasText(rawTitle)) return null;
+
+  const extractedSeries = extractBolSeries(detailHtml);
+  const titleSeries = extractBolSeriesFromTitle(rawTitle);
+  const series = extractedSeries ?? titleSeries.series;
+  const title = series ? titleSeries.cleanTitle : rawTitle;
+
+  return {
+    title: cleanText(title),
+    author: extractBolAuthor(detailHtml) ?? bookProduct.author?.name,
+    series,
+    description: getBolDescription(bookProduct, matchedWorkExample),
+    coverPath: getBolImageUrl(bookProduct.image),
+    source: "BOL"
+  };
+};
+
+const scoreBolDetail = (
+  result: MetadataResult,
+  queryTitle: string,
+  queryAuthor?: string
+): number => {
+  if (isSpamTitle(result.title, queryTitle)) return -1;
+
+  const titleScore = similarityScore(queryTitle, result.title);
+  const authorScore = similarityScore(queryAuthor, result.author);
+
+  let completeness = 0;
+  if (hasText(result.description)) completeness += 0.35;
+  if (hasText(result.coverPath)) completeness += 0.35;
+  if (hasText(result.author)) completeness += 0.2;
+  if (hasText(result.series)) completeness += 0.1;
+
+  return titleScore * 0.56 + authorScore * 0.3 + completeness * 0.14;
+};
+
+const getBolMetadata = async (
+  title: string,
+  author?: string
+): Promise<MetadataResult | null> => {
+  const searchUrl = new URL("https://www.bol.com/nl/nl/s/");
+  searchUrl.searchParams.set("searchtext", toQuery(title, author));
+  searchUrl.searchParams.set("N", "8299");
+
+  const headers = {
+    "user-agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "accept-language": "nl-NL,nl;q=0.9,en;q=0.8"
+  };
+
+  const searchResponse = await fetch(searchUrl, {
+    method: "GET",
+    headers,
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!searchResponse.ok) return null;
+  const searchHtml = await searchResponse.text();
+
+  const candidates = extractBolCandidates(searchHtml)
+    .map((url) => ({ url, score: scoreBolSearchCandidate(url, title) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
+  if (candidates.length === 0) return null;
+
+  const settled = await Promise.allSettled(
+    candidates.map(async ({ url }) => {
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) return null;
+
+      const detailHtml = await response.text();
+      return parseBolDetailMetadata(detailHtml, url);
+    })
+  );
+
+  const best = settled
+    .filter(
+      (entry): entry is PromiseFulfilledResult<MetadataResult | null> => entry.status === "fulfilled"
+    )
+    .map((entry) => entry.value)
+    .filter((entry): entry is MetadataResult => Boolean(entry))
+    .map((entry) => ({ entry, score: scoreBolDetail(entry, title, author) }))
+    .sort((a, b) => b.score - a.score)[0]?.entry;
+
+  return best ?? null;
+};
+
 const getAmazonMetadata = async (
   title: string,
   author: string | undefined,
@@ -945,6 +1214,7 @@ const providerFetchers: Record<MetadataProvider, ProviderFetcher> = {
   open_library: (title, author) => getOpenLibraryMetadata(title, author),
   amazon: (title, author, settings) =>
     getAmazonMetadata(title, author, settings.amazonDomain || "com", settings.amazonCookie),
+  bol: (title, author) => getBolMetadata(title, author),
   google: (title, author, settings) =>
     getGoogleMetadata(title, author, settings.googleApiKey, settings.googleLanguage),
   hardcover: (title, author, settings) =>
@@ -955,6 +1225,14 @@ const providerFetchers: Record<MetadataProvider, ProviderFetcher> = {
 
 const buildProviderFetchOrder = (providerEnabled: MetadataProviderEnabled): MetadataProvider[] =>
   providerPreference.filter((provider) => providerEnabled[provider]);
+
+const coverProviderPreferenceScore: Record<MetadataProvider, number> = coverProviderPreference.reduce(
+  (scores, provider, index) => ({
+    ...scores,
+    [provider]: 1 - index * 0.08
+  }),
+  {} as Record<MetadataProvider, number>
+);
 
 const metadataCompleteness = (result: MetadataResult): number => {
   let presentFields = 0;
@@ -1025,7 +1303,8 @@ const toOptionalText = (value: unknown): string | undefined => {
 
 const resolveDescriptionFromProviders = (
   candidates: ProviderCandidate[],
-  llmDescription: string | undefined
+  llmDescription: string | undefined,
+  queryAuthor?: string
 ): string | undefined => {
   if (!hasText(llmDescription)) return undefined;
 
@@ -1038,6 +1317,7 @@ const resolveDescriptionFromProviders = (
   for (const candidate of candidates) {
     const description = candidate.metadata.description;
     if (!hasText(description)) continue;
+    if (!isStrongBookMatchCandidate(candidate, queryAuthor)) continue;
 
     const snippet = truncateForPrompt(cleanText(description), 200);
     const snippetNormalized = normalizeForMatch(snippet);
@@ -1103,35 +1383,176 @@ const resolveCoverFromProviders = (
   return bestScore >= 0.75 ? bestValue : undefined;
 };
 
-const buildCoverOptions = (
+const clampScore = (value: number): number => Math.max(0, Math.min(1, value));
+
+const getCoverQualityScore = (
+  coverPath: string,
+  provider: MetadataProvider
+): number => {
+  let score = coverProviderPreferenceScore[provider] ?? 0.7;
+
+  if (provider === "open_library") {
+    score -= 0.12;
+  }
+
+  if (/-L\.(?:jpg|jpeg|png|webp)(?:$|\?)/i.test(coverPath)) {
+    score += 0.06;
+  }
+
+  if (/-S\.(?:jpg|jpeg|png|webp)(?:$|\?)/i.test(coverPath)) {
+    score -= 0.14;
+  }
+
+  if (/smallthumbnail|small[_-]?thumb|\/small\//i.test(coverPath)) {
+    score -= 0.18;
+  }
+
+  if (/zoom=0\b/i.test(coverPath)) {
+    score -= 0.08;
+  } else if (/zoom=1\b/i.test(coverPath)) {
+    score -= 0.04;
+  } else if (/zoom=[2-9]\b/i.test(coverPath)) {
+    score += 0.03;
+  }
+
+  if (/placeholder|default[_-]?cover|blank\.(?:jpg|jpeg|png|webp)/i.test(coverPath)) {
+    score -= 0.25;
+  }
+
+  return clampScore(score);
+};
+
+const isStrongBookMatchCandidate = (
+  candidate: ProviderCandidate,
+  queryAuthor?: string
+): boolean => {
+  if (candidate.metadata.source === "NONE") return false;
+  if (candidate.titleScore < 0.55) return false;
+
+  const hasProviderAuthor = hasText(candidate.metadata.author);
+  const hasQueryAuthor = hasText(queryAuthor);
+
+  if (hasQueryAuthor && hasProviderAuthor) {
+    if (candidate.authorScore < 0.3 && candidate.titleScore < 0.96) return false;
+    if (candidate.titleScore < 0.72 && candidate.authorScore < 0.7) return false;
+  }
+
+  return true;
+};
+
+const isEligibleCoverCandidate = (
+  candidate: ProviderCandidate,
+  queryAuthor?: string
+): boolean => {
+  const coverPath = candidate.metadata.coverPath;
+  if (!hasText(coverPath)) return false;
+
+  return isStrongBookMatchCandidate(candidate, queryAuthor);
+};
+
+const scoreCoverCandidate = (
+  candidate: ProviderCandidate,
+  queryAuthor?: string
+): number => {
+  const coverPath = candidate.metadata.coverPath;
+  if (!hasText(coverPath) || !isEligibleCoverCandidate(candidate, queryAuthor)) {
+    return -Infinity;
+  }
+
+  const authorScore =
+    hasText(queryAuthor) && hasText(candidate.metadata.author) ? candidate.authorScore : 0.65;
+  const providerPreferenceScore = coverProviderPreferenceScore[candidate.provider] ?? 0.7;
+  const qualityScore = getCoverQualityScore(coverPath, candidate.provider);
+
+  return (
+    candidate.titleScore * 0.44 +
+    authorScore * 0.2 +
+    qualityScore * 0.2 +
+    providerPreferenceScore * 0.1 +
+    candidate.trust * 0.06
+  );
+};
+
+const selectBestCoverPath = (
   candidates: ProviderCandidate[],
-  selectedCoverPath: string | undefined
-): MetadataCoverOption[] => {
-  const selectedKey = hasText(selectedCoverPath) ? normalizeUrl(selectedCoverPath.trim()) : null;
-  const seen = new Set<string>();
-  const options: MetadataCoverOption[] = [];
-  let selectedOption: MetadataCoverOption | null = null;
+  queryAuthor?: string
+): string | undefined => {
+  let bestValue: string | undefined;
+  let bestScore = -Infinity;
 
   for (const candidate of candidates) {
+    const coverPath = candidate.metadata.coverPath;
+    if (!hasText(coverPath)) continue;
+
+    const score = scoreCoverCandidate(candidate, queryAuthor);
+    if (score > bestScore) {
+      bestScore = score;
+      bestValue = coverPath;
+    }
+  }
+
+  return Number.isFinite(bestScore) ? bestValue : undefined;
+};
+
+const buildCoverOptions = (
+  candidates: ProviderCandidate[],
+  selectedCoverPath: string | undefined,
+  queryAuthor?: string
+): MetadataCoverOption[] => {
+  const selectedKey = hasText(selectedCoverPath) ? normalizeUrl(selectedCoverPath.trim()) : null;
+  const rankedOptions = new Map<
+    string,
+    { option: MetadataCoverOption; score: number; providerIndex: number }
+  >();
+
+  for (const [providerIndex, candidate] of candidates.entries()) {
     const coverPath = candidate.metadata.coverPath?.trim();
     if (!hasText(coverPath) || candidate.metadata.source === "NONE") continue;
 
+    const score = scoreCoverCandidate(candidate, queryAuthor);
+    if (!Number.isFinite(score)) continue;
+
     const normalizedCover = normalizeUrl(coverPath);
-    if (seen.has(normalizedCover)) continue;
-    seen.add(normalizedCover);
+    const current = rankedOptions.get(normalizedCover);
+    if (
+      current &&
+      (current.score > score ||
+        (current.score === score && current.providerIndex <= providerIndex))
+    ) {
+      continue;
+    }
 
-    const option: MetadataCoverOption = {
-      coverPath,
-      source: candidate.metadata.source
-    };
+    rankedOptions.set(normalizedCover, {
+      option: {
+        coverPath,
+        source: candidate.metadata.source
+      },
+      score,
+      providerIndex
+    });
+  }
 
+  const sortedOptions = [...rankedOptions.values()]
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.providerIndex - b.providerIndex;
+    })
+    .map((entry) => entry.option);
+
+  let selectedOption: MetadataCoverOption | null = null;
+
+  for (const option of sortedOptions) {
+    const normalizedCover = normalizeUrl(option.coverPath);
     if (selectedKey && normalizedCover === selectedKey) {
       selectedOption = option;
       continue;
     }
-
-    options.push(option);
   }
+
+  const options = sortedOptions.filter((option) => {
+    if (!selectedKey) return true;
+    return normalizeUrl(option.coverPath) !== selectedKey;
+  });
 
   return selectedOption ? [selectedOption, ...options] : options;
 };
@@ -1198,7 +1619,8 @@ ${providerRows}`;
     const series = toOptionalText(parsed.series);
     const description = resolveDescriptionFromProviders(
       candidates,
-      toOptionalText(parsed.description)
+      toOptionalText(parsed.description),
+      queryAuthor
     );
     const coverPath = resolveCoverFromProviders(candidates, toOptionalText(parsed.coverPath));
 
@@ -1316,7 +1738,9 @@ const resolveMetadata = async (
     candidates,
     (metadata) => metadata.author,
     (candidate) =>
-      candidate.authorScore * 0.75 + candidate.trust * 0.15 + candidate.completeness * 0.1
+      isStrongBookMatchCandidate(candidate, author)
+        ? candidate.authorScore * 0.75 + candidate.trust * 0.15 + candidate.completeness * 0.1
+        : -Infinity
   );
   const mergedSeries = selectBestField(
     candidates,
@@ -1330,20 +1754,14 @@ const resolveMetadata = async (
     candidates,
     (metadata) => metadata.description,
     (candidate) =>
-      candidate.completeness * 0.5 +
-      candidate.titleScore * 0.2 +
-      candidate.authorScore * 0.1 +
-      candidate.trust * 0.2
+      isStrongBookMatchCandidate(candidate, author)
+        ? candidate.completeness * 0.5 +
+          candidate.titleScore * 0.2 +
+          candidate.authorScore * 0.1 +
+          candidate.trust * 0.2
+        : -Infinity
   );
-  const mergedCoverPath = selectBestField(
-    candidates,
-    (metadata) => metadata.coverPath,
-    (candidate) =>
-      candidate.completeness * 0.45 +
-      candidate.titleScore * 0.2 +
-      candidate.authorScore * 0.1 +
-      candidate.trust * 0.25
-  );
+  const mergedCoverPath = selectBestCoverPath(candidates, author);
 
   if (
     !hasText(mergedTitle) &&
@@ -1383,6 +1801,6 @@ export const fetchMetadataPreview = async (
 
   return {
     ...result,
-    coverOptions: buildCoverOptions(candidates, result.coverPath)
+    coverOptions: buildCoverOptions(candidates, result.coverPath, author)
   };
 };

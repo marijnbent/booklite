@@ -35,6 +35,7 @@ import {
   Loader2,
   Library,
   ShoppingCart,
+  Store,
   BookOpen,
   BookMarked,
   Star,
@@ -78,6 +79,7 @@ interface AppSettings {
 type EnabledMetadataProvider =
   | "open_library"
   | "amazon"
+  | "bol"
   | "google"
   | "hardcover"
   | "goodreads"
@@ -115,6 +117,12 @@ const providerMeta: Record<
     description: "Scrapes book details from Amazon product pages",
     icon: <ShoppingCart className="size-4" />,
     color: "text-amber-600 dark:text-amber-400",
+  },
+  bol: {
+    label: "bol.com",
+    description: "Scrapes book metadata from bol.com search and product pages",
+    icon: <Store className="size-4" />,
+    color: "text-sky-600 dark:text-sky-400",
   },
   google: {
     label: "Google Books",

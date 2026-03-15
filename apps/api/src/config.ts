@@ -15,7 +15,7 @@ export const config = {
   frontendMode: process.env.BOOKLITE_FRONTEND_MODE ?? "auto",
   jwtSecret: process.env.JWT_SECRET ?? "booklite-dev-secret-change-me",
   accessTokenTtlSeconds: toInt(process.env.ACCESS_TOKEN_TTL_SECONDS, 900),
-  refreshTokenTtlSeconds: toInt(process.env.REFRESH_TOKEN_TTL_SECONDS, 604800),
+  refreshTokenTtlSeconds: toInt(process.env.REFRESH_TOKEN_TTL_SECONDS, 2592000),
   uploadLimitMb: toInt(process.env.UPLOAD_LIMIT_MB, 100),
   googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? "",
   googleBooksLanguage: process.env.GOOGLE_BOOKS_LANGUAGE ?? "",

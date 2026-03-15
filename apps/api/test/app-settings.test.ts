@@ -93,6 +93,7 @@ describe("app settings", () => {
     expect(body.metadataProviderEnabled).toEqual({
       open_library: true,
       amazon: true,
+      bol: false,
       google: true,
       hardcover: false,
       goodreads: true,

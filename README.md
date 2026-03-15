@@ -8,7 +8,7 @@ If you need the full feature set, check out [BookLore](https://github.com/booklo
 
 - **Upload** EPUB, KEPUB, and PDF files from the web UI
 - **Collections** with drag-and-drop organization
-- **Metadata** from 6 providers (Open Library, Google Books, Amazon, Hardcover, Goodreads, Douban)
+- **Metadata** from 7 providers (Open Library, Google Books, Amazon, bol.com, Hardcover, Goodreads, Douban)
 - **Kobo sync** — books and reading progress over the built-in Kobo API
 - **Multi-user** with simple Owner/Member roles
 - **Built-in EPUB and KEPUB reader**
@@ -46,6 +46,8 @@ See `.env.example`:
 - `BOOKS_DIR` (default `/books`)
 - `JWT_SECRET`
 - `BASE_URL`
+- `ACCESS_TOKEN_TTL_SECONDS` (default `900`, 15 minutes)
+- `REFRESH_TOKEN_TTL_SECONDS` (default `2592000`, 30 days)
 - `BOOKLITE_FRONTEND_MODE` (`auto`/`vite`/`static`/`off`, default `auto`)
   - `auto` resolves to `vite` when `NODE_ENV` is not `production`
   - `auto` resolves to `static` when `NODE_ENV=production`

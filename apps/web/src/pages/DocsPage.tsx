@@ -157,7 +157,7 @@ export const DocsPage: React.FC = () => {
           <ul className="space-y-2">
             <BulletItem>Upload EPUB, KEPUB, and PDF files from the web UI.</BulletItem>
             <BulletItem>Organize books into collections with drag and drop.</BulletItem>
-            <BulletItem>Automatic metadata from 6 providers (Open Library, Google Books, Amazon, Hardcover, Goodreads, Douban).</BulletItem>
+            <BulletItem>Automatic metadata from 7 providers (Open Library, Google Books, Amazon, bol.com, Hardcover, Goodreads, Douban).</BulletItem>
             <BulletItem>Kobo sync &mdash; books and reading progress over the built-in Kobo API.</BulletItem>
             <BulletItem>Multi-user with simple Owner/Member roles.</BulletItem>
             <BulletItem>Built-in EPUB and KEPUB reader.</BulletItem>

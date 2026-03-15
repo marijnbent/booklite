@@ -77,6 +77,7 @@ export interface KoboSettings {
 export type MetadataProvider =
   | "open_library"
   | "amazon"
+  | "bol"
   | "google"
   | "hardcover"
   | "goodreads"
@@ -86,6 +87,7 @@ export type MetadataProvider =
 export interface MetadataProviderEnabled {
   open_library: boolean;
   amazon: boolean;
+  bol: boolean;
   google: boolean;
   hardcover: boolean;
   goodreads: boolean;

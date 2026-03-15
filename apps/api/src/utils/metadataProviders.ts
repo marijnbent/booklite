@@ -3,6 +3,7 @@ import { z } from "zod";
 export const metadataProviderKeys = [
   "open_library",
   "amazon",
+  "bol",
   "google",
   "hardcover",
   "goodreads",
@@ -15,6 +16,7 @@ export const metadataProviderEnabledSchema = z
   .object({
     open_library: z.boolean(),
     amazon: z.boolean(),
+    bol: z.boolean(),
     google: z.boolean(),
     hardcover: z.boolean(),
     goodreads: z.boolean(),
@@ -27,6 +29,7 @@ export type MetadataProviderEnabled = z.infer<typeof metadataProviderEnabledSche
 export const defaultMetadataProviderEnabled: MetadataProviderEnabled = {
   open_library: true,
   amazon: true,
+  bol: false,
   google: true,
   hardcover: false,
   goodreads: true,
@@ -47,6 +50,7 @@ export const toMetadataProviderEnabled = (
     open_library:
       typeof row.open_library === "boolean" ? row.open_library : fallback.open_library,
     amazon: typeof row.amazon === "boolean" ? row.amazon : fallback.amazon,
+    bol: typeof row.bol === "boolean" ? row.bol : fallback.bol,
     google: typeof row.google === "boolean" ? row.google : fallback.google,
     hardcover: typeof row.hardcover === "boolean" ? row.hardcover : fallback.hardcover,
     goodreads: typeof row.goodreads === "boolean" ? row.goodreads : fallback.goodreads,
