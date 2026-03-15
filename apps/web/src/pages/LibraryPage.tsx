@@ -578,7 +578,11 @@ const BookMenuItems: React.FC<{
   onRemoveFromCollection: (bookId: number, collectionId: number) => void;
   onDelete: (id: number) => void;
   onToggleSelect: (id: number) => void;
-  MenuItem: React.FC<React.ComponentPropsWithoutRef<"div"> & { onClick?: () => void }>;
+  MenuItem: React.FC<{
+    children?: React.ReactNode;
+    className?: string;
+    onSelect?: () => void;
+  }>;
   MenuSeparator: React.FC;
   MenuSub: React.FC<{ children: React.ReactNode }>;
   MenuSubTrigger: React.FC<{ children: React.ReactNode; className?: string }>;
@@ -610,7 +614,7 @@ const BookMenuItems: React.FC<{
 
   return (
     <>
-      <MenuItem onClick={() => onSelect(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={() => onSelect(book.id)} className="gap-2 text-xs">
         <Book className="size-3.5" />
         View details
       </MenuItem>
@@ -628,7 +632,7 @@ const BookMenuItems: React.FC<{
               {assignableCollections.map((col) => (
                 <MenuItem
                   key={col.id}
-                  onClick={() => {
+                  onSelect={() => {
                     if (col.id !== activeCollectionId) onAddToCollection(book.id, col.id);
                   }}
                   className={cn("gap-2 text-xs", col.id === activeCollectionId && "bg-accent")}
@@ -646,7 +650,7 @@ const BookMenuItems: React.FC<{
           </MenuSub>
           {canRemoveFromActiveCollection && (
             <MenuItem
-              onClick={() => onRemoveFromCollection(book.id, activeCollectionId)}
+              onSelect={() => onRemoveFromCollection(book.id, activeCollectionId)}
               className="gap-2 text-xs text-destructive focus:text-destructive"
             >
               <X className="size-3.5" />
@@ -669,7 +673,7 @@ const BookMenuItems: React.FC<{
             return (
               <MenuItem
                 key={s}
-                onClick={() => onStatusChange(book.id, s)}
+                onSelect={() => onStatusChange(book.id, s)}
                 className={cn("gap-2 text-xs", status === s && "bg-accent")}
               >
                 <sc.icon className="size-3.5" />
@@ -682,7 +686,7 @@ const BookMenuItems: React.FC<{
       </MenuSub>
 
       <MenuItem
-        onClick={() => onToggleFavorite(book.id, !book.isFavorite)}
+        onSelect={() => onToggleFavorite(book.id, !book.isFavorite)}
         className="gap-2 text-xs"
       >
         <Star className={cn("size-3.5", book.isFavorite && "fill-yellow-400 text-yellow-500")} />
@@ -691,22 +695,22 @@ const BookMenuItems: React.FC<{
 
       <MenuSeparator />
 
-      <MenuItem onClick={() => onRefreshMetadata(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={() => onRefreshMetadata(book.id)} className="gap-2 text-xs">
         <RefreshCw className="size-3.5" />
         Refresh metadata
       </MenuItem>
-      <MenuItem onClick={() => onDownload(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={() => onDownload(book.id)} className="gap-2 text-xs">
         <Download className="size-3.5" />
         Download
       </MenuItem>
       <MenuSeparator />
-      <MenuItem onClick={() => onToggleSelect(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={() => onToggleSelect(book.id)} className="gap-2 text-xs">
         <CheckSquare className="size-3.5" />
         Select
       </MenuItem>
       <MenuSeparator />
       <MenuItem
-        onClick={() => {
+        onSelect={() => {
           if (window.confirm(`Delete "${book.title}"? This cannot be undone.`))
             onDelete(book.id);
         }}
