@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { apiFetch, apiFetchRaw } from "@/lib/api";
+import { isBrowserReadableBookExt } from "@/lib/bookFormats";
 import {
   openReaderBook,
   renderReaderBook,
@@ -307,7 +308,7 @@ export const ReaderPage: React.FC = () => {
 
   // Boot the reader
   useEffect(() => {
-    if (!hasValidBookId || !bookQuery.data || bookQuery.data.fileExt.toLowerCase() !== "epub") {
+    if (!hasValidBookId || !bookQuery.data || !isBrowserReadableBookExt(bookQuery.data.fileExt)) {
       return;
     }
     if (!viewerRef.current) return;
@@ -368,7 +369,7 @@ export const ReaderPage: React.FC = () => {
         setIsReady(true);
       } catch {
         if (!cancelled && mountedRef.current) {
-          setRenderError("Could not open this EPUB in the browser.");
+          setRenderError("Could not open this book in the browser.");
           setIsReady(false);
         }
       }
@@ -542,12 +543,12 @@ export const ReaderPage: React.FC = () => {
     );
   }
 
-  if (bookQuery.data.fileExt.toLowerCase() !== "epub") {
+  if (!isBrowserReadableBookExt(bookQuery.data.fileExt)) {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center gap-4 py-20 text-center">
         <h1 className="text-2xl font-semibold">Reader not available</h1>
         <p className="text-sm text-muted-foreground">
-          Built-in reading is currently available for EPUB books only.
+          Built-in reading is currently available for EPUB and KEPUB books.
         </p>
         <Button asChild><Link to="/library">Back to library</Link></Button>
       </div>

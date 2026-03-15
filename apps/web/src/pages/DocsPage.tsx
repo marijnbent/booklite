@@ -155,12 +155,12 @@ export const DocsPage: React.FC = () => {
             Features
           </h2>
           <ul className="space-y-2">
-            <BulletItem>Upload EPUB and PDF files from the web UI.</BulletItem>
+            <BulletItem>Upload EPUB, KEPUB, and PDF files from the web UI.</BulletItem>
             <BulletItem>Organize books into collections with drag and drop.</BulletItem>
             <BulletItem>Automatic metadata from 6 providers (Open Library, Google Books, Amazon, Hardcover, Goodreads, Douban).</BulletItem>
             <BulletItem>Kobo sync &mdash; books and reading progress over the built-in Kobo API.</BulletItem>
             <BulletItem>Multi-user with simple Owner/Member roles.</BulletItem>
-            <BulletItem>Built-in EPUB reader.</BulletItem>
+            <BulletItem>Built-in EPUB and KEPUB reader.</BulletItem>
             <BulletItem>Full-text search powered by SQLite FTS5.</BulletItem>
           </ul>
         </section>
@@ -191,7 +191,7 @@ export const DocsPage: React.FC = () => {
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Good to know</span>
             </div>
             <ul className="space-y-1.5">
-              <BulletItem>Only EPUB books sync to Kobo.</BulletItem>
+              <BulletItem>Only EPUB and KEPUB books sync to Kobo.</BulletItem>
               <BulletItem>You can sync all books or only books from selected collections.</BulletItem>
               <BulletItem>Regenerating your token immediately invalidates the old token.</BulletItem>
             </ul>
@@ -282,7 +282,7 @@ export const DocsPage: React.FC = () => {
               <ul className="space-y-1.5">
                 <BulletItem>Check Kobo sync is enabled.</BulletItem>
                 <BulletItem>Make sure at least one sync collection is selected.</BulletItem>
-                <BulletItem>Only EPUB files are synced.</BulletItem>
+                <BulletItem>Only EPUB and KEPUB files are synced.</BulletItem>
                 <BulletItem>If token was regenerated, update Kobo config with the new endpoint.</BulletItem>
               </ul>
             </TroubleshootItem>

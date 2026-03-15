@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { apiFetch, apiFetchRaw } from "@/lib/api";
+import { isBrowserReadableBookExt } from "@/lib/bookFormats";
 import { toRenderableCoverSrc } from "@/lib/covers";
 import type { MetadataCoverOption, MetadataSource } from "@/lib/metadata";
 import { sourceLabel } from "@/lib/metadata";
@@ -1079,7 +1080,7 @@ export const LibraryPage: React.FC = () => {
     const blob = await response.blob();
     const contentDisposition = response.headers.get("content-disposition") ?? "";
     const match = contentDisposition.match(/filename="([^"]+)"/i);
-    const filename = match?.[1] ?? `book-${bookId}.epub`;
+    const filename = match?.[1] ?? `book-${bookId}`;
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = objectUrl;
@@ -1657,7 +1658,7 @@ export const LibraryPage: React.FC = () => {
                     );
                   })}
                 </ToggleGroup>
-                {panelBook.fileExt.toLowerCase() === "epub" && (
+                {isBrowserReadableBookExt(panelBook.fileExt) && (
                   <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={() => openReader(panelBook.id)} title="Read">
                     <BookOpen className="size-3.5" />
                   </Button>

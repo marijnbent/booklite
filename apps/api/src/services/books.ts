@@ -1,7 +1,13 @@
 import path from "node:path";
 
+const supportedBookExts = ["epub", "kepub", "pdf"] as const;
+const koboSyncableBookExts = ["epub", "kepub"] as const;
+
 export const isSupportedBookExt = (ext: string): boolean =>
-  ["epub", "pdf"].includes(ext.toLowerCase());
+  supportedBookExts.includes(ext.toLowerCase() as (typeof supportedBookExts)[number]);
+
+export const isKoboSyncableBookExt = (ext: string): boolean =>
+  koboSyncableBookExts.includes(ext.toLowerCase() as (typeof koboSyncableBookExts)[number]);
 
 export interface ParsedFilename {
   title: string;
@@ -21,7 +27,7 @@ const SOURCE_TAGS = [
 const HASH_PATTERN = /\b[0-9a-f]{32,}\b/gi;
 const ISBN_PATTERN = /\b(?:97[89])?\d{10}\b/g;
 const TRAILING_TAG_PATTERN =
-  /\s*[\[(](?:epub|pdf|mobi|azw3|fb2|cbz|cbr|ebook|audiobook|retail|scan|ocr|v\d+|rev\d+)[\])]\s*$/i;
+  /\s*[\[(](?:epub|kepub|pdf|mobi|azw3|fb2|cbz|cbr|ebook|audiobook|retail|scan|ocr|v\d+|rev\d+)[\])]\s*$/i;
 const YEAR_PUBLISHER_PATTERN = /\s*\((?:(?:19|20)\d{2}(?:-\d{2}(?:-\d{2})?)?)?(?:,\s*[^)]+)?\)\s*$/;
 const TRAILING_YEAR_PATTERN = /\s*[\[(](?:19|20)\d{2}[\])]\s*$/;
 

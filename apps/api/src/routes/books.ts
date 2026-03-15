@@ -82,7 +82,7 @@ export const mapBookRow = (row: any) => ({
 
 export const koboSyncableCase = (userId: number) => sql`
   CASE
-    WHEN lower(b.file_ext) = 'epub' AND (
+    WHEN lower(b.file_ext) IN ('epub', 'kepub') AND (
       EXISTS (
         SELECT 1 FROM kobo_user_settings kus
         WHERE kus.user_id = ${userId} AND kus.sync_enabled = 1 AND kus.sync_all_books = 1

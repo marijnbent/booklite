@@ -190,7 +190,7 @@ const getSyncedBooksForUser = async (userId: number): Promise<SyncedBook[]> => {
         SELECT b.id, b.title, b.author, b.series, b.description, b.cover_path AS coverPath, b.created_at AS createdAt, b.updated_at AS updatedAt, b.file_path AS filePath, b.file_size AS fileSize
         FROM books b
         WHERE b.owner_user_id = ${userId}
-          AND lower(b.file_ext) = 'epub'
+          AND lower(b.file_ext) IN ('epub', 'kepub')
       `
     );
     return rows as SyncedBook[];
@@ -205,7 +205,7 @@ const getSyncedBooksForUser = async (userId: number): Promise<SyncedBook[]> => {
       JOIN books b ON b.id = cb.book_id
       WHERE ksc.user_id = ${userId}
         AND c.user_id = ${userId}
-        AND lower(b.file_ext) = 'epub'
+        AND lower(b.file_ext) IN ('epub', 'kepub')
     `
   );
   return rows as SyncedBook[];
@@ -243,7 +243,7 @@ export const isBookInKoboSyncScope = async (userId: number, bookId: number): Pro
         SELECT b.id FROM books b
         WHERE b.owner_user_id = ${userId}
           AND b.id = ${bookId}
-          AND lower(b.file_ext) = 'epub'
+          AND lower(b.file_ext) IN ('epub', 'kepub')
         LIMIT 1
       `
     );
@@ -260,7 +260,7 @@ export const isBookInKoboSyncScope = async (userId: number, bookId: number): Pro
       WHERE ksc.user_id = ${userId}
         AND c.user_id = ${userId}
         AND b.id = ${bookId}
-        AND lower(b.file_ext) = 'epub'
+        AND lower(b.file_ext) IN ('epub', 'kepub')
       LIMIT 1
     `
   );
@@ -460,7 +460,7 @@ const buildTagEntitlements = async (userId: number): Promise<Record<string, unkn
     .where(
       and(
         inArray(collectionBooks.collectionId, collectionIds),
-        sql`lower(${books.fileExt}) = 'epub'`
+        sql`lower(${books.fileExt}) IN ('epub', 'kepub')`
       )
     );
 

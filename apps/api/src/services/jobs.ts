@@ -4,7 +4,7 @@ import { db, getSetting, walCheckpoint } from "../db/client";
 import { books, collectionBooks, collections, importJobs } from "../db/schema";
 import { nowIso } from "../utils/time";
 import { fetchMetadataWithFallback } from "./metadata";
-import { filenameToBasicMetadata } from "./books";
+import { filenameToBasicMetadata, isKoboSyncableBookExt } from "./books";
 import { resolveFilenameMetadata } from "./filenameNormalizer";
 import { getFavoritesCollectionId } from "./systemCollections";
 import { logAdminActivity } from "./adminActivityLog";
@@ -123,7 +123,7 @@ const processUploadJob = async (job: {
       filePath: payload.filePath,
       fileExt: payload.fileExt,
       fileSize: payload.fileSize,
-      koboSyncable: payload.fileExt.toLowerCase() === "epub" ? 1 : 0,
+      koboSyncable: isKoboSyncableBookExt(payload.fileExt) ? 1 : 0,
       createdAt: timestamp,
       updatedAt: timestamp
     })

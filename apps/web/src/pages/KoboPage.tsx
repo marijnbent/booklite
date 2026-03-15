@@ -144,7 +144,7 @@ export const KoboPage: React.FC = () => {
               <div>
                 <Label htmlFor="sync-all" className="text-sm font-medium cursor-pointer">Sync all books</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Sync all EPUB books to Kobo instead of selecting collections
+                  Sync all EPUB and KEPUB books to Kobo instead of selecting collections
                 </p>
               </div>
               <Switch
@@ -176,7 +176,7 @@ export const KoboPage: React.FC = () => {
               <div>
                 <Label className="text-sm font-medium">Collections to sync</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Only EPUB books from selected collections will sync to Kobo.
+                  Only EPUB and KEPUB books from selected collections will sync to Kobo.
                 </p>
               </div>
               <Badge variant="secondary" className="tabular-nums">

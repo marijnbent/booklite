@@ -221,7 +221,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (!isSupportedBookExt(fileExt)) {
           await drainFile(part.file);
-          fileErrors.set(clientId, "Only EPUB and PDF are supported");
+          fileErrors.set(clientId, "Only EPUB, KEPUB, and PDF are supported");
           continue;
         }
 

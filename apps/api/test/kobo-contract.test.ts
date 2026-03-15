@@ -12,7 +12,7 @@ let koboToken = "";
 let favoritesCollectionId = 0;
 let bookId = 0;
 let unsyncedBookId = 0;
-const koboBookBody = "dummy-epub-content";
+const koboBookBody = "dummy-kepub-content";
 
 const getEntriesByKey = (payload: unknown, key: string): Array<Record<string, unknown>> => {
   if (!Array.isArray(payload)) return [];
@@ -32,7 +32,7 @@ describe("kobo contract", () => {
     accessToken = (await setupOwnerAndLogin(app, "owner4@example.com", "owner4")).accessToken;
 
     const timestamp = new Date().toISOString();
-    fs.writeFileSync(path.join(booksDir, "kobo.epub"), koboBookBody);
+    fs.writeFileSync(path.join(booksDir, "kobo.kepub"), koboBookBody);
     const inserted = await dbModule.db
       .insert(schema.books)
       .values([
@@ -43,8 +43,8 @@ describe("kobo contract", () => {
           series: null,
           description: null,
           coverPath: null,
-          filePath: "kobo.epub",
-          fileExt: "epub",
+          filePath: "kobo.kepub",
+          fileExt: "kepub",
           fileSize: 100,
           koboSyncable: 1,
           createdAt: timestamp,
@@ -385,10 +385,10 @@ describe("kobo contract", () => {
     expect(response.headers["content-length"]).toBe(String(Buffer.byteLength(koboBookBody)));
     expect(response.headers["accept-ranges"]).toBeUndefined();
     expect(response.headers["content-disposition"]).toContain(
-      `filename="Kobo Caf_ Sample.epub"`
+      `filename="Kobo Caf_ Sample.kepub"`
     );
     expect(response.headers["content-disposition"]).toContain(
-      "filename*=UTF-8''Kobo%20Caf%C3%A9%20Sample.epub"
+      "filename*=UTF-8''Kobo%20Caf%C3%A9%20Sample.kepub"
     );
   });
 
@@ -404,10 +404,10 @@ describe("kobo contract", () => {
     expect(response.headers["content-length"]).toBe(String(Buffer.byteLength(koboBookBody)));
     expect(response.headers["accept-ranges"]).toBeUndefined();
     expect(response.headers["content-disposition"]).toContain(
-      `filename="Kobo Caf_ Sample.epub"`
+      `filename="Kobo Caf_ Sample.kepub"`
     );
     expect(response.headers["content-disposition"]).toContain(
-      "filename*=UTF-8''Kobo%20Caf%C3%A9%20Sample.epub"
+      "filename*=UTF-8''Kobo%20Caf%C3%A9%20Sample.kepub"
     );
   });
 

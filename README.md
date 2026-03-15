@@ -6,12 +6,12 @@ If you need the full feature set, check out [BookLore](https://github.com/booklo
 
 ## Features
 
-- **Upload** EPUB and PDF files from the web UI
+- **Upload** EPUB, KEPUB, and PDF files from the web UI
 - **Collections** with drag-and-drop organization
 - **Metadata** from 6 providers (Open Library, Google Books, Amazon, Hardcover, Goodreads, Douban)
 - **Kobo sync** — books and reading progress over the built-in Kobo API
 - **Multi-user** with simple Owner/Member roles
-- **Built-in EPUB reader**
+- **Built-in EPUB and KEPUB reader**
 - **Full-text search** powered by SQLite FTS5
 
 ## Stack
@@ -89,6 +89,6 @@ npm test
 ## Kobo Notes
 
 - Sync endpoint remains at `/api/kobo/{token}/...`
-- Only EPUB books are synced to Kobo
+- Only EPUB and KEPUB books are synced to Kobo
 - PDF remains library-only
 - Progress sync uses latest timestamp wins

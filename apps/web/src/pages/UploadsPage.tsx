@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { isUploadableBookName, toInitialBookTitle } from "@/lib/bookFormats";
 import { toRenderableCoverSrc } from "@/lib/covers";
 import type { MetadataCoverOption, MetadataSource } from "@/lib/metadata";
 import { sourceLabel } from "@/lib/metadata";
@@ -105,13 +106,6 @@ const statusDisplay: Record<
   COMPLETED: { label: "Completed", variant: "success", icon: <CheckCircle2 className="size-3.5" /> },
   FAILED: { label: "Failed", variant: "destructive", icon: <XCircle className="size-3.5" /> },
 };
-
-const extAllowed = (name: string): boolean => {
-  const lower = name.toLowerCase();
-  return lower.endsWith(".epub") || lower.endsWith(".pdf");
-};
-
-const toInitialTitle = (name: string): string => name.replace(/\.[^.]+$/, "");
 
 const DEPLOYMENT_SAFE_UPLOAD_BATCH_BYTES = 8 * 1024 * 1024;
 const DEPLOYMENT_SAFE_UPLOAD_BATCH_FILES = 5;
@@ -324,8 +318,8 @@ export const UploadsPage: React.FC = () => {
   const addFilesToDrafts = (files: FileList | File[]) => {
     const next: UploadDraft[] = [];
     Array.from(files).forEach((file) => {
-      if (!extAllowed(file.name)) return;
-      const fileNameTitle = toInitialTitle(file.name);
+      if (!isUploadableBookName(file.name)) return;
+      const fileNameTitle = toInitialBookTitle(file.name);
       next.push({
         id: crypto.randomUUID(),
         file,
@@ -485,7 +479,7 @@ export const UploadsPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Upload</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Add books to your library from EPUB or PDF files.
+          Add books to your library from EPUB, KEPUB, or PDF files.
         </p>
       </div>
 
@@ -507,7 +501,7 @@ export const UploadsPage: React.FC = () => {
           dragOver ? "text-primary" : "text-muted-foreground/40"
         )} />
         <div className="text-center">
-          <p className="text-sm font-medium">Drop EPUB or PDF files here</p>
+          <p className="text-sm font-medium">Drop EPUB, KEPUB, or PDF files here</p>
           <p className="mt-1 text-xs text-muted-foreground">
             or click to browse -- metadata is looked up automatically
           </p>
@@ -516,7 +510,7 @@ export const UploadsPage: React.FC = () => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".epub,.pdf"
+          accept=".epub,.kepub,.pdf"
           multiple
           className="hidden"
           onChange={(e) => {
