@@ -13,8 +13,22 @@ import { db } from "../db/client";
 import { collections } from "../db/schema";
 import { logAdminActivity } from "../services/adminActivityLog";
 
-const sanitizeFileName = (name: string): string =>
-  name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 200);
+const MAX_UPLOAD_FILE_NAME_LENGTH = 200;
+
+export const sanitizeFileName = (name: string): string => {
+  const sanitized = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  if (sanitized.length <= MAX_UPLOAD_FILE_NAME_LENGTH) {
+    return sanitized;
+  }
+
+  const ext = path.extname(sanitized);
+  if (!ext || ext.length >= MAX_UPLOAD_FILE_NAME_LENGTH) {
+    return sanitized.slice(0, MAX_UPLOAD_FILE_NAME_LENGTH);
+  }
+
+  const base = sanitized.slice(0, -ext.length);
+  return `${base.slice(0, MAX_UPLOAD_FILE_NAME_LENGTH - ext.length)}${ext}`;
+};
 
 const dedupePath = (targetPath: string): string => {
   if (!fs.existsSync(targetPath)) return targetPath;
