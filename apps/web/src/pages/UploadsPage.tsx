@@ -68,6 +68,9 @@ interface CollectionItem {
 
 interface MetadataPreview {
   source: MetadataSource;
+  queryTitle: string;
+  queryAuthor?: string | null;
+  querySeries?: string | null;
   title?: string | null;
   author?: string | null;
   series?: string | null;
@@ -261,8 +264,9 @@ export const UploadsPage: React.FC = () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          title: target.title || target.fileNameTitle,
-          author: target.author || undefined
+          fileName: target.file.name,
+          title: target.titleTouched ? (target.title || undefined) : undefined,
+          author: target.authorTouched ? (target.author || undefined) : undefined
         })
       });
 
@@ -273,6 +277,12 @@ export const UploadsPage: React.FC = () => {
           if (preview.source === "NONE") {
             return {
               ...draft,
+              title: draft.titleTouched ? draft.title : preview.queryTitle,
+              author: draft.authorTouched ? draft.author : (preview.queryAuthor ?? draft.author),
+              series:
+                draft.series.trim().length > 0
+                  ? draft.series
+                  : (preview.querySeries ?? draft.series),
               coverPath: "",
               coverOptions: [],
               metadataState: "none",
@@ -287,9 +297,18 @@ export const UploadsPage: React.FC = () => {
 
           return {
             ...draft,
-            title: draft.titleTouched ? draft.title : (preview.title ?? draft.title),
-            author: draft.authorTouched ? draft.author : (preview.author ?? draft.author),
-            series: draft.series.trim().length > 0 ? draft.series : (preview.series ?? draft.series),
+            title:
+              draft.titleTouched
+                ? draft.title
+                : (preview.title ?? preview.queryTitle ?? draft.title),
+            author:
+              draft.authorTouched
+                ? draft.author
+                : (preview.author ?? preview.queryAuthor ?? draft.author),
+            series:
+              draft.series.trim().length > 0
+                ? draft.series
+                : (preview.series ?? preview.querySeries ?? draft.series),
             description: draft.descriptionTouched
               ? draft.description
               : (preview.description ?? draft.description),

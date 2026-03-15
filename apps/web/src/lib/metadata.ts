@@ -1,20 +1,11 @@
-export type MetadataSource =
-  | "OPEN_LIBRARY"
-  | "AMAZON"
-  | "GOOGLE"
-  | "HARDCOVER"
-  | "GOODREADS"
-  | "DOUBAN"
-  | "NONE";
+import type { MetadataCoverOption, MetadataSource } from "@booklite/shared";
 
-export interface MetadataCoverOption {
-  coverPath: string;
-  source: Exclude<MetadataSource, "NONE">;
-}
+export type { MetadataCoverOption, MetadataSource } from "@booklite/shared";
 
 export const sourceLabel = (source: string | null | undefined): string => {
   if (source === "OPEN_LIBRARY") return "Open Library";
   if (source === "AMAZON") return "Amazon";
+  if (source === "BOL") return "bol.com";
   if (source === "GOOGLE") return "Google Books";
   if (source === "HARDCOVER") return "Hardcover";
   if (source === "GOODREADS") return "Goodreads";

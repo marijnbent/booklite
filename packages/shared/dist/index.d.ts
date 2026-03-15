@@ -56,10 +56,27 @@ export interface KoboSettings {
     markFinishedThreshold: number;
     syncCollectionIds: number[];
 }
-export type MetadataProvider = "open_library" | "amazon" | "google" | "hardcover" | "goodreads" | "douban" | "none";
+export type MetadataProvider = "open_library" | "amazon" | "bol" | "google" | "hardcover" | "goodreads" | "douban" | "none";
+export type MetadataSource = "OPEN_LIBRARY" | "AMAZON" | "BOL" | "GOOGLE" | "HARDCOVER" | "GOODREADS" | "DOUBAN" | "NONE";
+export interface MetadataCoverOption {
+    coverPath: string;
+    source: Exclude<MetadataSource, "NONE">;
+}
+export interface MetadataResult {
+    title?: string;
+    author?: string;
+    series?: string;
+    description?: string;
+    coverPath?: string;
+    source: MetadataSource;
+}
+export interface MetadataPreviewResult extends MetadataResult {
+    coverOptions: MetadataCoverOption[];
+}
 export interface MetadataProviderEnabled {
     open_library: boolean;
     amazon: boolean;
+    bol: boolean;
     google: boolean;
     hardcover: boolean;
     goodreads: boolean;
@@ -72,6 +89,7 @@ export interface AppSettings {
     metadataGoogleLanguage: string;
     metadataGoogleApiKey: string;
     metadataHardcoverApiKey: string;
+    koboDebugLogging: boolean;
     uploadLimitMb: number;
 }
 export type AdminActivityScope = "metadata" | "upload" | "kobo";
