@@ -577,11 +577,12 @@ const BookMenuItems: React.FC<{
   onAddToCollection: (bookId: number, collectionId: number) => void;
   onRemoveFromCollection: (bookId: number, collectionId: number) => void;
   onDelete: (id: number) => void;
+  onMenuAction: () => void;
   onToggleSelect: (id: number) => void;
   MenuItem: React.FC<{
     children?: React.ReactNode;
     className?: string;
-    onSelect?: () => void;
+    onSelect?: (event: Event) => void;
   }>;
   MenuSeparator: React.FC;
   MenuSub: React.FC<{ children: React.ReactNode }>;
@@ -599,6 +600,7 @@ const BookMenuItems: React.FC<{
   onAddToCollection,
   onRemoveFromCollection,
   onDelete,
+  onMenuAction,
   onToggleSelect,
   MenuItem,
   MenuSeparator,
@@ -611,10 +613,18 @@ const BookMenuItems: React.FC<{
   const canRemoveFromActiveCollection =
     activeCollectionId !== null &&
     assignableCollections.some((collection) => collection.id === activeCollectionId);
+  const runMenuAction = useCallback(
+    (action: () => void) => (event: Event) => {
+      event.stopPropagation();
+      onMenuAction();
+      action();
+    },
+    [onMenuAction],
+  );
 
   return (
     <>
-      <MenuItem onSelect={() => onSelect(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={runMenuAction(() => onSelect(book.id))} className="gap-2 text-xs">
         <Book className="size-3.5" />
         View details
       </MenuItem>
@@ -632,9 +642,9 @@ const BookMenuItems: React.FC<{
               {assignableCollections.map((col) => (
                 <MenuItem
                   key={col.id}
-                  onSelect={() => {
+                  onSelect={runMenuAction(() => {
                     if (col.id !== activeCollectionId) onAddToCollection(book.id, col.id);
-                  }}
+                  })}
                   className={cn("gap-2 text-xs", col.id === activeCollectionId && "bg-accent")}
                 >
                   {col.icon ? <span className="text-sm leading-none">{col.icon}</span> : <FolderOpen className="size-3.5" />}
@@ -650,7 +660,7 @@ const BookMenuItems: React.FC<{
           </MenuSub>
           {canRemoveFromActiveCollection && (
             <MenuItem
-              onSelect={() => onRemoveFromCollection(book.id, activeCollectionId)}
+              onSelect={runMenuAction(() => onRemoveFromCollection(book.id, activeCollectionId))}
               className="gap-2 text-xs text-destructive focus:text-destructive"
             >
               <X className="size-3.5" />
@@ -673,7 +683,7 @@ const BookMenuItems: React.FC<{
             return (
               <MenuItem
                 key={s}
-                onSelect={() => onStatusChange(book.id, s)}
+                onSelect={runMenuAction(() => onStatusChange(book.id, s))}
                 className={cn("gap-2 text-xs", status === s && "bg-accent")}
               >
                 <sc.icon className="size-3.5" />
@@ -686,7 +696,7 @@ const BookMenuItems: React.FC<{
       </MenuSub>
 
       <MenuItem
-        onSelect={() => onToggleFavorite(book.id, !book.isFavorite)}
+        onSelect={runMenuAction(() => onToggleFavorite(book.id, !book.isFavorite))}
         className="gap-2 text-xs"
       >
         <Star className={cn("size-3.5", book.isFavorite && "fill-yellow-400 text-yellow-500")} />
@@ -695,25 +705,25 @@ const BookMenuItems: React.FC<{
 
       <MenuSeparator />
 
-      <MenuItem onSelect={() => onRefreshMetadata(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={runMenuAction(() => onRefreshMetadata(book.id))} className="gap-2 text-xs">
         <RefreshCw className="size-3.5" />
         Refresh metadata
       </MenuItem>
-      <MenuItem onSelect={() => onDownload(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={runMenuAction(() => onDownload(book.id))} className="gap-2 text-xs">
         <Download className="size-3.5" />
         Download
       </MenuItem>
       <MenuSeparator />
-      <MenuItem onSelect={() => onToggleSelect(book.id)} className="gap-2 text-xs">
+      <MenuItem onSelect={runMenuAction(() => onToggleSelect(book.id))} className="gap-2 text-xs">
         <CheckSquare className="size-3.5" />
         Select
       </MenuItem>
       <MenuSeparator />
       <MenuItem
-        onSelect={() => {
+        onSelect={runMenuAction(() => {
           if (window.confirm(`Delete "${book.title}"? This cannot be undone.`))
             onDelete(book.id);
-        }}
+        })}
         className="gap-2 text-xs text-destructive focus:text-destructive"
       >
         <Trash2 className="size-3.5" />
@@ -750,6 +760,7 @@ export const LibraryPage: React.FC = () => {
   const [selectedBookIds, setSelectedBookIds] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const lastClickedIdRef = useRef<number | null>(null);
+  const suppressNextBookClickRef = useRef(false);
   const selectionActive = selectionMode || selectedBookIds.size > 0;
 
   const queryClient = useQueryClient();
@@ -1104,6 +1115,11 @@ export const LibraryPage: React.FC = () => {
 
   const handleBookClick = useCallback(
     (bookId: number, event: React.MouseEvent) => {
+      if (suppressNextBookClickRef.current) {
+        suppressNextBookClickRef.current = false;
+        return;
+      }
+
       if (event.metaKey || event.ctrlKey) {
         // Toggle selection
         setSelectedBookIds((prev) => {
@@ -1155,6 +1171,13 @@ export const LibraryPage: React.FC = () => {
     lastClickedIdRef.current = bookId;
   }, []);
 
+  const suppressBookClickOnce = useCallback(() => {
+    suppressNextBookClickRef.current = true;
+    window.setTimeout(() => {
+      suppressNextBookClickRef.current = false;
+    }, 0);
+  }, []);
+
   const isLoading = selectedCollectionId !== null
     ? selectedCollectionId === UNCOLLECTED_COLLECTION_ID
       ? uncollectedBooksQuery.isLoading
@@ -1189,10 +1212,11 @@ export const LibraryPage: React.FC = () => {
       onAddToCollection: (bookId: number, collectionId: number) => void addToCollection(bookId, collectionId),
       onRemoveFromCollection: (bookId: number, collectionId: number) => void removeFromCollection(bookId, collectionId),
       onDelete: (id: number) => void deleteBook(id),
+      onMenuAction: suppressBookClickOnce,
       onBookClick: handleBookClick,
       onToggleSelect: handleToggleSelect,
     }),
-    [collections, selectedCollectionId, toggleFavorite, changeStatus, refreshMetadata, handleDownload, addToCollection, removeFromCollection, deleteBook, handleBookClick, handleToggleSelect],
+    [collections, selectedCollectionId, toggleFavorite, changeStatus, refreshMetadata, handleDownload, addToCollection, removeFromCollection, deleteBook, suppressBookClickOnce, handleBookClick, handleToggleSelect],
   );
 
   return (
@@ -1940,6 +1964,7 @@ type BookMenuProps = {
   onAddToCollection: (bookId: number, collectionId: number) => void;
   onRemoveFromCollection: (bookId: number, collectionId: number) => void;
   onDelete: (id: number) => void;
+  onMenuAction: () => void;
   onBookClick: (id: number, event: React.MouseEvent) => void;
   onToggleSelect: (id: number) => void;
 };
