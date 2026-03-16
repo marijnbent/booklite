@@ -1,4 +1,4 @@
-import { coverProviderPreference, providerTrustScore } from "./constants";
+import { coverProviderPreferenceScore, providerTrustScore } from "./providers";
 import type {
   MetadataCoverOption,
   MetadataProvider,
@@ -13,14 +13,6 @@ import {
   similarityScore,
   truncateForPrompt
 } from "./text";
-
-const coverProviderPreferenceScore: Record<MetadataProvider, number> = coverProviderPreference.reduce(
-  (scores, provider, index) => ({
-    ...scores,
-    [provider]: 1 - index * 0.08
-  }),
-  {} as Record<MetadataProvider, number>
-);
 
 export const hasUsableMetadata = (result: MetadataResult): boolean =>
   hasText(result.title) ||

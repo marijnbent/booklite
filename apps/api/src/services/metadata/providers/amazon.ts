@@ -1,5 +1,6 @@
 import type { MetadataResult } from "../types";
-import { extractSeriesFromTitle, readMeta, stripTags, toQuery } from "../utils";
+import { extractSeriesFromTitle } from "../series";
+import { readMeta, stripTags, toQuery } from "../text";
 
 const extractAmazonSeries = (detailHtml: string, titleText?: string): string | undefined => {
   const bookOfMatch = detailHtml.match(

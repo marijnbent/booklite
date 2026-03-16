@@ -3,7 +3,7 @@ import { Check, Image as ImageIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toRenderableCoverSrc } from "@/lib/covers";
 import { cn } from "@/lib/utils";
-import type { MetadataCoverOption } from "@/lib/metadata";
+import type { MetadataCoverOption } from "@booklite/shared";
 
 export interface CoverGridOption extends MetadataCoverOption {
   badgeLabel?: string;

@@ -1,11 +1,6 @@
 import type { MetadataResult } from "../types";
-import {
-  extractSeriesFromTitle,
-  hasText,
-  isSpamTitle,
-  similarityScore,
-  toQuery
-} from "../utils";
+import { extractSeriesFromTitle } from "../series";
+import { hasText, isSpamTitle, similarityScore, toQuery } from "../text";
 
 const scoreOpenLibraryDoc = (
   doc: {

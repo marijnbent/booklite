@@ -73,6 +73,7 @@ export interface MetadataResult {
 export interface MetadataPreviewResult extends MetadataResult {
     coverOptions: MetadataCoverOption[];
 }
+export declare const sourceLabel: (source: string | null | undefined) => string;
 export interface MetadataProviderEnabled {
     open_library: boolean;
     amazon: boolean;

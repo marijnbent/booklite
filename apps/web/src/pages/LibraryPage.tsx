@@ -15,8 +15,8 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch, apiFetchRaw } from "@/lib/api";
 import { isBrowserReadableBookExt } from "@/lib/bookFormats";
 import { toRenderableCoverSrc } from "@/lib/covers";
-import type { MetadataCoverOption, MetadataSource } from "@/lib/metadata";
-import { sourceLabel } from "@/lib/metadata";
+import type { MetadataCoverOption, MetadataSource } from "@booklite/shared";
+import { sourceLabel } from "@booklite/shared";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CoverOptionGrid } from "@/components/CoverOptionGrid";
@@ -28,6 +28,7 @@ import { Progress } from "@/components/ui/progress";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -1038,9 +1039,14 @@ export const LibraryPage: React.FC = () => {
   const deleteBook = useCallback(
     async (bookId: number) => {
       await apiFetch(`/api/v1/books/${bookId}`, { method: "DELETE" });
+      if (selectedBookId === bookId) {
+        setSelectedBookId(null);
+        setEditMode(false);
+        setCoverOptionsRequested(false);
+      }
       invalidateAll();
     },
-    [invalidateAll],
+    [invalidateAll, selectedBookId],
   );
 
   const toggleFavorite = useCallback(
@@ -1581,7 +1587,7 @@ export const LibraryPage: React.FC = () => {
           className={cn(
             "fixed inset-y-0 right-0 left-auto h-full w-full max-w-[440px]",
             "translate-x-0 translate-y-0 rounded-none",
-            "border-l border-border bg-background overflow-y-auto p-0 gap-0",
+            "border-l border-border bg-background overflow-hidden p-0 gap-0",
             "data-[state=open]:animate-slide-in-right data-[state=open]:duration-200",
             /* Hide the built-in close button — the drawer has its own controls */
             "[&>button:last-child]:hidden",
@@ -1599,241 +1605,269 @@ export const LibraryPage: React.FC = () => {
           )}
 
           {panelBook && (
-            <div className="flex flex-col min-h-0">
-              {/* Hero cover area */}
-              <div className="relative flex justify-center bg-secondary/30 py-6">
-                <div className="w-36 aspect-[2/3] overflow-hidden rounded-lg shadow-md">
-                  <BookCover
-                    book={panelBook}
-                    className="h-full w-full"
-                    showTitle={false}
-                  />
-                </div>
-                {/* Favorite overlay */}
-                <button
-                  className="absolute top-3 right-12"
-                  onClick={() => void toggleFavorite(panelBook.id, !panelBook.isFavorite)}
-                  title={panelBook.isFavorite ? "Remove from favorites" : "Add to favorites"}
-                >
-                  <Star className={cn("size-5", panelBook.isFavorite ? "fill-yellow-400 text-yellow-500" : "text-muted-foreground/40 hover:text-muted-foreground")} />
-                </button>
-                {/* Overflow menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="absolute top-3 right-3 rounded-md p-1 hover:bg-secondary/60 text-muted-foreground/60 hover:text-foreground transition-colors">
-                      <MoreHorizontal className="size-5" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => void refreshMetadata(panelBook.id)}>
-                      <RefreshCw className="size-3.5 mr-2" />
-                      Refresh metadata
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      if (!coverOptionsRequested) {
-                        setCoverOptionsRequested(true);
-                        setShowPanelCoverImage(true);
-                      } else {
-                        setCoverOptionsRequested(false);
-                      }
-                    }}>
-                      <ImageIcon className="size-3.5 mr-2" />
-                      Change cover
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setEditMode(!editMode)}>
-                      <Pencil className="size-3.5 mr-2" />
-                      Edit metadata
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              {/* Title + meta (centered) */}
-              <div className="px-5 pt-4 pb-3 text-center">
-                <h2 className="text-base font-semibold leading-snug line-clamp-3">{panelBook.title}</h2>
-                {panelBook.author && (
-                  <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{panelBook.author}</p>
-                )}
-                {panelBook.series && (
-                  <p className="mt-0.5 text-xs text-muted-foreground/50 italic line-clamp-1">{panelBook.series}</p>
-                )}
-                <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground/60">
-                  <span className="font-medium uppercase bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground text-[11px]">{panelBook.fileExt.toUpperCase()}</span>
-                  <span className="tabular-nums">{formatSize(panelBook.fileSize)}</span>
-                  {panelBook.koboSyncable === 1 && <span className="flex items-center gap-0.5 font-medium bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground text-[11px]"><RefreshCw className="size-2.5" />Kobo</span>}
-                </div>
-              </div>
-
-              {/* Status + Actions (single row) */}
-              <div className="flex items-center gap-2 px-5 pb-3">
-                <ToggleGroup
-                  type="single"
-                  value={panelBook.progress?.status ?? "UNREAD"}
-                  onValueChange={(v) => { if (v) void changeStatus(panelBook.id, v); }}
-                  className="flex-1 bg-secondary rounded-md p-0.5"
-                >
-                  {(["UNREAD", "READING", "DONE"] as const).map((s) => {
-                    const c = statusConfig[s];
-                    return (
-                      <ToggleGroupItem
-                        key={s}
-                        value={s}
-                        className="flex-1 gap-1 text-[11px] h-7 rounded data-[state=on]:bg-card data-[state=on]:shadow-sm"
-                      >
-                        <c.icon className="size-3" />
-                        {c.label}
-                      </ToggleGroupItem>
-                    );
-                  })}
-                </ToggleGroup>
-                {isBrowserReadableBookExt(panelBook.fileExt) && (
-                  <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={() => openReader(panelBook.id)} title="Read">
-                    <BookOpen className="size-3.5" />
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <DialogClose asChild>
+                  <Button variant="ghost" size="icon" className="size-8 shrink-0" title="Close details">
+                    <X className="size-4" />
                   </Button>
-                )}
-                <Button variant="outline" size="icon" className="size-8 shrink-0" onClick={() => handleDownload(panelBook.id)} title="Download">
-                  <Download className="size-3.5" />
-                </Button>
+                </DialogClose>
+                <div className="flex items-center gap-1">
+                  <button
+                    className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    onClick={() => void toggleFavorite(panelBook.id, !panelBook.isFavorite)}
+                    title={panelBook.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Star className={cn("size-5", panelBook.isFavorite ? "fill-yellow-400 text-yellow-500" : "")} />
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                        <MoreHorizontal className="size-5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => void refreshMetadata(panelBook.id)}>
+                        <RefreshCw className="mr-2 size-3.5" />
+                        Refresh metadata
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          if (!coverOptionsRequested) {
+                            setCoverOptionsRequested(true);
+                            setShowPanelCoverImage(true);
+                          } else {
+                            setCoverOptionsRequested(false);
+                          }
+                        }}
+                      >
+                        <ImageIcon className="mr-2 size-3.5" />
+                        Change cover
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setEditMode(!editMode)}>
+                        <Pencil className="mr-2 size-3.5" />
+                        Edit metadata
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          if (window.confirm(`Delete "${panelBook.title}"? This cannot be undone.`)) {
+                            void deleteBook(panelBook.id);
+                          }
+                        }}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 size-3.5" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
-              <div className="px-5 pb-5 space-y-3">
-                {/* Progress (conditional, single line) */}
-                {(panelBook.progress?.status === "READING" || (panelBook.progress?.progressPercent ?? 0) > 0) && (
-                  <div className="flex items-center gap-2">
-                    <Progress value={panelBook.progress?.progressPercent ?? 0} className="h-1 flex-1" />
-                    <span className="text-[11px] tabular-nums text-muted-foreground shrink-0">
-                      {panelBook.progress?.progressPercent ?? 0}%
-                    </span>
-                  </div>
-                )}
-
-                {/* Description */}
-                {panelBook.description && !editMode && (
-                  <p className="text-[13px] leading-relaxed text-muted-foreground line-clamp-4">
-                    {panelBook.description}
-                  </p>
-                )}
-
-                {/* Collections (no label, hidden when empty) */}
-                {bookCollections.isLoading && (
-                  <div className="flex justify-center py-2">
-                    <Loader2 className="size-3.5 animate-spin text-muted-foreground/40" />
-                  </div>
-                )}
-                {(bookCollections.data ?? []).length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {(bookCollections.data ?? []).map((collection) => (
-                      <button
-                        key={collection.id}
-                        onClick={() => void setCollectionAssigned(collection.id, !collection.assigned)}
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
-                          collection.assigned
-                            ? "bg-primary/10 text-primary"
-                            : "bg-secondary text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {collection.icon && <span className="text-xs">{collection.icon}</span>}
-                        {collection.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Expandable: Change cover */}
-                {coverOptionsRequested && (
-                  <div className="animate-fade-in">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                        <ImageIcon className="size-3" />
-                        Change cover
-                        {(setBookCover.isPending || coverPreviewQuery.isLoading) && <Loader2 className="size-3 animate-spin" />}
-                      </span>
-                      <button onClick={() => setCoverOptionsRequested(false)} className="text-muted-foreground/50 hover:text-foreground">
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                    <CoverOptionGrid
-                      selectedCoverPath={panelBook.coverPath ?? ""}
-                      options={
-                        panelCoverOptions.map((option) => ({
-                          ...option,
-                          badgeLabel: option.label,
-                          metaLabel:
-                            option.label === "Current cover"
-                              ? "Saved on this book"
-                              : sourceLabel(option.source)
-                        }))
-                      }
-                      onSelectCover={(coverPath) => {
-                        setShowPanelCoverImage(true);
-                        setBookCover.mutate(coverPath);
-                      }}
-                      onClearCover={() => {
-                        setShowPanelCoverImage(false);
-                        setBookCover.mutate(null);
-                      }}
-                      clearSelectedLabel="Using title card"
-                      clearIdleLabel="Remove cover"
-                      idleActionLabel="Click to use"
-                      className="xl:grid-cols-2"
-                      emptyState={
-                        coverPreviewQuery.isLoading ? (
-                          <div className="col-span-1 flex min-h-24 items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/20">
-                            <Loader2 className="size-4 animate-spin text-muted-foreground/50" />
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 py-2">
-                            <ImageIcon className="size-4 text-muted-foreground shrink-0" />
-                            <p className="text-xs text-muted-foreground">No cover suggestions found</p>
-                          </div>
-                        )
-                      }
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="flex justify-center border-b border-border bg-secondary/20 px-5 py-6">
+                  <div className="aspect-[2/3] w-36 overflow-hidden rounded-md shadow-sm">
+                    <BookCover
+                      book={panelBook}
+                      className="h-full w-full"
+                      showTitle={false}
                     />
                   </div>
-                )}
+                </div>
 
-                {/* Expandable: Edit metadata */}
-                {editMode && (
-                  <div className="animate-fade-in">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                        <Pencil className="size-3" />
-                        Edit metadata
+                <div className="space-y-4 px-5 py-5">
+                  <div className="space-y-1 text-center">
+                    <h2 className="text-base font-semibold leading-snug">{panelBook.title}</h2>
+                    {panelBook.author && (
+                      <p className="text-sm text-muted-foreground">{panelBook.author}</p>
+                    )}
+                    {panelBook.series && (
+                      <p className="text-xs text-muted-foreground/70">{panelBook.series}</p>
+                    )}
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs text-muted-foreground/70">
+                      <span className="rounded-md bg-secondary px-2 py-1 font-medium uppercase text-secondary-foreground">
+                        {panelBook.fileExt.toUpperCase()}
                       </span>
-                      <button onClick={() => setEditMode(false)} className="text-muted-foreground/50 hover:text-foreground">
-                        <X className="size-3.5" />
-                      </button>
+                      <span className="tabular-nums">{formatSize(panelBook.fileSize)}</span>
+                      {panelBook.koboSyncable === 1 && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 font-medium text-secondary-foreground">
+                          <RefreshCw className="size-3" />
+                          Kobo
+                        </span>
+                      )}
                     </div>
-                    <div className="space-y-2 rounded-md border border-border/40 bg-card p-3">
-                      <div className="space-y-0.5">
-                        <Label className="text-[11px] text-muted-foreground">Title</Label>
-                        <Input className="h-8" value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[11px] text-muted-foreground">Author</Label>
-                        <Input className="h-8" value={draft.author} onChange={(e) => setDraft((p) => ({ ...p, author: e.target.value }))} />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[11px] text-muted-foreground">Series</Label>
-                        <Input className="h-8" value={draft.series} onChange={(e) => setDraft((p) => ({ ...p, series: e.target.value }))} />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[11px] text-muted-foreground">Description</Label>
-                        <Textarea
-                          rows={2}
-                          value={draft.description}
-                          onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
-                          className="resize-none"
-                        />
-                      </div>
-                      <Button size="sm" onClick={() => saveMetadata.mutate()} disabled={saveMetadata.isPending} className="gap-1.5 h-8">
-                        {saveMetadata.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                        Save changes
+                  </div>
+
+                  <div className="space-y-3">
+                    <ToggleGroup
+                      type="single"
+                      value={panelBook.progress?.status ?? "UNREAD"}
+                      onValueChange={(v) => { if (v) void changeStatus(panelBook.id, v); }}
+                      className="grid grid-cols-3 gap-2"
+                    >
+                      {(["UNREAD", "READING", "DONE"] as const).map((s) => {
+                        const c = statusConfig[s];
+                        return (
+                          <ToggleGroupItem
+                            key={s}
+                            value={s}
+                            className="flex h-9 items-center justify-center gap-1 rounded-md border border-border bg-secondary text-[11px] data-[state=on]:border-foreground/15 data-[state=on]:bg-background"
+                          >
+                            <c.icon className="size-3" />
+                            {c.label}
+                          </ToggleGroupItem>
+                        );
+                      })}
+                    </ToggleGroup>
+
+                    <div className={cn("grid gap-2", isBrowserReadableBookExt(panelBook.fileExt) ? "grid-cols-2" : "grid-cols-1")}>
+                      {isBrowserReadableBookExt(panelBook.fileExt) && (
+                        <Button variant="outline" className="h-9 justify-center gap-2" onClick={() => openReader(panelBook.id)}>
+                          <BookOpen className="size-3.5" />
+                          Read
+                        </Button>
+                      )}
+                      <Button variant="outline" className="h-9 justify-center gap-2" onClick={() => handleDownload(panelBook.id)}>
+                        <Download className="size-3.5" />
+                        Download
                       </Button>
                     </div>
                   </div>
-                )}
+
+                  {(panelBook.progress?.status === "READING" || (panelBook.progress?.progressPercent ?? 0) > 0) && (
+                    <div className="flex items-center gap-2">
+                      <Progress value={panelBook.progress?.progressPercent ?? 0} className="h-1 flex-1" />
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                        {panelBook.progress?.progressPercent ?? 0}%
+                      </span>
+                    </div>
+                  )}
+
+                  {panelBook.description && !editMode && (
+                    <p className="text-[13px] leading-relaxed text-muted-foreground">
+                      {panelBook.description}
+                    </p>
+                  )}
+
+                  {bookCollections.isLoading && (
+                    <div className="flex justify-center py-2">
+                      <Loader2 className="size-3.5 animate-spin text-muted-foreground/40" />
+                    </div>
+                  )}
+                  {(bookCollections.data ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(bookCollections.data ?? []).map((collection) => (
+                        <button
+                          key={collection.id}
+                          onClick={() => void setCollectionAssigned(collection.id, !collection.assigned)}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                            collection.assigned
+                              ? "bg-primary/10 text-primary"
+                              : "bg-secondary text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          {collection.icon && <span className="text-xs">{collection.icon}</span>}
+                          {collection.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {coverOptionsRequested && (
+                    <div className="animate-fade-in">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          <ImageIcon className="size-3" />
+                          Change cover
+                          {(setBookCover.isPending || coverPreviewQuery.isLoading) && <Loader2 className="size-3 animate-spin" />}
+                        </span>
+                        <button onClick={() => setCoverOptionsRequested(false)} className="text-muted-foreground/50 hover:text-foreground">
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                      <CoverOptionGrid
+                        selectedCoverPath={panelBook.coverPath ?? ""}
+                        options={
+                          panelCoverOptions.map((option) => ({
+                            ...option,
+                            badgeLabel: option.label,
+                            metaLabel:
+                              option.label === "Current cover"
+                                ? "Saved on this book"
+                                : sourceLabel(option.source)
+                          }))
+                        }
+                        onSelectCover={(coverPath) => {
+                          setShowPanelCoverImage(true);
+                          setBookCover.mutate(coverPath);
+                        }}
+                        onClearCover={() => {
+                          setShowPanelCoverImage(false);
+                          setBookCover.mutate(null);
+                        }}
+                        clearSelectedLabel="Using title card"
+                        clearIdleLabel="Remove cover"
+                        idleActionLabel="Click to use"
+                        className="xl:grid-cols-2"
+                        emptyState={
+                          coverPreviewQuery.isLoading ? (
+                            <div className="col-span-1 flex min-h-24 items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/20">
+                              <Loader2 className="size-4 animate-spin text-muted-foreground/50" />
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 py-2">
+                              <ImageIcon className="size-4 shrink-0 text-muted-foreground" />
+                              <p className="text-xs text-muted-foreground">No cover suggestions found</p>
+                            </div>
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {editMode && (
+                    <div className="animate-fade-in">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          <Pencil className="size-3" />
+                          Edit metadata
+                        </span>
+                        <button onClick={() => setEditMode(false)} className="text-muted-foreground/50 hover:text-foreground">
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                      <div className="space-y-2 rounded-md border border-border/40 bg-card p-3">
+                        <div className="space-y-0.5">
+                          <Label className="text-[11px] text-muted-foreground">Title</Label>
+                          <Input className="h-8" value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[11px] text-muted-foreground">Author</Label>
+                          <Input className="h-8" value={draft.author} onChange={(e) => setDraft((p) => ({ ...p, author: e.target.value }))} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[11px] text-muted-foreground">Series</Label>
+                          <Input className="h-8" value={draft.series} onChange={(e) => setDraft((p) => ({ ...p, series: e.target.value }))} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[11px] text-muted-foreground">Description</Label>
+                          <Textarea
+                            rows={2}
+                            value={draft.description}
+                            onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
+                            className="resize-none"
+                          />
+                        </div>
+                        <Button size="sm" onClick={() => saveMetadata.mutate()} disabled={saveMetadata.isPending} className="h-8 gap-1.5">
+                          {saveMetadata.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                          Save changes
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

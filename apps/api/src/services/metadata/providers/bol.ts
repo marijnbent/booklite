@@ -1,14 +1,14 @@
 import type { MetadataResult } from "../types";
+import { extractSeriesFromTitle } from "../series";
 import {
   absoluteUrl,
   cleanText,
-  extractSeriesFromTitle,
   hasText,
   isSpamTitle,
   similarityScore,
   stripTags,
   toQuery
-} from "../utils";
+} from "../text";
 
 const extractBolSeries = (detailHtml: string): string | undefined => {
   const match =
