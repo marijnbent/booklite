@@ -24,7 +24,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return "system";
   });
 
-  const resolved = theme === "system" ? getSystemTheme() : theme;
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">(getSystemTheme);
+
+  const resolved = theme === "system" ? systemTheme : theme;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -34,23 +36,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [theme, resolved]);
 
   useEffect(() => {
-    if (theme !== "system") return;
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      const root = document.documentElement;
-      root.classList.remove("light", "dark");
-      root.classList.add(getSystemTheme());
-    };
+    const handler = () => setSystemTheme(mediaQuery.matches ? "dark" : "light");
     mediaQuery.addEventListener("change", handler);
     return () => mediaQuery.removeEventListener("change", handler);
-  }, [theme]);
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-  };
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolved }}>
+    <ThemeContext.Provider value={{ theme, setTheme: setThemeState, resolved }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -7,9 +7,12 @@ export interface AccessPayload {
   username: string;
 }
 
-export const signAccessToken = (payload: AccessPayload): string =>
+export const signAccessToken = (
+  payload: AccessPayload,
+  options?: { expiresInSeconds?: number }
+): string =>
   jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.accessTokenTtlSeconds
+    expiresIn: options?.expiresInSeconds ?? config.accessTokenTtlSeconds
   });
 
 export const verifyAccessToken = (token: string): AccessPayload =>

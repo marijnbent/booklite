@@ -11,6 +11,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import type { ReadStatus } from "@booklite/shared";
 import { useNavigate } from "react-router-dom";
 import { apiFetch, apiFetchRaw } from "@/lib/api";
 import { isBrowserReadableBookExt } from "@/lib/bookFormats";
@@ -111,7 +112,7 @@ interface BookItem {
   createdAt: string;
   updatedAt: string;
   progress: {
-    status: "UNREAD" | "READING" | "DONE";
+    status: ReadStatus;
     progressPercent: number;
   } | null;
 }
@@ -145,17 +146,54 @@ interface PanelCoverOption extends MetadataCoverOption {
   label: string;
 }
 
-type StatusFilter = "ALL" | "UNREAD" | "READING" | "DONE";
+type StatusFilter = "ALL" | "UNREAD" | "READING" | "READ" | "ABANDONED";
 type SortOption = "updated" | "title" | "author";
 type ViewMode = "grid" | "list";
+type DisplayStatus = Exclude<ReadStatus, "UNSET">;
+type StatusBadgeVariant = "secondary" | "info" | "success" | "warning" | "destructive" | "outline";
 
 const PAGE_SIZE = 50;
 const UNCOLLECTED_COLLECTION_ID = -1;
 
-const statusConfig = {
-  UNREAD: { label: "Unread", icon: Book, variant: "secondary" as const },
-  READING: { label: "Reading", icon: BookOpen, variant: "info" as const },
-  DONE: { label: "Done", icon: CheckCircle2, variant: "success" as const },
+const manualStatusOptions = ["UNREAD", "READING", "READ", "ABANDONED"] as const;
+const statusFilterOptions = ["ALL", ...manualStatusOptions] as const;
+const statusFilterLabels: Record<StatusFilter, string> = {
+  ALL: "All",
+  UNREAD: "Unread",
+  READING: "Reading",
+  READ: "Done",
+  ABANDONED: "Did not finish",
+};
+const statusConfig: Record<
+  DisplayStatus,
+  { label: string; icon: React.ComponentType<{ className?: string }>; variant: StatusBadgeVariant }
+> = {
+  UNREAD: { label: "Unread", icon: Book, variant: "secondary" },
+  READING: { label: "Reading", icon: BookOpen, variant: "info" },
+  RE_READING: { label: "Re-reading", icon: RotateCcw, variant: "info" },
+  READ: { label: "Done", icon: CheckCircle2, variant: "success" },
+  PARTIALLY_READ: { label: "Partially read", icon: BookMarked, variant: "warning" },
+  PAUSED: { label: "Paused", icon: Minus, variant: "warning" },
+  ABANDONED: { label: "Did not finish", icon: X, variant: "destructive" },
+  WONT_READ: { label: "Won't read", icon: X, variant: "outline" },
+};
+
+const getDisplayStatus = (status: ReadStatus | null | undefined): DisplayStatus =>
+  status && status !== "UNSET" ? status : "UNREAD";
+
+const getStatusFilterBucket = (status: ReadStatus | null | undefined): Exclude<StatusFilter, "ALL"> => {
+  const displayStatus = getDisplayStatus(status);
+  if (
+    displayStatus === "READING" ||
+    displayStatus === "RE_READING" ||
+    displayStatus === "PARTIALLY_READ" ||
+    displayStatus === "PAUSED"
+  ) {
+    return "READING";
+  }
+  if (displayStatus === "READ") return "READ";
+  if (displayStatus === "ABANDONED") return "ABANDONED";
+  return "UNREAD";
 };
 
 function coverHue(id: number): number {
@@ -609,7 +647,7 @@ const BookMenuItems: React.FC<{
   MenuSubTrigger,
   MenuSubContent,
 }) => {
-  const status = book.progress?.status ?? "UNREAD";
+  const status = getStatusFilterBucket(book.progress?.status);
   const assignableCollections = collections.filter((collection) => !isVirtualCollection(collection));
   const canRemoveFromActiveCollection =
     activeCollectionId !== null &&
@@ -678,8 +716,8 @@ const BookMenuItems: React.FC<{
           <BookOpen className="size-3.5" />
           Status
         </MenuSubTrigger>
-        <MenuSubContent className="w-36">
-          {(["UNREAD", "READING", "DONE"] as const).map((s) => {
+        <MenuSubContent className="w-44">
+          {manualStatusOptions.map((s) => {
             const sc = statusConfig[s];
             return (
               <MenuItem
@@ -904,9 +942,9 @@ export const LibraryPage: React.FC = () => {
   );
 
   const statusCounts = useMemo(() => {
-    const counts = { ALL: 0, UNREAD: 0, READING: 0, DONE: 0 };
+    const counts: Record<StatusFilter, number> = { ALL: 0, UNREAD: 0, READING: 0, READ: 0, ABANDONED: 0 };
     for (const book of allBooks) {
-      counts[book.progress?.status ?? "UNREAD"]++;
+      counts[getStatusFilterBucket(book.progress?.status)]++;
       counts.ALL++;
     }
     return counts;
@@ -915,7 +953,7 @@ export const LibraryPage: React.FC = () => {
   const filteredAndSorted = useMemo(() => {
     let result = allBooks;
     if (statusFilter !== "ALL") {
-      result = result.filter((b) => (b.progress?.status ?? "UNREAD") === statusFilter);
+      result = result.filter((b) => getStatusFilterBucket(b.progress?.status) === statusFilter);
     }
     return [...result].sort((a, b) => sortBooks(a, b, sort));
   }, [allBooks, statusFilter, sort]);
@@ -1320,10 +1358,10 @@ export const LibraryPage: React.FC = () => {
 
       {/* Status filters */}
       <div className="flex items-center gap-1.5 overflow-x-auto">
-        {(["ALL", "UNREAD", "READING", "DONE"] as const).map((status) => {
+        {statusFilterOptions.map((status) => {
           const active = statusFilter === status;
           const count = statusCounts[status];
-          const config = status === "ALL" ? null : statusConfig[status as keyof typeof statusConfig];
+          const config = status === "ALL" ? null : statusConfig[status];
           return (
             <button
               key={status}
@@ -1336,7 +1374,7 @@ export const LibraryPage: React.FC = () => {
               )}
             >
               {config && <config.icon className="size-3" />}
-              {status === "ALL" ? "All" : config?.label}
+              {statusFilterLabels[status]}
               <span className="text-[10px] tabular-nums opacity-60">{count}</span>
             </button>
           );
@@ -1501,7 +1539,10 @@ export const LibraryPage: React.FC = () => {
       {noFilterResults && (
         <div className="flex flex-col items-center py-16">
           <p className="text-sm text-muted-foreground">
-            No {statusFilter.toLowerCase()} books{debouncedQuery && ` matching "${debouncedQuery}"`}.
+            {statusFilter === "ALL"
+              ? "No books"
+              : `No books marked "${statusFilterLabels[statusFilter].toLowerCase()}"`}
+            {debouncedQuery && ` matching "${debouncedQuery}"`}.
           </p>
           <button onClick={() => setStatusFilter("ALL")} className="mt-2 text-sm text-primary hover:underline">
             Show all
@@ -1702,11 +1743,11 @@ export const LibraryPage: React.FC = () => {
                   <div className="space-y-3">
                     <ToggleGroup
                       type="single"
-                      value={panelBook.progress?.status ?? "UNREAD"}
+                      value={getStatusFilterBucket(panelBook.progress?.status)}
                       onValueChange={(v) => { if (v) void changeStatus(panelBook.id, v); }}
-                      className="grid grid-cols-3 gap-2"
+                      className="grid grid-cols-2 gap-2"
                     >
-                      {(["UNREAD", "READING", "DONE"] as const).map((s) => {
+                      {manualStatusOptions.map((s) => {
                         const c = statusConfig[s];
                         return (
                           <ToggleGroupItem
@@ -1946,8 +1987,8 @@ const SelectionToolbar: React.FC<{
             <BookOpen className="size-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" className="w-36">
-          {(["UNREAD", "READING", "DONE"] as const).map((s) => {
+        <DropdownMenuContent align="center" className="w-44">
+          {manualStatusOptions.map((s) => {
             const sc = statusConfig[s];
             return (
               <DropdownMenuItem key={s} onClick={() => onSetStatus(s)} className="gap-2 text-xs">
@@ -2009,7 +2050,8 @@ const GridCard: React.FC<{
   isSelected: boolean;
   selectionActive: boolean;
 }> = React.memo(({ book, menuProps, isSelected, selectionActive }) => {
-  const status = book.progress?.status ?? "UNREAD";
+  const status = getDisplayStatus(book.progress?.status);
+  const statusBucket = getStatusFilterBucket(book.progress?.status);
   const config = statusConfig[status];
   const percent = book.progress?.progressPercent ?? 0;
 
@@ -2081,7 +2123,7 @@ const GridCard: React.FC<{
             </div>
 
             {/* Progress bar */}
-            {status === "READING" && percent > 0 && (
+            {statusBucket === "READING" && percent > 0 && (
               <div className="absolute bottom-0 inset-x-0 h-0.5 bg-black/20">
                 <div className="h-full bg-status-processing" style={{ width: `${percent}%` }} />
               </div>
@@ -2099,7 +2141,7 @@ const GridCard: React.FC<{
                   <config.icon className="size-2.5" />
                   {config.label}
                 </Badge>
-                {status === "READING" && percent > 0 && (
+                {statusBucket === "READING" && percent > 0 && (
                   <span className="text-[10px] tabular-nums text-muted-foreground/50">{percent}%</span>
                 )}
               </div>
@@ -2133,7 +2175,8 @@ const ListRow: React.FC<{
   isSelected: boolean;
   selectionActive: boolean;
 }> = React.memo(({ book, menuProps, isSelected, selectionActive }) => {
-  const status = book.progress?.status ?? "UNREAD";
+  const status = getDisplayStatus(book.progress?.status);
+  const statusBucket = getStatusFilterBucket(book.progress?.status);
   const config = statusConfig[status];
   const percent = book.progress?.progressPercent ?? 0;
 
@@ -2171,7 +2214,7 @@ const ListRow: React.FC<{
                 {book.author ?? "Unknown author"}
                 {book.series && <span className="text-muted-foreground/35"> &middot; {book.series}</span>}
               </p>
-              {status === "READING" && percent > 0 && (
+              {statusBucket === "READING" && percent > 0 && (
                 <div className="mt-1 flex items-center gap-2">
                   <div className="h-1 flex-1 max-w-20 rounded-full bg-muted/60 overflow-hidden">
                     <div className="h-full bg-status-processing rounded-full" style={{ width: `${percent}%` }} />

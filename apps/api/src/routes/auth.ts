@@ -7,7 +7,7 @@ import { verifyPassword } from "../auth/password";
 import { randomToken, sha256 } from "../utils/hash";
 import { nowIso } from "../utils/time";
 import { config } from "../config";
-import { getAuth, requireAuth } from "../auth/guards";
+import { getAuth, requireAuth, requireOwner } from "../auth/guards";
 import { signAccessToken } from "../auth/jwt";
 
 const loginSchema = z.object({
@@ -16,6 +16,10 @@ const loginSchema = z.object({
 });
 
 const refreshSchema = z.object({ refreshToken: z.string().min(8) });
+const apiTokenSchema = z.object({
+  label: z.string().trim().max(100).optional(),
+  expiresInDays: z.coerce.number().int().min(1).max(365).default(30)
+});
 
 const issueTokens = async (input: {
   userId: number;
@@ -174,4 +178,32 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (!found[0]) return reply.code(401).send({ error: "Unauthorized" });
     return found[0];
   });
+
+  fastify.post(
+    "/api/v1/admin/api-docs/token",
+    { preHandler: requireOwner },
+    async (request) => {
+      const { userId, role, username } = getAuth(request);
+      const body = apiTokenSchema.parse(request.body ?? {});
+      const expiresInSeconds = body.expiresInDays * 24 * 60 * 60;
+      const issuedAt = nowIso();
+      const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+      const token = signAccessToken(
+        {
+          userId,
+          role,
+          username
+        },
+        { expiresInSeconds }
+      );
+
+      return {
+        token,
+        issuedAt,
+        expiresAt,
+        expiresInDays: body.expiresInDays,
+        label: body.label || null
+      };
+    }
+  );
 };

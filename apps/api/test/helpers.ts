@@ -11,6 +11,9 @@ export const createTempEnv = (): { appDataDir: string; booksDir: string } => {
   process.env.BOOKS_DIR = booksDir;
   process.env.JWT_SECRET = "test-secret";
   process.env.PORT = "0";
+  delete process.env.BOOTSTRAP_OWNER_EMAIL;
+  delete process.env.BOOTSTRAP_OWNER_USERNAME;
+  delete process.env.BOOTSTRAP_OWNER_PASSWORD;
 
   return { appDataDir, booksDir };
 };

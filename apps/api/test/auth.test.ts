@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { createTempEnv, setupTestApp } from "./helpers";
+import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
 createTempEnv();
 
@@ -73,5 +73,71 @@ describe("auth", () => {
     expect(refreshed.statusCode).toBe(200);
     const second = refreshed.json();
     expect(second.refreshToken).not.toBe(first.refreshToken);
+  });
+
+  it("allows owners to generate an API docs token", async () => {
+    const tokens = await setupOwnerAndLogin(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/api-docs/token",
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`
+      },
+      payload: {
+        expiresInDays: 30,
+        label: "LLM"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      token: expect.any(String),
+      expiresInDays: 30,
+      label: "LLM"
+    });
+  });
+
+  it("rejects API docs token generation for members", async () => {
+    const ownerTokens = await setupOwnerAndLogin(app);
+
+    const createMember = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      },
+      payload: {
+        email: "member@example.com",
+        username: "member",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+    expect(createMember.statusCode).toBe(201);
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: "member",
+        password: "secret123"
+      }
+    });
+
+    const tokens = login.json();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/api-docs/token",
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`
+      },
+      payload: {
+        expiresInDays: 30
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
   });
 });

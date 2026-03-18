@@ -20,6 +20,7 @@ import {
   TabletSmartphone,
   User,
   Shield,
+  Key,
   LogOut,
   Sun,
   Moon,
@@ -41,6 +42,7 @@ const navItems = [
 const adminItems = [
   { to: "/admin-users", label: "Admin", icon: Shield, ownerOnly: true },
   { to: "/admin-activity", label: "Activity", icon: TerminalSquare, ownerOnly: true },
+  { to: "/admin-api", label: "API", icon: Key, ownerOnly: true },
 ];
 
 interface PublicAppSettings {

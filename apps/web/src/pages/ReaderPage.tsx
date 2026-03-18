@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ReadStatus } from "@booklite/shared";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Contents as ReaderContents } from "epubjs";
 import {
@@ -27,7 +28,7 @@ interface ReaderBookItem {
   author: string | null;
   fileExt: string;
   progress: {
-    status: "UNREAD" | "READING" | "DONE";
+    status: ReadStatus;
     progressPercent: number;
   } | null;
 }

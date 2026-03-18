@@ -48,6 +48,11 @@ const AdminUsersPage = lazy(async () => {
   return { default: module.AdminUsersPage };
 });
 
+const AdminApiDocsPage = lazy(async () => {
+  const module = await import("@/pages/AdminApiDocsPage");
+  return { default: module.AdminApiDocsPage };
+});
+
 const DocsPage = lazy(async () => {
   const module = await import("@/pages/DocsPage");
   return { default: module.DocsPage };
@@ -91,6 +96,7 @@ export const App: React.FC = () => (
         <Route element={<ProtectedRoute ownerOnly />}>
           <Route path="/admin-users" element={withSuspense(<AdminUsersPage />)} />
           <Route path="/admin-activity" element={withSuspense(<AdminActivityPage />)} />
+          <Route path="/admin-api" element={withSuspense(<AdminApiDocsPage />)} />
         </Route>
 
         <Route path="/" element={<Navigate to="/library" replace />} />
