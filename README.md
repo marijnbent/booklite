@@ -47,7 +47,7 @@ See `.env.example`:
 - `JWT_SECRET`
 - `BASE_URL`
 - `ACCESS_TOKEN_TTL_SECONDS` (default `900`, 15 minutes)
-- `REFRESH_TOKEN_TTL_SECONDS` (default `2592000`, 30 days)
+- `REFRESH_TOKEN_TTL_SECONDS` (default `7776000`, 90 days)
 - `BOOKLITE_FRONTEND_MODE` (`auto`/`vite`/`static`/`off`, default `auto`)
   - `auto` resolves to `vite` when `NODE_ENV` is not `production`
   - `auto` resolves to `static` when `NODE_ENV=production`
