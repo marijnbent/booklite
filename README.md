@@ -27,6 +27,12 @@ cp .env.example .env
 docker compose -f deploy/compose.yml up -d --build
 ```
 
+or run the predefinded build with:
+
+```bash
+docker run -p 6060:6060 ghcr.io/marijnbent/booklite:latest
+```
+
 Open [http://localhost:6060](http://localhost:6060)
 
 On first run either:
