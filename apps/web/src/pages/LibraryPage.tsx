@@ -303,11 +303,11 @@ const BookCover: React.FC<{
 const GridSkeleton: React.FC = () => (
   <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
     {Array.from({ length: 12 }).map((_, i) => (
-      <div key={i} className="space-y-2">
-        <div className="aspect-[2/3] rounded-md bg-muted/40 animate-pulse" />
+      <div key={i} className="space-y-2.5">
+        <div className="aspect-[2/3] rounded-lg bg-muted/40 animate-pulse" />
         <div className="space-y-1.5">
-          <div className="h-3 w-3/4 rounded bg-muted/40 animate-pulse" />
-          <div className="h-2.5 w-1/2 rounded bg-muted/30 animate-pulse" />
+          <div className="h-3 w-3/4 rounded-full bg-muted/40 animate-pulse" />
+          <div className="h-2.5 w-1/2 rounded-full bg-muted/30 animate-pulse" />
         </div>
       </div>
     ))}
@@ -1268,7 +1268,7 @@ export const LibraryPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Library</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Library</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {activeCollection
               ? `${activeCollection.icon ? activeCollection.icon + " " : ""}${activeCollection.name} \u00b7 ${statusCounts.ALL} books`
@@ -1357,7 +1357,7 @@ export const LibraryPage: React.FC = () => {
       </div>
 
       {/* Status filters */}
-      <div className="flex items-center gap-1.5 overflow-x-auto">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-px">
         {statusFilterOptions.map((status) => {
           const active = statusFilter === status;
           const count = statusCounts[status];
@@ -1367,29 +1367,29 @@ export const LibraryPage: React.FC = () => {
               key={status}
               onClick={() => setStatusFilter(status)}
               className={cn(
-                "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
                 active
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
               {config && <config.icon className="size-3" />}
               {statusFilterLabels[status]}
-              <span className="text-[10px] tabular-nums opacity-60">{count}</span>
+              <span className="text-[10px] tabular-nums opacity-50">{count}</span>
             </button>
           );
         })}
       </div>
 
       {/* Collection filters */}
-      <div className="flex items-center gap-1.5 overflow-x-auto">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-px">
         <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-medium mr-1">Collections</span>
         <button
           onClick={() => setSelectedCollectionId(null)}
           className={cn(
-            "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+            "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
             selectedCollectionId === null
-              ? "bg-primary/10 text-primary"
+              ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
               : "text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
         >
@@ -1401,9 +1401,9 @@ export const LibraryPage: React.FC = () => {
               key={col.id}
               onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
               className={cn(
-                "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
                 selectedCollectionId === col.id
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
@@ -1419,9 +1419,9 @@ export const LibraryPage: React.FC = () => {
                 <button
                   onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
                   className={cn(
-                    "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
                     selectedCollectionId === col.id
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
@@ -1466,7 +1466,7 @@ export const LibraryPage: React.FC = () => {
         )}
         <button
           onClick={() => setCreateCollectionOpen(true)}
-          className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-muted-foreground/40 hover:bg-accent hover:text-foreground transition-colors"
+          className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground/40 hover:bg-accent hover:text-foreground transition-all duration-150"
           title="New collection"
         >
           <Plus className="size-3.5" />
@@ -1707,8 +1707,8 @@ export const LibraryPage: React.FC = () => {
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="flex justify-center border-b border-border bg-secondary/20 px-5 py-6">
-                  <div className="aspect-[2/3] w-36 overflow-hidden rounded-md shadow-sm">
+                <div className="flex justify-center border-b border-border bg-gradient-to-b from-secondary/30 to-secondary/10 px-5 py-8">
+                  <div className="aspect-[2/3] w-36 overflow-hidden rounded-lg shadow-md shadow-black/10">
                     <BookCover
                       book={panelBook}
                       className="h-full w-full"
@@ -1953,7 +1953,7 @@ const SelectionToolbar: React.FC<{
   const assignableCollections = collections.filter((c) => !isVirtualCollection(c));
 
   return (
-    <div className="fixed bottom-6 left-1/2 z-50 flex items-center gap-1 rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg px-3 py-2 animate-slide-up">
+    <div className="fixed bottom-6 left-1/2 z-50 flex items-center gap-1 rounded-xl border border-border/60 bg-background/95 backdrop-blur-md shadow-xl shadow-black/[0.08] px-3 py-2 animate-slide-up">
       <span className="text-sm font-medium whitespace-nowrap px-1">{selectedCount} selected</span>
       <div className="h-5 w-px bg-border/60 mx-0.5" />
 
@@ -2060,7 +2060,7 @@ const GridCard: React.FC<{
       <ContextMenuTrigger asChild>
         <div className="group cursor-pointer" onClick={(e) => menuProps.onBookClick(book.id, e)}>
           <div className={cn(
-            "relative aspect-[2/3] overflow-hidden rounded-md bg-muted/20 shadow-sm transition-all group-hover:shadow-md",
+            "relative aspect-[2/3] overflow-hidden rounded-lg bg-muted/20 shadow-sm transition-all duration-200 group-hover:shadow-lg group-hover:-translate-y-0.5",
             isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
           )}>
             <BookCover book={book} className="h-full w-full" />
@@ -2124,14 +2124,14 @@ const GridCard: React.FC<{
 
             {/* Progress bar */}
             {statusBucket === "READING" && percent > 0 && (
-              <div className="absolute bottom-0 inset-x-0 h-0.5 bg-black/20">
-                <div className="h-full bg-status-processing" style={{ width: `${percent}%` }} />
+              <div className="absolute bottom-0 inset-x-0 h-[3px] bg-black/15">
+                <div className="h-full bg-status-processing/90" style={{ width: `${percent}%` }} />
               </div>
             )}
           </div>
 
-          <div className="pt-2 space-y-0.5">
-            <h3 className="text-[13px] font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+          <div className="pt-2.5 space-y-0.5">
+            <h3 className="text-[13px] font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-200">
               {book.title}
             </h3>
             <p className="text-xs text-muted-foreground truncate">{book.author ?? "Unknown author"}</p>
@@ -2204,7 +2204,7 @@ const ListRow: React.FC<{
                 {isSelected && <Check className="size-3 text-primary-foreground" />}
               </button>
             )}
-            <div className="h-12 w-8 shrink-0 overflow-hidden rounded shadow-sm">
+            <div className="h-12 w-8 shrink-0 overflow-hidden rounded-md shadow-sm">
               <BookCover book={book} className="h-full w-full" showTitle={false} />
             </div>
 

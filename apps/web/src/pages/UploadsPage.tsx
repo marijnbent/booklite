@@ -496,7 +496,7 @@ export const UploadsPage: React.FC = () => {
     <div className="space-y-8">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Upload</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Upload</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Add books to your library from EPUB, KEPUB, or PDF files.
         </p>
@@ -509,20 +509,25 @@ export const UploadsPage: React.FC = () => {
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
         className={cn(
-          "flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed p-12 transition-colors duration-200 cursor-pointer",
+          "flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-14 transition-all duration-200 cursor-pointer",
           dragOver
-            ? "border-primary bg-accent/50"
-            : "border-border hover:border-muted-foreground/30"
+            ? "border-primary bg-primary/5 scale-[1.01]"
+            : "border-border/70 hover:border-primary/40 hover:bg-accent/30"
         )}
       >
-        <FileUp className={cn(
-          "size-8 transition-colors duration-200",
-          dragOver ? "text-primary" : "text-muted-foreground/40"
-        )} />
+        <div className={cn(
+          "flex size-14 items-center justify-center rounded-2xl transition-all duration-200",
+          dragOver ? "bg-primary/12 ring-2 ring-primary/20" : "bg-muted/60"
+        )}>
+          <FileUp className={cn(
+            "size-7 transition-colors duration-200",
+            dragOver ? "text-primary" : "text-muted-foreground/50"
+          )} />
+        </div>
         <div className="text-center">
-          <p className="text-sm font-medium">Drop EPUB, KEPUB, or PDF files here</p>
+          <p className="text-sm font-semibold">{dragOver ? "Drop to add books" : "Drop EPUB, KEPUB, or PDF files here"}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            or click to browse -- metadata is looked up automatically
+            or click to browse &mdash; metadata is looked up automatically
           </p>
         </div>
 

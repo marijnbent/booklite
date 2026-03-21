@@ -84,10 +84,10 @@ export const AppShell: React.FC = () => {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      "group relative flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg transition-all duration-150",
+      "group relative flex items-center gap-3 px-3 py-2 text-[13px] rounded-lg transition-all duration-150",
       isActive
-        ? "bg-primary/10 text-primary"
-        : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+        ? "bg-primary/10 text-primary font-semibold"
+        : "font-medium text-muted-foreground hover:text-foreground hover:bg-accent/60"
     );
 
   const iconClass = (isActive: boolean) =>
@@ -139,12 +139,12 @@ export const AppShell: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-background">
       {!isReaderRoute && (
-        <aside className="hidden md:flex w-52 shrink-0 flex-col sticky top-0 h-screen bg-muted/30 border-r border-border/50">
+        <aside className="hidden md:flex w-52 shrink-0 flex-col sticky top-0 h-screen bg-card border-r border-border/60">
           <div className="flex items-center gap-2.5 px-5 h-14">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
-              <Book className="size-3.5 text-primary" />
+            <div className="flex size-8 items-center justify-center rounded-xl bg-primary/12 ring-1 ring-primary/15">
+              <Book className="size-4 text-primary" />
             </div>
-            <span className="text-sm font-semibold tracking-tight">BookLite</span>
+            <span className="text-[15px] font-bold tracking-tight">BookLite</span>
           </div>
 
           <nav className="flex flex-1 flex-col gap-1 px-3 pt-2">
@@ -163,7 +163,7 @@ export const AppShell: React.FC = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-muted-foreground hover:bg-accent/60 transition-colors">
-                  <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary shrink-0 ring-1 ring-primary/10">
+                  <div className="flex size-7 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary shrink-0 ring-2 ring-primary/20">
                     {me?.username?.slice(0, 2).toUpperCase() ?? "?"}
                   </div>
                   <span className="truncate font-medium text-foreground/80">{me?.username}</span>
@@ -197,12 +197,12 @@ export const AppShell: React.FC = () => {
       <div className="flex flex-1 flex-col min-w-0">
         {!isReaderRoute && (
           <>
-            <header className="md:hidden flex items-center justify-between h-12 px-4 border-b border-border/50 bg-muted/30">
+            <header className="md:hidden flex items-center justify-between h-12 px-4 border-b border-border/60 bg-card">
               <div className="flex items-center gap-2.5">
-                <div className="flex size-6 items-center justify-center rounded-md bg-primary/10">
-                  <Book className="size-3 text-primary" />
+                <div className="flex size-7 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/15">
+                  <Book className="size-3.5 text-primary" />
                 </div>
-                <span className="text-sm font-semibold">BookLite</span>
+                <span className="text-sm font-bold tracking-tight">BookLite</span>
               </div>
               <Button variant="ghost" size="icon" className="size-8" onClick={() => setMobileOpen(!mobileOpen)}>
                 {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
@@ -210,7 +210,7 @@ export const AppShell: React.FC = () => {
             </header>
 
             {mobileOpen && (
-              <nav className="md:hidden border-b border-border/40 bg-muted/20 p-2.5 flex flex-col gap-0.5 animate-fade-in">
+              <nav className="md:hidden border-b border-border/60 bg-card shadow-sm p-2.5 flex flex-col gap-0.5 animate-fade-in">
                 {topItems.map((item) => renderNavItem(item, true))}
                 {visibleAdminItems.length > 0 && (
                   <>
@@ -231,7 +231,7 @@ export const AppShell: React.FC = () => {
         <main
           className={cn(
             "flex-1 animate-fade-in",
-            isReaderRoute ? "overflow-hidden p-0" : "p-6 lg:p-8"
+            isReaderRoute ? "overflow-hidden p-0" : "p-4 sm:p-6 lg:p-8"
           )}
         >
           <Outlet />

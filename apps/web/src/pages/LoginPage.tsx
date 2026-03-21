@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Book, Loader2 } from "lucide-react";
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -51,12 +51,21 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm">
-        <h2 className="mb-6 text-center text-lg font-medium text-muted-foreground">
-          BookLite
-        </h2>
+      {/* Subtle decorative gradient */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-32 size-[600px] rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -bottom-40 -left-32 size-[500px] rounded-full bg-primary/4 blur-3xl" />
+      </div>
 
-        <div className="rounded-lg border border-border bg-card">
+      <div className="relative w-full max-w-sm animate-fade-up">
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/12 ring-2 ring-primary/20 shadow-sm">
+            <Book className="size-6 text-primary" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight">BookLite</span>
+        </div>
+
+        <div className="rounded-xl border border-border/80 bg-card shadow-lg shadow-black/[0.04]">
           <div className="p-6">
             <h1 className="text-xl font-semibold tracking-tight text-center mb-1">
               Welcome back

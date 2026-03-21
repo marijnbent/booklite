@@ -303,7 +303,7 @@ export const AdminActivityPage: React.FC = () => {
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2.5">
             <TerminalSquare className="size-5 text-muted-foreground" />
-            <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
             {settings.data?.koboDebugLogging ? (
               <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                 Kobo debug on

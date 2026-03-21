@@ -204,7 +204,7 @@ Books and collections require Bearer auth on every request.`,
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-foreground">
           <Shield className="size-4 text-muted-foreground" />
-          <h1 className="text-2xl font-semibold tracking-tight">Admin API</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Admin API</h1>
         </div>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Owner-only API notes for scripts and LLM agents. This page is intentionally plain and

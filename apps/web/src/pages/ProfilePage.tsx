@@ -23,19 +23,21 @@ export const ProfilePage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-8 max-w-2xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Your account information
-      </p>
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your account information
+        </p>
+      </div>
 
       {/* Profile card */}
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="pt-5">
           {/* User identity row */}
           <div className="flex items-center gap-4">
-            <Avatar className="size-14">
-              <AvatarFallback className="text-lg font-semibold bg-primary/10 text-primary">
+            <Avatar className="size-16 ring-2 ring-primary/15 ring-offset-2">
+              <AvatarFallback className="text-lg font-bold bg-primary/12 text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>

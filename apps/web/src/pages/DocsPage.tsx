@@ -108,7 +108,7 @@ const NAV_ITEMS = [
 export const DocsPage: React.FC = () => {
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Docs</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Docs</h1>
       <p className="mt-1 text-sm text-muted-foreground mb-10">
         Everything you need to know about BookLite.
       </p>
