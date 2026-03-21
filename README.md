@@ -50,6 +50,8 @@ See `.env.example`:
 - `PORT` (default `6060`)
 - `APP_DATA_DIR` (default `/app/data`)
 - `BOOKS_DIR` (default `/books`)
+- `APP_DATA_BIND` (default `./app-data`)
+- `BOOKS_BIND` (default `./books`)
 - `JWT_SECRET`
 - `BASE_URL`
 - `ACCESS_TOKEN_TTL_SECONDS` (default `900`, 15 minutes)

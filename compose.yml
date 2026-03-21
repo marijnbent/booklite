@@ -5,11 +5,11 @@ services:
       dockerfile: Dockerfile
     container_name: booklite
     environment:
-      - PORT=6060
-      - APP_DATA_DIR=/app/data
-      - BOOKS_DIR=/books
-      - BASE_URL=http://localhost:6060
-      - JWT_SECRET=change-me-booklite
+      - PORT=${PORT:-6060}
+      - APP_DATA_DIR=${APP_DATA_DIR:-/app/data}
+      - BOOKS_DIR=${BOOKS_DIR:-/books}
+      - BASE_URL=${BASE_URL:-http://localhost:6060}
+      - JWT_SECRET=${JWT_SECRET:-change-me-booklite}
       # Optional bootstrap owner (first run only)
       # - BOOTSTRAP_OWNER_EMAIL=owner@example.com
       # - BOOTSTRAP_OWNER_USERNAME=owner
@@ -17,8 +17,8 @@ services:
       # Optional Google fallback key
       # - GOOGLE_BOOKS_API_KEY=
     ports:
-      - "6060:6060"
+      - "${PORT:-6060}:${PORT:-6060}"
     volumes:
-      - ./app-data:/app/data
-      - ./books:/books
+      - ${APP_DATA_BIND:-./app-data}:${APP_DATA_DIR:-/app/data}
+      - ${BOOKS_BIND:-./books}:${BOOKS_DIR:-/books}
     restart: unless-stopped
