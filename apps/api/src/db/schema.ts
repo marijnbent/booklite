@@ -224,7 +224,7 @@ export const apiTokens = sqliteTable("api_tokens", {
 
 export const adminActivityLog = sqliteTable("admin_activity_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  scope: text("scope", { enum: ["metadata", "upload", "kobo"] }).notNull(),
+  scope: text("scope", { enum: ["metadata", "upload", "kobo", "auth"] }).notNull(),
   event: text("event").notNull(),
   level: text("level", { enum: ["ERROR", "WARN", "INFO"] }).notNull().default("ERROR"),
   message: text("message").notNull(),

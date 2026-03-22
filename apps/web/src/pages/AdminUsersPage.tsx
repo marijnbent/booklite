@@ -2,12 +2,21 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -45,6 +54,7 @@ import {
   Shield,
   Info,
   Link2,
+  LogIn,
   TerminalSquare,
 } from "lucide-react";
 
@@ -155,12 +165,14 @@ const providerMeta: Record<
 // ---------------------------------------------------------------------------
 
 export const AdminUsersPage: React.FC = () => {
+  const { me, beginImpersonation } = useAuth();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"OWNER" | "MEMBER">("MEMBER");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [impersonationTarget, setImpersonationTarget] = useState<UserItem | null>(null);
   const [expandedProviders, setExpandedProviders] = useState<Set<EnabledMetadataProvider>>(
     new Set()
   );
@@ -211,6 +223,11 @@ export const AdminUsersPage: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["app-settings"] }),
   });
 
+  const impersonateUser = useMutation({
+    mutationFn: (user: UserItem) => beginImpersonation(user.id),
+    onSuccess: () => setImpersonationTarget(null),
+  });
+
   const updateProviderEnabled = (
     provider: EnabledMetadataProvider,
     enabled: boolean
@@ -240,6 +257,9 @@ export const AdminUsersPage: React.FC = () => {
   const enabledCount = settings.data
     ? Object.values(settings.data.metadataProviderEnabled).filter(Boolean).length
     : 0;
+
+  const canImpersonateUser = (user: UserItem): boolean =>
+    !user.disabledAt && user.role === "MEMBER" && user.id !== me?.id;
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -447,19 +467,32 @@ export const AdminUsersPage: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant={user.disabledAt ? "outline" : "secondary"}
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() =>
-                              patchUser.mutate({
-                                id: user.id,
-                                payload: { disabled: !user.disabledAt },
-                              })
-                            }
-                          >
-                            {user.disabledAt ? "Enable" : "Disable"}
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            {canImpersonateUser(user) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => setImpersonationTarget(user)}
+                              >
+                                <LogIn className="size-3.5" />
+                                Impersonate
+                              </Button>
+                            )}
+                            <Button
+                              variant={user.disabledAt ? "outline" : "secondary"}
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() =>
+                                patchUser.mutate({
+                                  id: user.id,
+                                  payload: { disabled: !user.disabledAt },
+                                })
+                              }
+                            >
+                              {user.disabledAt ? "Enable" : "Disable"}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -469,6 +502,62 @@ export const AdminUsersPage: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        <Dialog
+          open={impersonationTarget !== null}
+          onOpenChange={(open) => {
+            if (!open && !impersonateUser.isPending) setImpersonationTarget(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Impersonate {impersonationTarget?.username}</DialogTitle>
+              <DialogDescription>
+                BookLite will switch this browser into that member account and keep your admin
+                session parked behind a restore overlay so you can come back when you are done.
+              </DialogDescription>
+            </DialogHeader>
+            {impersonationTarget && (
+              <div className="rounded-xl border border-border bg-muted/30 p-4">
+                <p className="text-sm font-semibold">{impersonationTarget.username}</p>
+                <p className="text-xs text-muted-foreground">{impersonationTarget.email}</p>
+              </div>
+            )}
+            {impersonateUser.error instanceof Error && (
+              <p className="text-sm text-destructive">{impersonateUser.error.message}</p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setImpersonationTarget(null)}
+                disabled={impersonateUser.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!impersonationTarget || impersonateUser.isPending}
+                onClick={() => {
+                  if (!impersonationTarget) return;
+                  impersonateUser.mutate(impersonationTarget);
+                }}
+              >
+                {impersonateUser.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Switching...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="size-4" />
+                    Continue as user
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* ================================================================
             METADATA PROVIDERS SECTION

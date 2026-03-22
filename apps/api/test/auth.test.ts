@@ -233,4 +233,174 @@ describe("auth", () => {
 
     expect(response.statusCode).toBe(403);
   });
+
+  it("allows owners to impersonate active members", async () => {
+    const ownerTokens = await setupOwnerAndLogin(app);
+
+    const createMember = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      },
+      payload: {
+        email: "member-impersonate@example.com",
+        username: "member-impersonate",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+    expect(createMember.statusCode).toBe(201);
+    const member = createMember.json<{ id: number; username: string; role: "MEMBER" }>();
+
+    const impersonate = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/users/${member.id}/impersonate`,
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      }
+    });
+
+    expect(impersonate.statusCode).toBe(200);
+    expect(impersonate.json()).toMatchObject({
+      impersonatedUser: {
+        id: member.id,
+        username: "member-impersonate",
+        role: "MEMBER"
+      },
+      tokens: {
+        accessToken: expect.any(String),
+        refreshToken: expect.any(String),
+        expiresInSeconds: expect.any(Number)
+      }
+    });
+
+    const asMember = impersonate.json<{
+      tokens: { accessToken: string };
+    }>();
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${asMember.tokens.accessToken}`
+      }
+    });
+
+    expect(me.statusCode).toBe(200);
+    expect(me.json()).toMatchObject({
+      id: member.id,
+      username: "member-impersonate",
+      role: "MEMBER"
+    });
+  });
+
+  it("rejects impersonation for non-member or disabled targets", async () => {
+    const ownerTokens = await setupOwnerAndLogin(app);
+
+    const createOwner = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      },
+      payload: {
+        email: "owner-target@example.com",
+        username: "owner-target",
+        password: "secret123",
+        role: "OWNER"
+      }
+    });
+    expect(createOwner.statusCode).toBe(201);
+    const ownerTarget = createOwner.json<{ id: number }>();
+
+    const ownerImpersonate = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/users/${ownerTarget.id}/impersonate`,
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      }
+    });
+
+    expect(ownerImpersonate.statusCode).toBe(403);
+
+    const createMember = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      },
+      payload: {
+        email: "disabled-member@example.com",
+        username: "disabled-member",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+    expect(createMember.statusCode).toBe(201);
+    const disabledMember = createMember.json<{ id: number }>();
+
+    const disableMember = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${disabledMember.id}`,
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      },
+      payload: {
+        disabled: true
+      }
+    });
+    expect(disableMember.statusCode).toBe(200);
+
+    const disabledImpersonate = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/users/${disabledMember.id}/impersonate`,
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      }
+    });
+
+    expect(disabledImpersonate.statusCode).toBe(409);
+  });
+
+  it("rejects impersonation for members", async () => {
+    const ownerTokens = await setupOwnerAndLogin(app);
+
+    const createMember = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerTokens.accessToken}`
+      },
+      payload: {
+        email: "member-authz@example.com",
+        username: "member-authz",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+    expect(createMember.statusCode).toBe(201);
+    const member = createMember.json<{ id: number }>();
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: "member-authz",
+        password: "secret123"
+      }
+    });
+
+    const memberTokens = login.json<{ accessToken: string }>();
+
+    const impersonate = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/users/${member.id}/impersonate`,
+      headers: {
+        authorization: `Bearer ${memberTokens.accessToken}`
+      }
+    });
+
+    expect(impersonate.statusCode).toBe(403);
+  });
 });

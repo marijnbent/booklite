@@ -59,7 +59,7 @@ type NavItem = {
 );
 
 export const AppShell: React.FC = () => {
-  const { me, logout } = useAuth();
+  const { me, logout, endImpersonation, impersonation, isImpersonating } = useAuth();
   const { resolved, setTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,11 +75,19 @@ export const AppShell: React.FC = () => {
     ? [...navItems, { href: ebookDownloadUrl, label: "Ebooks", icon: Download }]
     : navItems;
 
-  const visibleAdminItems = adminItems.filter((i) => !i.ownerOnly || me?.role === "OWNER");
+  const visibleAdminItems = isImpersonating
+    ? []
+    : adminItems.filter((i) => !i.ownerOnly || me?.role === "OWNER");
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
+  };
+
+  const handleReturnToAdmin = async () => {
+    const restorePath = impersonation?.restorePath ?? "/admin-users";
+    await endImpersonation();
+    navigate(restorePath, { replace: true });
   };
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -138,6 +146,26 @@ export const AppShell: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-background">
+      {isImpersonating && impersonation && (
+        <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3">
+          <div className="pointer-events-auto flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-amber-500/30 bg-background/95 px-4 py-3 shadow-xl ring-1 ring-black/5 backdrop-blur">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/12 text-amber-700 dark:text-amber-300">
+              <Shield className="size-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">
+                Viewing BookLite as {impersonation.targetUsername}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Admin session parked as {impersonation.adminUsername}. Admin tools stay hidden until you restore.
+              </p>
+            </div>
+            <Button size="sm" className="shrink-0" onClick={() => void handleReturnToAdmin()}>
+              Return to admin
+            </Button>
+          </div>
+        </div>
+      )}
       {!isReaderRoute && (
         <aside className="hidden md:flex w-52 shrink-0 flex-col sticky top-0 h-screen bg-card border-r border-border/60">
           <div className="flex items-center gap-2.5 px-5 h-14">

@@ -92,7 +92,7 @@ export interface AppSettings {
     koboDebugLogging: boolean;
     uploadLimitMb: number;
 }
-export type AdminActivityScope = "metadata" | "upload" | "kobo";
+export type AdminActivityScope = "metadata" | "upload" | "kobo" | "auth";
 export type AdminActivityLevel = "ERROR" | "WARN" | "INFO";
 export interface AdminActivityItem {
     id: number;

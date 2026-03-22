@@ -3,7 +3,7 @@ import { db } from "../db/client";
 import { adminActivityLog } from "../db/schema";
 import { nowIso } from "../utils/time";
 
-export type AdminActivityScope = "metadata" | "upload" | "kobo";
+export type AdminActivityScope = "metadata" | "upload" | "kobo" | "auth";
 export type AdminActivityLevel = "ERROR" | "WARN" | "INFO";
 
 const MAX_LOG_ENTRIES = 1000;

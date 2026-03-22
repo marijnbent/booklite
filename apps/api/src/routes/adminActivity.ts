@@ -9,14 +9,14 @@ import {
 } from "../services/adminActivityLog";
 
 const querySchema = z.object({
-  scope: z.enum(["metadata", "upload", "kobo"]).optional(),
+  scope: z.enum(["metadata", "upload", "kobo", "auth"]).optional(),
   level: z.enum(["ERROR", "WARN", "INFO"]).optional(),
   limit: z.coerce.number().int().min(1).max(250).default(100)
 });
 
 const clearSchema = z
   .object({
-    scope: z.enum(["metadata", "upload", "kobo"]).optional()
+    scope: z.enum(["metadata", "upload", "kobo", "auth"]).optional()
   })
   .optional();
 

@@ -25,7 +25,7 @@ import {
   Inbox,
 } from "lucide-react";
 
-type AdminActivityScope = "metadata" | "upload" | "kobo";
+type AdminActivityScope = "metadata" | "upload" | "kobo" | "auth";
 type AdminActivityLevel = "ERROR" | "WARN" | "INFO";
 
 interface AdminActivityItem {
@@ -48,6 +48,7 @@ interface AppSettings {
 
 const activityScopeOptions: Array<{ value: "all" | AdminActivityScope; label: string }> = [
   { value: "all", label: "All systems" },
+  { value: "auth", label: "Auth" },
   { value: "metadata", label: "Metadata" },
   { value: "upload", label: "Upload" },
   { value: "kobo", label: "Kobo" },
@@ -61,6 +62,10 @@ const activityLevelOptions: Array<{ value: "all" | AdminActivityLevel; label: st
 ];
 
 const activityScopeMeta: Record<AdminActivityScope, { label: string; className: string }> = {
+  auth: {
+    label: "Auth",
+    className: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  },
   metadata: {
     label: "Metadata",
     className: "bg-blue-500/10 text-blue-700 dark:text-blue-300",

@@ -5,9 +5,11 @@ import { db } from "../db/client";
 import { users } from "../db/schema";
 import { getAuth, requireAuth, requireOwner } from "../auth/guards";
 import { hashPassword } from "../auth/password";
+import { issueTokens } from "../auth/tokens";
 import { nowIso } from "../utils/time";
 import { ensureKoboSettingsRow } from "../services/koboSettings";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
+import { logAdminActivity } from "../services/adminActivityLog";
 import { idParams } from "../schemas";
 
 const createUserSchema = z.object({
@@ -113,6 +115,69 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!updated) return reply.code(404).send({ error: "User not found" });
       return updated;
+    }
+  );
+
+  fastify.post(
+    "/api/v1/admin/users/:id/impersonate",
+    { preHandler: requireOwner },
+    async (request, reply) => {
+      const params = idParams.parse(request.params);
+      const actor = getAuth(request);
+
+      const found = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          role: users.role,
+          disabledAt: users.disabledAt
+        })
+        .from(users)
+        .where(eq(users.id, params.id))
+        .limit(1);
+
+      const target = found[0];
+      if (!target) return reply.code(404).send({ error: "User not found" });
+      if (target.disabledAt) {
+        return reply.code(409).send({ error: "Disabled users cannot be impersonated" });
+      }
+      if (target.role !== "MEMBER") {
+        return reply.code(403).send({ error: "Only member accounts can be impersonated" });
+      }
+      if (target.id === actor.userId) {
+        return reply.code(400).send({ error: "Use your existing session instead" });
+      }
+
+      const tokens = await issueTokens({
+        userId: target.id,
+        username: target.username,
+        role: target.role
+      });
+
+      await logAdminActivity({
+        scope: "auth",
+        event: "admin_impersonation_started",
+        level: "INFO",
+        message: `Admin ${actor.username} started impersonating ${target.username}`,
+        actorUserId: actor.userId,
+        targetUserId: target.id,
+        details: {
+          actorUsername: actor.username,
+          targetUsername: target.username,
+          targetRole: target.role
+        }
+      });
+
+      return {
+        tokens,
+        impersonatedUser: {
+          id: target.id,
+          email: target.email,
+          username: target.username,
+          role: target.role
+        }
+      };
     }
   );
 };
