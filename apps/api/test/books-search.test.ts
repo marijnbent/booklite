@@ -29,6 +29,21 @@ describe("books + search", () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
+
+    await dbModule.db.insert(schema.books).values({
+      ownerUserId: 1,
+      title: "The Whore's Child and Other Stories",
+      author: "Richard Russo",
+      series: null,
+      description: "Stories about family and memory",
+      coverPath: null,
+      filePath: "whore-child.epub",
+      fileExt: "epub",
+      fileSize: 1000,
+      koboSyncable: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
   });
 
   it("supports FTS query", async () => {
@@ -40,5 +55,22 @@ describe("books + search", () => {
 
     expect(search.statusCode).toBe(200);
     expect(search.json().length).toBeGreaterThan(0);
+  });
+
+  it("supports prefix matching for partial words", async () => {
+    const search = await app.inject({
+      method: "GET",
+      url: "/api/v1/books?q=chil",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+
+    expect(search.statusCode).toBe(200);
+    expect(search.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "The Whore's Child and Other Stories"
+        })
+      ])
+    );
   });
 });

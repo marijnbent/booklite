@@ -161,6 +161,212 @@ describe("users", () => {
     });
   });
 
+  it("returns field-specific conflicts for duplicate usernames and emails", async () => {
+    const createFirst = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        email: "duplicate-a@example.com",
+        username: "duplicate-a",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+
+    expect(createFirst.statusCode).toBe(201);
+    const firstUser = createFirst.json<{ id: number }>();
+
+    const createSecond = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        email: "duplicate-b@example.com",
+        username: "duplicate-b",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+
+    expect(createSecond.statusCode).toBe(201);
+    const secondUser = createSecond.json<{ id: number }>();
+
+    const duplicateUsername = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        email: "duplicate-c@example.com",
+        username: "duplicate-a",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+
+    expect(duplicateUsername.statusCode).toBe(409);
+    expect(duplicateUsername.json()).toEqual({
+      error: "Username already exists",
+      field: "username"
+    });
+
+    const duplicateEmail = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        email: "duplicate-a@example.com",
+        username: "duplicate-c",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+
+    expect(duplicateEmail.statusCode).toBe(409);
+    expect(duplicateEmail.json()).toEqual({
+      error: "Email already exists",
+      field: "email"
+    });
+
+    const patchDuplicateUsername = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${secondUser.id}`,
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        username: "duplicate-a"
+      }
+    });
+
+    expect(patchDuplicateUsername.statusCode).toBe(409);
+    expect(patchDuplicateUsername.json()).toEqual({
+      error: "Username already exists",
+      field: "username"
+    });
+
+    const patchDuplicateEmail = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${secondUser.id}`,
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        email: "duplicate-a@example.com"
+      }
+    });
+
+    expect(patchDuplicateEmail.statusCode).toBe(409);
+    expect(patchDuplicateEmail.json()).toEqual({
+      error: "Email already exists",
+      field: "email"
+    });
+
+    const unchangedFirstUser = await app.inject({
+      method: "GET",
+      url: `/api/v1/users`,
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      }
+    });
+
+    expect(unchangedFirstUser.statusCode).toBe(200);
+    expect(
+      unchangedFirstUser.json<Array<{ id: number; username: string; email: string | null }>>()
+        .find((user) => user.id === firstUser.id)
+    ).toMatchObject({
+      id: firstUser.id,
+      username: "duplicate-a",
+      email: "duplicate-a@example.com"
+    });
+  });
+
+  it("prevents removing the last enabled owner but allows it once another owner exists", async () => {
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      }
+    });
+
+    expect(me.statusCode).toBe(200);
+    const owner = me.json<{ id: number }>();
+
+    const demoteLastOwner = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${owner.id}`,
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        role: "MEMBER"
+      }
+    });
+
+    expect(demoteLastOwner.statusCode).toBe(409);
+    expect(demoteLastOwner.json()).toEqual({
+      error: "You cannot remove your own last enabled owner access"
+    });
+
+    const disableLastOwner = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${owner.id}`,
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        disabled: true
+      }
+    });
+
+    expect(disableLastOwner.statusCode).toBe(409);
+    expect(disableLastOwner.json()).toEqual({
+      error: "You cannot remove your own last enabled owner access"
+    });
+
+    const createSecondOwner = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        email: "second-owner@example.com",
+        username: "second-owner",
+        password: "secret123",
+        role: "OWNER"
+      }
+    });
+
+    expect(createSecondOwner.statusCode).toBe(201);
+
+    const demoteWithBackupOwner = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${owner.id}`,
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`
+      },
+      payload: {
+        role: "MEMBER"
+      }
+    });
+
+    expect(demoteWithBackupOwner.statusCode).toBe(200);
+    expect(demoteWithBackupOwner.json()).toMatchObject({
+      id: owner.id,
+      role: "MEMBER"
+    });
+  });
+
   it("deletes disabled users and blocks invalid deletions", async () => {
     const createDeleteTarget = await app.inject({
       method: "POST",

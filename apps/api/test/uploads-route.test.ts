@@ -1,7 +1,11 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { isSupportedBookExt } from "../src/services/books";
-import { sanitizeFileName } from "../src/routes/uploads";
+import { createTempEnv } from "./helpers";
+
+createTempEnv();
+
+const { isSupportedBookExt } = await import("../src/services/books");
+const { sanitizeFileName } = await import("../src/routes/uploads");
 
 describe("upload filename sanitization", () => {
   it("preserves the epub extension when truncating long upload names", () => {

@@ -5,6 +5,25 @@ const toInt = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const INSECURE_JWT_SECRETS = new Set([
+  "booklite-dev-secret-change-me",
+  "change-me-booklite"
+]);
+
+const resolveJwtSecret = (): string => {
+  const jwtSecret = process.env.JWT_SECRET?.trim();
+
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET is required");
+  }
+
+  if (INSECURE_JWT_SECRETS.has(jwtSecret)) {
+    throw new Error("JWT_SECRET must be changed from the default/example value");
+  }
+
+  return jwtSecret;
+};
+
 export const config = {
   port: toInt(process.env.PORT, 6060),
   host: process.env.HOST ?? "0.0.0.0",
@@ -13,7 +32,7 @@ export const config = {
   booksDir: process.env.BOOKS_DIR ?? path.join(process.cwd(), "books"),
   webDistDir: process.env.WEB_DIST_DIR ?? path.join(process.cwd(), "apps/web/dist"),
   frontendMode: process.env.BOOKLITE_FRONTEND_MODE ?? "auto",
-  jwtSecret: process.env.JWT_SECRET ?? "booklite-dev-secret-change-me",
+  jwtSecret: resolveJwtSecret(),
   accessTokenTtlSeconds: toInt(process.env.ACCESS_TOKEN_TTL_SECONDS, 3600),
   refreshTokenTtlSeconds: toInt(process.env.REFRESH_TOKEN_TTL_SECONDS, 7776000),
   uploadLimitMb: toInt(process.env.UPLOAD_LIMIT_MB, 100),

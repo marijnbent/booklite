@@ -62,7 +62,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -129,6 +128,13 @@ const ListSkeleton: React.FC = () => (
     ))}
   </div>
 );
+
+const SORT_LABELS: Record<SortOption, string> = {
+  created: "Newest uploads",
+  updated: "Recently updated",
+  title: "Title (A-Z)",
+  author: "Author (A-Z)",
+};
 
 // ---------------------------------------------------------------------------
 // Emoji picker
@@ -967,76 +973,78 @@ export const LibraryPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Library</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {activeCollection
               ? `${activeCollection.icon ? activeCollection.icon + " " : ""}${activeCollection.name} \u00b7 ${statusCounts.ALL} books`
               : `${statusCounts.ALL} books${statusCounts.READING > 0 ? ` \u00b7 ${statusCounts.READING} reading` : ""}`}
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          {activeCollection && !activeCollectionIsVirtual && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setAddBooksDialogOpen(true)}
-            >
-              <Plus className="size-3.5" />
-              Add books
-            </Button>
-          )}
-        </div>
+        {activeCollection && !activeCollectionIsVirtual && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setAddBooksDialogOpen(true)}
+          >
+            <Plus className="size-3.5" />
+            Add books
+          </Button>
+        )}
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40" />
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />
           <Input
             placeholder="Search..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9 pr-8"
+            className="h-9 rounded-lg border-border/70 bg-background pl-9 pr-8 text-sm placeholder:text-muted-foreground/60"
           />
           {searchInput && (
             <button
               onClick={() => setSearchInput("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 transition-colors hover:text-foreground"
             >
               <X className="size-3.5" />
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-            <SelectTrigger className="h-9 w-[190px] text-xs">
-              <ArrowDownAZ className="size-3.5 text-muted-foreground/60" />
-              <SelectValue />
+            <SelectTrigger className="h-9 w-auto rounded-lg border-border/70 bg-background px-3 text-sm" aria-label={`Sort by: ${SORT_LABELS[sort]}`}>
+              <div className="flex items-center gap-2 text-left">
+                <ArrowDownAZ className="size-3.5 shrink-0 text-muted-foreground/60" />
+                <span className="font-medium text-foreground">{SORT_LABELS[sort]}</span>
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="created">Upload date: new first</SelectItem>
-              <SelectItem value="updated">Recently updated</SelectItem>
-              <SelectItem value="title">Title A-Z</SelectItem>
-              <SelectItem value="author">Author A-Z</SelectItem>
+              <SelectItem value="created">{SORT_LABELS.created}</SelectItem>
+              <SelectItem value="updated">{SORT_LABELS.updated}</SelectItem>
+              <SelectItem value="title">{SORT_LABELS.title}</SelectItem>
+              <SelectItem value="author">{SORT_LABELS.author}</SelectItem>
             </SelectContent>
           </Select>
+
+          <div className="h-5 w-px bg-border/60" />
 
           <ToggleGroup
             type="single"
             value={view}
             onValueChange={(v) => { if (v) setView(v as ViewMode); }}
-            className="border border-border rounded-md p-0.5"
+            className="h-9 rounded-lg border border-border/70 bg-background p-0.5"
           >
-            <ToggleGroupItem value="grid" aria-label="Grid" className="size-8 data-[state=on]:bg-accent">
+            <ToggleGroupItem value="grid" aria-label="Grid" className="size-8 rounded-md text-muted-foreground data-[state=on]:bg-accent data-[state=on]:text-foreground">
               <Grid3X3 className="size-3.5" />
             </ToggleGroupItem>
-            <ToggleGroupItem value="list" aria-label="List" className="size-8 data-[state=on]:bg-accent">
+            <ToggleGroupItem value="list" aria-label="List" className="size-8 rounded-md text-muted-foreground data-[state=on]:bg-accent data-[state=on]:text-foreground">
               <List className="size-3.5" />
             </ToggleGroupItem>
           </ToggleGroup>
@@ -1044,7 +1052,7 @@ export const LibraryPage: React.FC = () => {
           <Button
             variant={selectionActive ? "secondary" : "ghost"}
             size="sm"
-            className="gap-1.5 h-8 text-xs"
+            className="h-9 gap-1.5 rounded-lg px-2.5 text-sm"
             onClick={() => {
               if (selectionActive) {
                 clearSelection();
@@ -1070,15 +1078,18 @@ export const LibraryPage: React.FC = () => {
               key={status}
               onClick={() => setStatusFilter(status)}
               className={cn(
-                "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
+                "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
                 active
-                  ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
-              {config && <config.icon className="size-3" />}
+              {config && <config.icon className="size-3.5" />}
               {statusFilterLabels[status]}
-              <span className="text-[10px] tabular-nums opacity-50">{count}</span>
+              <span className={cn(
+                "text-[11px] tabular-nums font-normal",
+                active ? "text-primary/70" : "text-muted-foreground/60",
+              )}>{count}</span>
             </button>
           );
         })}
@@ -1086,13 +1097,12 @@ export const LibraryPage: React.FC = () => {
 
       {/* Collection filters */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-px">
-        <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground/50 font-medium mr-1">Collections</span>
         <button
           onClick={() => setSelectedCollectionId(null)}
           className={cn(
-            "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
+            "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
             selectedCollectionId === null
-              ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
+              ? "bg-primary/10 text-primary"
               : "text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
         >
@@ -1104,17 +1114,18 @@ export const LibraryPage: React.FC = () => {
               key={col.id}
               onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
               className={cn(
-                "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
+                "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
                 selectedCollectionId === col.id
-                  ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
               {renderCollectionIcon(col)}
               {col.name}
-              <span className="text-[10px] tabular-nums ml-0.5 opacity-40">
-                {col.book_count}
-              </span>
+              <span className={cn(
+                "text-[11px] tabular-nums font-normal",
+                selectedCollectionId === col.id ? "text-primary/70" : "text-muted-foreground/60",
+              )}>{col.book_count}</span>
             </button>
           ) : (
             <ContextMenu key={col.id}>
@@ -1122,17 +1133,18 @@ export const LibraryPage: React.FC = () => {
                 <button
                   onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
                   className={cn(
-                    "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-all duration-150",
+                    "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
                     selectedCollectionId === col.id
-                      ? "bg-primary/12 text-primary ring-1 ring-primary/25 shadow-sm"
+                      ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
                   {renderCollectionIcon(col)}
                   {col.name}
-                  <span className="text-[10px] tabular-nums ml-0.5 opacity-40">
-                    {col.book_count}
-                  </span>
+                  <span className={cn(
+                    "text-[11px] tabular-nums font-normal",
+                    selectedCollectionId === col.id ? "text-primary/70" : "text-muted-foreground/60",
+                  )}>{col.book_count}</span>
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent className="w-44">
@@ -1169,13 +1181,12 @@ export const LibraryPage: React.FC = () => {
         )}
         <button
           onClick={() => setCreateCollectionOpen(true)}
-          className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground/40 hover:bg-accent hover:text-foreground transition-all duration-150"
+          className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground/40 hover:bg-accent hover:text-foreground transition-colors duration-150"
           title="New collection"
         >
           <Plus className="size-3.5" />
           {collections.filter((collection) => !isVirtualCollection(collection)).length === 0 && <span>New collection</span>}
         </button>
-
       </div>
 
       {/* Content */}

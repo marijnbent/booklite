@@ -65,6 +65,7 @@ It is inspired by [BookLore](https://github.com/booklore-app/booklore), but deli
 
 ```bash
 cp .env.example .env
+# then edit .env and set JWT_SECRET
 docker compose up -d --build
 ```
 
@@ -76,7 +77,7 @@ Open [http://localhost:6060](http://localhost:6060).
 docker run -d \
   --name booklite \
   -p 6060:6060 \
-  -e JWT_SECRET=change-me-booklite \
+  -e JWT_SECRET=replace-with-a-long-random-secret \
   -e BASE_URL=http://localhost:6060 \
   -v "$(pwd)/app-data:/app/data" \
   -v "$(pwd)/books:/books" \
@@ -103,7 +104,7 @@ Core settings:
 - `PORT` default `6060`
 - `HOST` default `0.0.0.0`
 - `BASE_URL` default `http://localhost:6060`
-- `JWT_SECRET`
+- `JWT_SECRET` required, must not be left empty or set to the example/default value
 - `ACCESS_TOKEN_TTL_SECONDS` default `3600`
 - `REFRESH_TOKEN_TTL_SECONDS` default `7776000`
 

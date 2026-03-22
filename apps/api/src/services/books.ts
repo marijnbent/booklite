@@ -15,6 +15,27 @@ export interface ParsedFilename {
   series: string | null;
 }
 
+const normalizeSearchTokens = (value: string): string[] =>
+  value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+export const buildBookSearchQuery = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") return null;
+
+  const seen = new Set<string>();
+  const tokens = normalizeSearchTokens(value).filter((token) => {
+    if (seen.has(token)) return false;
+    seen.add(token);
+    return true;
+  });
+
+  return tokens.length > 0 ? tokens.map((token) => `${token}*`).join(" AND ") : null;
+};
+
 // --- Source tag patterns ---
 
 const SOURCE_TAGS = [

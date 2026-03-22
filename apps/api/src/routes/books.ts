@@ -29,6 +29,7 @@ import {
   ensureSystemCollectionsForUser,
   getFavoritesCollectionId
 } from "../services/systemCollections";
+import { buildBookSearchQuery } from "../services/books";
 
 const patchBookSchema = z.object({
   title: z.string().min(1).optional(),
@@ -292,19 +293,23 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       })
       .parse(request.query);
 
-    const rows = query.q
+    const searchQuery = buildBookSearchQuery(query.q);
+
+    const rows = searchQuery
       ? await db.all(
           sql`
             SELECT ${bookSelectFields(userId)}
             FROM books b
             JOIN book_search bs ON bs.rowid = b.id
             ${bookJoins(userId)}
-            WHERE book_search MATCH ${query.q}
+            WHERE book_search MATCH ${searchQuery}
               AND ${bookVisibleToUserWhere(userId)}
             ORDER BY b.updated_at DESC
             LIMIT ${query.limit} OFFSET ${query.offset}
           `
         )
+      : query.q
+        ? []
       : await db.all(
           sql`
             SELECT ${bookSelectFields(userId)}

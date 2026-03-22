@@ -11,6 +11,7 @@ import { ensureKoboSettingsRow } from "../services/koboSettings";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
 import { logAdminActivity } from "../services/adminActivityLog";
 import { idParams } from "../schemas";
+import { getSqliteUniqueConstraintColumns } from "../utils/sqliteErrors";
 
 const nullableEmailSchema = z.preprocess((value) => {
   if (value === undefined || value === null) return null;
@@ -40,6 +41,42 @@ const patchUserSchema = z.object({
   role: z.enum(["OWNER", "MEMBER"]).optional(),
   disabled: z.boolean().optional()
 });
+
+const getUserConflictResponse = (
+  error: unknown
+): { error: string; field: "username" | "email" } | null => {
+  const columns = getSqliteUniqueConstraintColumns(error);
+  if (columns.includes("users.username")) {
+    return {
+      error: "Username already exists",
+      field: "username"
+    };
+  }
+
+  if (columns.includes("users.email")) {
+    return {
+      error: "Email already exists",
+      field: "email"
+    };
+  }
+
+  return null;
+};
+
+const countOtherEnabledOwners = async (excludedUserId: number): Promise<number> => {
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(users)
+    .where(
+      and(
+        eq(users.role, "OWNER"),
+        isNull(users.disabledAt),
+        ne(users.id, excludedUserId)
+      )
+    );
+
+  return total;
+};
 
 export const usersRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/users", { preHandler: requireOwner }, async () =>
@@ -72,24 +109,43 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/api/v1/users", { preHandler: requireOwner }, async (request, reply) => {
     const body = createUserSchema.parse(request.body);
 
-    const [created] = await db
-      .insert(users)
-      .values({
-        email: body.email,
-        username: body.username,
-        passwordHash: await hashPassword(body.password),
-        role: body.role,
-        createdAt: nowIso(),
-        disabledAt: null
-      })
-      .returning({
-        id: users.id,
-        email: users.email,
-        username: users.username,
-        role: users.role,
-        createdAt: users.createdAt,
-        disabledAt: users.disabledAt
-      });
+    let created:
+      | {
+          id: number;
+          email: string | null;
+          username: string;
+          role: "OWNER" | "MEMBER";
+          createdAt: string;
+          disabledAt: string | null;
+        }
+      | undefined;
+
+    try {
+      [created] = await db
+        .insert(users)
+        .values({
+          email: body.email,
+          username: body.username,
+          passwordHash: await hashPassword(body.password),
+          role: body.role,
+          createdAt: nowIso(),
+          disabledAt: null
+        })
+        .returning({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          role: users.role,
+          createdAt: users.createdAt,
+          disabledAt: users.disabledAt
+        });
+    } catch (error) {
+      const conflict = getUserConflictResponse(error);
+      if (conflict) {
+        return reply.code(409).send(conflict);
+      }
+      throw error;
+    }
 
     await ensureKoboSettingsRow(created.id);
 
@@ -104,8 +160,43 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/users/:id",
     { preHandler: requireOwner },
     async (request, reply) => {
+      const actor = getAuth(request);
       const params = idParams.parse(request.params);
       const body = patchUserSchema.parse(request.body);
+
+      const [existing] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          username: users.username,
+          role: users.role,
+          createdAt: users.createdAt,
+          disabledAt: users.disabledAt
+        })
+        .from(users)
+        .where(eq(users.id, params.id))
+        .limit(1);
+
+      if (!existing) return reply.code(404).send({ error: "User not found" });
+
+      const nextRole = body.role ?? existing.role;
+      const nextDisabled = body.disabled ?? (existing.disabledAt !== null);
+      const removesEnabledOwner =
+        existing.role === "OWNER" &&
+        existing.disabledAt === null &&
+        (nextRole !== "OWNER" || nextDisabled);
+
+      if (removesEnabledOwner) {
+        const otherEnabledOwners = await countOtherEnabledOwners(existing.id);
+        if (otherEnabledOwners === 0) {
+          return reply.code(409).send({
+            error:
+              actor.userId === existing.id
+                ? "You cannot remove your own last enabled owner access"
+                : "At least one enabled owner must remain"
+          });
+        }
+      }
 
       const set: Record<string, unknown> = {};
       if (body.email !== undefined) set.email = body.email;
@@ -116,35 +207,40 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (Object.keys(set).length === 0) {
-        const [existing] = await db
-          .select({
+        return existing;
+      }
+
+      let updated:
+        | {
+            id: number;
+            email: string | null;
+            username: string;
+            role: "OWNER" | "MEMBER";
+            createdAt: string;
+            disabledAt: string | null;
+          }
+        | undefined;
+
+      try {
+        [updated] = await db
+          .update(users)
+          .set(set)
+          .where(eq(users.id, params.id))
+          .returning({
             id: users.id,
             email: users.email,
             username: users.username,
             role: users.role,
             createdAt: users.createdAt,
             disabledAt: users.disabledAt
-          })
-          .from(users)
-          .where(eq(users.id, params.id))
-          .limit(1);
-
-        if (!existing) return reply.code(404).send({ error: "User not found" });
-        return existing;
+          });
+      } catch (error) {
+        const conflict = getUserConflictResponse(error);
+        if (conflict) {
+          return reply.code(409).send(conflict);
+        }
+        throw error;
       }
-
-      const [updated] = await db
-        .update(users)
-        .set(set)
-        .where(eq(users.id, params.id))
-        .returning({
-          id: users.id,
-          email: users.email,
-          username: users.username,
-          role: users.role,
-          createdAt: users.createdAt,
-          disabledAt: users.disabledAt
-        });
 
       if (!updated) return reply.code(404).send({ error: "User not found" });
       return updated;

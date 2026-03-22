@@ -7,6 +7,7 @@ import { hashPassword } from "../auth/password";
 import { nowIso } from "../utils/time";
 import { ensureKoboSettingsRow } from "../services/koboSettings";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
+import { getSqliteUniqueConstraintColumns } from "../utils/sqliteErrors";
 
 const nullableEmailSchema = z.preprocess((value) => {
   if (value === undefined || value === null) return null;
@@ -38,17 +39,37 @@ export const setupRoutes: FastifyPluginAsync = async (fastify) => {
 
     const timestamp = nowIso();
     const passwordHash = await hashPassword(body.password);
-    const [owner] = await db
-      .insert(users)
-      .values({
-        email: body.email,
-        username: body.username,
-        passwordHash,
-        role: "OWNER",
-        createdAt: timestamp,
-        disabledAt: null
-      })
-      .returning({ id: users.id, email: users.email, username: users.username, role: users.role });
+    let owner: { id: number; email: string | null; username: string; role: "OWNER" | "MEMBER" };
+    try {
+      [owner] = await db
+        .insert(users)
+        .values({
+          email: body.email,
+          username: body.username,
+          passwordHash,
+          role: "OWNER",
+          createdAt: timestamp,
+          disabledAt: null
+        })
+        .returning({ id: users.id, email: users.email, username: users.username, role: users.role });
+    } catch (error) {
+      const columns = getSqliteUniqueConstraintColumns(error);
+      if (columns.includes("users.username")) {
+        return reply.code(409).send({
+          error: "Username already exists",
+          field: "username"
+        });
+      }
+
+      if (columns.includes("users.email")) {
+        return reply.code(409).send({
+          error: "Email already exists",
+          field: "email"
+        });
+      }
+
+      throw error;
+    }
 
     await ensureKoboSettingsRow(owner.id);
 
