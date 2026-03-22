@@ -8,6 +8,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -33,6 +36,7 @@
     "@types/jsonwebtoken": "^9.0.8",
     "@types/mime-types": "^3.0.1",
     "@types/node": "^22.15.3",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vite": "^7.1.2",

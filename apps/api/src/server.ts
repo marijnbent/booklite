@@ -1,10 +1,13 @@
 import { buildApp } from "./app";
 import { config } from "./config";
 import { bootstrapOwnerFromEnv } from "./bootstrap";
+import { prepareDatabase } from "./db/migrate";
 import { startJobRunner } from "./services/jobs";
 import { registerFrontend } from "./frontend";
 
 const main = async (): Promise<void> => {
+  prepareDatabase();
+
   const app = buildApp();
   await registerFrontend(app);
 

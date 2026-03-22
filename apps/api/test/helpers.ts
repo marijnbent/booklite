@@ -19,6 +19,9 @@ export const createTempEnv = (): { appDataDir: string; booksDir: string } => {
 };
 
 export const setupTestApp = async () => {
+  const migrateModule = await import("../src/db/migrate");
+  migrateModule.prepareDatabase();
+
   const mod = await import("../src/app");
   const app = mod.buildApp();
   await app.ready();

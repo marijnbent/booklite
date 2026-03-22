@@ -175,6 +175,7 @@ type BookPages = {
 };
 
 const PAGE_SIZE = 50;
+const SHARED_WITH_ME_COLLECTION_ID = -2;
 const UNCOLLECTED_COLLECTION_ID = -1;
 
 const manualStatusOptions = ["UNREAD", "READING", "READ", "ABANDONED"] as const;
@@ -364,7 +365,12 @@ function buildPanelCoverOptions(
 }
 
 function isVirtualCollection(collection: CollectionItem | null | undefined): boolean {
-  return Boolean(collection && (collection.virtual === 1 || collection.id === UNCOLLECTED_COLLECTION_ID));
+  return Boolean(
+    collection &&
+      (collection.virtual === 1 ||
+        collection.id === SHARED_WITH_ME_COLLECTION_ID ||
+        collection.id === UNCOLLECTED_COLLECTION_ID)
+  );
 }
 
 type CollectionIconLike = {
@@ -386,6 +392,10 @@ function renderCollectionIcon(
 
   if (collection.slug === "uncollected") {
     return <FolderOpen className={options?.svgClassName ?? "size-3.5"} />;
+  }
+
+  if (collection.slug === "shared-with-me") {
+    return <Users className={options?.svgClassName ?? "size-3.5"} />;
   }
 
   if (collection.icon) {
@@ -1316,6 +1326,15 @@ export const LibraryPage: React.FC = () => {
   });
 
   const collections = collectionsQuery.data ?? [];
+  const orderedCollections = useMemo(() => {
+    const builtInOrder = ["favorites", "shared-with-me", "uncollected"];
+    const builtIns = builtInOrder
+      .map((slug) => collections.find((collection) => collection.slug === slug))
+      .filter((collection): collection is CollectionItem => Boolean(collection));
+    const builtInIds = new Set(builtIns.map((collection) => collection.id));
+    const customCollections = collections.filter((collection) => !builtInIds.has(collection.id));
+    return [...builtIns, ...customCollections];
+  }, [collections]);
 
   const deleteCollectionMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -1348,13 +1367,21 @@ export const LibraryPage: React.FC = () => {
     queryKey: ["collection-books", selectedCollectionId],
     queryFn: () => apiFetch<BookItem[]>(`/api/v1/collections/${selectedCollectionId}/books`),
     enabled:
-      selectedCollectionId !== null && selectedCollectionId !== UNCOLLECTED_COLLECTION_ID,
+      selectedCollectionId !== null &&
+      selectedCollectionId !== SHARED_WITH_ME_COLLECTION_ID &&
+      selectedCollectionId !== UNCOLLECTED_COLLECTION_ID,
   });
 
   const uncollectedBooksQuery = useQuery({
     queryKey: ["collection-books", "uncollected"],
     queryFn: () => apiFetch<BookItem[]>("/api/v1/collections/uncollected/books"),
     enabled: selectedCollectionId === UNCOLLECTED_COLLECTION_ID,
+  });
+
+  const sharedWithMeBooksQuery = useQuery({
+    queryKey: ["collection-books", "shared-with-me"],
+    queryFn: () => apiFetch<BookItem[]>("/api/v1/collections/shared-with-me/books"),
+    enabled: selectedCollectionId === SHARED_WITH_ME_COLLECTION_ID,
   });
 
   // Infinite scroll
@@ -1375,6 +1402,19 @@ export const LibraryPage: React.FC = () => {
   }, [selectedCollectionId, booksQuery.hasNextPage, booksQuery.isFetchingNextPage, booksQuery.fetchNextPage]);
 
   const allBooks = useMemo(() => {
+    if (selectedCollectionId === SHARED_WITH_ME_COLLECTION_ID) {
+      let books = sharedWithMeBooksQuery.data ?? [];
+      if (debouncedQuery) {
+        const q = debouncedQuery.toLowerCase();
+        books = books.filter(
+          (b) =>
+            b.title.toLowerCase().includes(q) ||
+            (b.author?.toLowerCase().includes(q) ?? false),
+        );
+      }
+      return books;
+    }
+
     if (selectedCollectionId === UNCOLLECTED_COLLECTION_ID) {
       let books = uncollectedBooksQuery.data ?? [];
       if (debouncedQuery) {
@@ -1404,6 +1444,7 @@ export const LibraryPage: React.FC = () => {
   }, [
     selectedCollectionId,
     collectionBooksQuery.data,
+    sharedWithMeBooksQuery.data,
     uncollectedBooksQuery.data,
     booksQuery.data,
     debouncedQuery,
@@ -1412,6 +1453,7 @@ export const LibraryPage: React.FC = () => {
   const collectionBookIds = useMemo(
     () =>
       selectedCollectionId !== null && selectedCollectionId !== UNCOLLECTED_COLLECTION_ID
+      && selectedCollectionId !== SHARED_WITH_ME_COLLECTION_ID
         ? new Set((collectionBooksQuery.data ?? []).map((b) => b.id))
         : new Set<number>(),
     [selectedCollectionId, collectionBooksQuery.data],
@@ -1769,12 +1811,16 @@ export const LibraryPage: React.FC = () => {
   }, []);
 
   const isLoading = selectedCollectionId !== null
-    ? selectedCollectionId === UNCOLLECTED_COLLECTION_ID
+    ? selectedCollectionId === SHARED_WITH_ME_COLLECTION_ID
+      ? sharedWithMeBooksQuery.isLoading
+      : selectedCollectionId === UNCOLLECTED_COLLECTION_ID
       ? uncollectedBooksQuery.isLoading
       : collectionBooksQuery.isLoading
     : booksQuery.isLoading;
   const isError = selectedCollectionId !== null
-    ? selectedCollectionId === UNCOLLECTED_COLLECTION_ID
+    ? selectedCollectionId === SHARED_WITH_ME_COLLECTION_ID
+      ? sharedWithMeBooksQuery.isError
+      : selectedCollectionId === UNCOLLECTED_COLLECTION_ID
       ? uncollectedBooksQuery.isError
       : collectionBooksQuery.isError
     : booksQuery.isError;
@@ -1944,7 +1990,7 @@ export const LibraryPage: React.FC = () => {
         >
           All
         </button>
-        {collections.map((col) =>
+        {orderedCollections.map((col) =>
           isVirtualCollection(col) ? (
             <button
               key={col.id}
@@ -2038,6 +2084,8 @@ export const LibraryPage: React.FC = () => {
             onClick={() => {
               if (selectedCollectionId === UNCOLLECTED_COLLECTION_ID) {
                 void uncollectedBooksQuery.refetch();
+              } else if (selectedCollectionId === SHARED_WITH_ME_COLLECTION_ID) {
+                void sharedWithMeBooksQuery.refetch();
               } else if (selectedCollectionId !== null) {
                 void collectionBooksQuery.refetch();
               }
@@ -2057,7 +2105,9 @@ export const LibraryPage: React.FC = () => {
             {debouncedQuery
               ? "No results"
               : selectedCollectionId !== null
-                ? selectedCollectionId === UNCOLLECTED_COLLECTION_ID
+                ? selectedCollectionId === SHARED_WITH_ME_COLLECTION_ID
+                  ? "No books shared with you"
+                  : selectedCollectionId === UNCOLLECTED_COLLECTION_ID
                   ? "No uncollected books"
                   : "This collection is empty"
                 : "Your library is empty"}
@@ -2066,12 +2116,14 @@ export const LibraryPage: React.FC = () => {
             {debouncedQuery
               ? "Try a different search."
               : selectedCollectionId !== null
-                ? selectedCollectionId === UNCOLLECTED_COLLECTION_ID
+                ? selectedCollectionId === SHARED_WITH_ME_COLLECTION_ID
+                  ? "Books appear here as soon as someone shares them with you."
+                  : selectedCollectionId === UNCOLLECTED_COLLECTION_ID
                   ? "Books disappear from this shelf as soon as they are added to a collection."
                   : "Add books using the button above or right-click a book."
                 : "Upload some books to get started."}
           </p>
-          {selectedCollectionId !== null && !debouncedQuery && selectedCollectionId !== UNCOLLECTED_COLLECTION_ID && (
+          {selectedCollectionId !== null && !debouncedQuery && !activeCollectionIsVirtual && (
             <Button
               variant="outline"
               size="sm"

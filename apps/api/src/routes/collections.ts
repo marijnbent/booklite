@@ -30,6 +30,9 @@ const listCollectionsSchema = z.object({
     .optional()
 });
 
+const SHARED_WITH_ME_COLLECTION_ID = -2;
+const UNCOLLECTED_COLLECTION_ID = -1;
+
 export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/collections", { preHandler: requireAuth }, async (request) => {
     const { userId } = getAuth(request);
@@ -87,10 +90,46 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       )
     `);
 
+    const sharedWithMeRows = await db.all<{ book_count: number; kobo_syncable_count: number }>(sql`
+      SELECT
+        COUNT(*) AS book_count,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN lower(b.file_ext) IN ('epub', 'kepub') THEN 1
+              ELSE 0
+            END
+          ),
+          0
+        ) AS kobo_syncable_count
+      FROM books b
+      WHERE b.owner_user_id != ${userId}
+        AND EXISTS (
+          SELECT 1
+          FROM book_shares bs
+          WHERE bs.book_id = b.id
+            AND bs.recipient_user_id = ${userId}
+            AND bs.removed_at IS NULL
+        )
+    `);
+
     return [
       ...rows,
       {
-        id: -1,
+        id: SHARED_WITH_ME_COLLECTION_ID,
+        user_id: userId,
+        name: "Shared with me",
+        icon: null,
+        slug: "shared-with-me",
+        is_system: 1,
+        created_at: "",
+        updated_at: "",
+        book_count: sharedWithMeRows[0]?.book_count ?? 0,
+        kobo_syncable_count: sharedWithMeRows[0]?.kobo_syncable_count ?? 0,
+        virtual: 1
+      },
+      {
+        id: UNCOLLECTED_COLLECTION_ID,
         user_id: userId,
         name: "Uncollected",
         icon: null,
@@ -325,6 +364,32 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         .where(eq(collections.id, body.collectionId));
 
       return { ok: true };
+    }
+  );
+
+  fastify.get(
+    "/api/v1/collections/shared-with-me/books",
+    { preHandler: requireAuth },
+    async (request) => {
+      const { userId } = getAuth(request);
+      await ensureSystemCollectionsForUser(userId);
+
+      const rows = await db.all(sql`
+        SELECT ${bookSelectFields(userId)}
+        FROM books b
+        ${bookJoins(userId)}
+        WHERE b.owner_user_id != ${userId}
+          AND EXISTS (
+            SELECT 1
+            FROM book_shares bs
+            WHERE bs.book_id = b.id
+              AND bs.recipient_user_id = ${userId}
+              AND bs.removed_at IS NULL
+          )
+        ORDER BY b.updated_at DESC
+      `);
+
+      return rows.map(mapBookRow);
     }
   );
 

@@ -30,6 +30,7 @@ RUN mkdir -p /app/data /books
 COPY --from=build /workspace/package.json /workspace/.npmrc ./
 COPY --from=build /workspace/node_modules ./node_modules
 COPY --from=build /workspace/apps/api/dist ./apps/api/dist
+COPY --from=build /workspace/apps/api/drizzle ./apps/api/drizzle
 COPY --from=build /workspace/apps/web/dist ./apps/web/dist
 COPY --from=build /workspace/packages/shared ./packages/shared
 

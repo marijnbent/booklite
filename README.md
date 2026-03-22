@@ -24,7 +24,7 @@ If you need the full feature set, check out [BookLore](https://github.com/booklo
 
 ```bash
 cp .env.example .env
-docker compose -f deploy/compose.yml up -d --build
+docker compose up -d --build
 ```
 
 or run the predefinded build with:
@@ -34,6 +34,8 @@ docker run -p 6060:6060 ghcr.io/marijnbent/booklite:latest
 ```
 
 Open [http://localhost:6060](http://localhost:6060)
+
+Pending Drizzle migrations are applied automatically when the API starts, including on Docker deploys.
 
 On first run either:
 1. Use `/setup` in the UI, or
@@ -87,6 +89,13 @@ npm run dev:split
 npm run build
 npm run typecheck
 npm test
+```
+
+Database helpers:
+
+```bash
+npm run db:generate
+npm run db:migrate
 ```
 
 ## Repository Layout

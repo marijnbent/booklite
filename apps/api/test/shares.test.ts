@@ -136,6 +136,40 @@ describe("book shares", () => {
       ])
     );
 
+    const recipientCollections = await app.inject({
+      method: "GET",
+      url: "/api/v1/collections?includeVirtual=true",
+      headers: { authorization: `Bearer ${recipientAccessToken}` }
+    });
+
+    expect(recipientCollections.statusCode).toBe(200);
+    expect(recipientCollections.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          slug: "shared-with-me",
+          virtual: 1,
+          book_count: 1
+        })
+      ])
+    );
+
+    const sharedWithMeBooks = await app.inject({
+      method: "GET",
+      url: "/api/v1/collections/shared-with-me/books",
+      headers: { authorization: `Bearer ${recipientAccessToken}` }
+    });
+
+    expect(sharedWithMeBooks.statusCode).toBe(200);
+    expect(sharedWithMeBooks.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: bookId,
+          isShared: true,
+          sharedByUsername: "owner-share"
+        })
+      ])
+    );
+
     const createdCollection = await app.inject({
       method: "POST",
       url: "/api/v1/collections",
@@ -183,6 +217,15 @@ describe("book shares", () => {
 
     expect(afterRemove.statusCode).toBe(200);
     expect(afterRemove.json()).toEqual([]);
+
+    const sharedWithMeAfterRemove = await app.inject({
+      method: "GET",
+      url: "/api/v1/collections/shared-with-me/books",
+      headers: { authorization: `Bearer ${recipientAccessToken}` }
+    });
+
+    expect(sharedWithMeAfterRemove.statusCode).toBe(200);
+    expect(sharedWithMeAfterRemove.json()).toEqual([]);
 
     const reshared = await app.inject({
       method: "POST",
