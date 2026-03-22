@@ -122,7 +122,6 @@ export const getKoboUserByToken = async (token: string): Promise<{
   userId: number;
   syncEnabled: number;
   syncAllBooks: number;
-  twoWayProgressSync: number;
   markReadingThreshold: number;
   markFinishedThreshold: number;
 } | null> => {
@@ -131,7 +130,6 @@ export const getKoboUserByToken = async (token: string): Promise<{
       userId: koboUserSettings.userId,
       syncEnabled: koboUserSettings.syncEnabled,
       syncAllBooks: koboUserSettings.syncAllBooks,
-      twoWayProgressSync: koboUserSettings.twoWayProgressSync,
       markReadingThreshold: koboUserSettings.markReadingThreshold,
       markFinishedThreshold: koboUserSettings.markFinishedThreshold
     })
@@ -491,59 +489,6 @@ const buildTagEntitlements = async (userId: number): Promise<Record<string, unkn
   });
 };
 
-const buildProgressEntitlements = async (userId: number): Promise<Record<string, unknown>[]> => {
-  const syncedBooks = await getSyncedBooksForUser(userId);
-  const syncedBookIds = syncedBooks.map((book) => book.id);
-  if (syncedBookIds.length === 0) return [];
-
-  const rows = await db
-    .select({
-      bookId: bookProgress.bookId,
-      status: bookProgress.status,
-      progressPercent: bookProgress.progressPercent,
-      positionRef: bookProgress.positionRef,
-      positionType: bookProgress.positionType,
-      positionSource: bookProgress.positionSource,
-      updatedAt: bookProgress.updatedAt
-    })
-    .from(bookProgress)
-    .where(
-      and(eq(bookProgress.userId, userId), inArray(bookProgress.bookId, syncedBookIds))
-    );
-
-  return rows.map((row) => ({
-    ChangedReadingState: {
-      ReadingState: {
-        EntitlementId: String(row.bookId),
-        LastModified: row.updatedAt,
-        PriorityTimestamp: row.updatedAt,
-        StatusInfo: {
-          LastModified: row.updatedAt,
-          Status:
-            row.status === "READ"
-              ? "Finished"
-              : row.status === "READING"
-                ? "Reading"
-                : "ReadyToRead"
-        },
-        CurrentBookmark: {
-          ProgressPercent: row.progressPercent,
-          LastModified: row.updatedAt,
-          ...(row.positionRef
-            ? {
-                Location: {
-                  Value: row.positionRef,
-                  Type: row.positionType ?? "Unknown",
-                  Source: row.positionSource ?? ""
-                }
-              }
-            : {})
-        }
-      }
-    }
-  }));
-};
-
 export const getLibrarySyncPayload = async (
   userId: number,
   token: string,
@@ -605,7 +550,6 @@ export const getLibrarySyncPayload = async (
   }
 
   payload.push(...(await buildTagEntitlements(userId)));
-  payload.push(...(await buildProgressEntitlements(userId)));
 
   const snapshotId = crypto.randomUUID();
   await db.insert(koboSyncSnapshots).values({
@@ -829,42 +773,5 @@ export const getKoboReadingState = async (
   if (row[0]) {
     return JSON.parse(row[0].payloadJson) as Record<string, unknown>;
   }
-
-  const progress = await db
-    .select({
-      status: bookProgress.status,
-      progressPercent: bookProgress.progressPercent,
-      positionRef: bookProgress.positionRef,
-      updatedAt: bookProgress.updatedAt
-    })
-    .from(bookProgress)
-    .where(and(eq(bookProgress.userId, userId), eq(bookProgress.bookId, bookId)))
-    .limit(1);
-
-  if (!progress[0]) return null;
-
-  const timestamp = progress[0].updatedAt;
-  return {
-    EntitlementId: String(bookId),
-    LastModified: timestamp,
-    PriorityTimestamp: timestamp,
-    StatusInfo: {
-      LastModified: timestamp,
-      Status:
-        progress[0].status === "READ"
-          ? "Finished"
-          : progress[0].status === "READING"
-            ? "Reading"
-            : "ReadyToRead"
-    },
-    CurrentBookmark: {
-      ProgressPercent: progress[0].progressPercent,
-      LastModified: timestamp,
-      Location: {
-        Value: progress[0].positionRef ?? "",
-        Type: "Unknown",
-        Source: "booklite"
-      }
-    }
-  };
+  return null;
 };

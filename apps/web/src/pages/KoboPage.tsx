@@ -21,7 +21,6 @@ interface KoboSettings {
   token: string;
   syncEnabled: boolean;
   syncAllBooks: boolean;
-  twoWayProgressSync: boolean;
   markReadingThreshold: number;
   markFinishedThreshold: number;
   syncCollectionIds: number[];
@@ -154,19 +153,6 @@ export const KoboPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center justify-between gap-4 px-4 py-3.5">
-              <div>
-                <Label htmlFor="two-way-sync" className="text-sm font-medium cursor-pointer">Two-way progress sync</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Also push BookLite progress to Kobo (Kobo → BookLite always works)
-                </p>
-              </div>
-              <Switch
-                id="two-way-sync"
-                checked={model.twoWayProgressSync}
-                onCheckedChange={(checked) => updateSettings({ twoWayProgressSync: checked })}
-              />
-            </div>
           </div>
 
           {/* Collections to sync */}

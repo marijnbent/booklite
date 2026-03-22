@@ -68,7 +68,6 @@ export interface KoboSettings {
   token: string;
   syncEnabled: boolean;
   syncAllBooks: boolean;
-  twoWayProgressSync: boolean;
   markReadingThreshold: number;
   markFinishedThreshold: number;
   syncCollectionIds: number[];

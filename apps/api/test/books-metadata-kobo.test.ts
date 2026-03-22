@@ -107,7 +107,6 @@ describe("books metadata + kobo scope", () => {
       payload: {
         syncEnabled: true,
         syncAllBooks: false,
-        twoWayProgressSync: true,
         markReadingThreshold: 1,
         markFinishedThreshold: 99,
         syncCollectionIds: [collectionId]

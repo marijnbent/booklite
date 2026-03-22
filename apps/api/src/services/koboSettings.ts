@@ -17,7 +17,20 @@ export const ensureKoboSettingsRow = async (userId: number) => {
     .where(eq(koboUserSettings.userId, userId))
     .limit(1);
 
-  if (found[0]) return found[0];
+  if (found[0]) {
+    if (found[0].twoWayProgressSync === 0) return found[0];
+
+    const [updated] = await db
+      .update(koboUserSettings)
+      .set({
+        twoWayProgressSync: 0,
+        updatedAt: nowIso()
+      })
+      .where(eq(koboUserSettings.userId, userId))
+      .returning();
+
+    return updated ?? { ...found[0], twoWayProgressSync: 0 };
+  }
 
   const [inserted] = await db
     .insert(koboUserSettings)

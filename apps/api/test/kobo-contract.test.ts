@@ -91,7 +91,6 @@ describe("kobo contract", () => {
       payload: {
         syncEnabled: true,
         syncAllBooks: false,
-        twoWayProgressSync: true,
         markReadingThreshold: 1,
         markFinishedThreshold: 99,
         syncCollectionIds: [favoritesCollectionId]
@@ -125,6 +124,17 @@ describe("kobo contract", () => {
     expect(Array.isArray(payload)).toBe(true);
     expect(JSON.stringify(payload).includes("Entitlement")).toBe(true);
     expect(JSON.stringify(fixture).includes("NewEntitlement")).toBe(true);
+  });
+
+  it("omits the removed two-way progress setting from the Kobo settings payload", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/kobo/settings",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).not.toHaveProperty("twoWayProgressSync");
   });
 
   it("returns full entitlements again when sync token header is missing", async () => {
@@ -338,6 +348,54 @@ describe("kobo contract", () => {
     expect(payload[0].DownloadUrls[0]?.Url).toBe(
       `https://reader.example.test/api/kobo/${koboToken}/v1/books/${bookId}/download`
     );
+  });
+
+  it("keeps BookLite-only progress out of Kobo responses", async () => {
+    const updateResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/books/${bookId}`,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        progressPercent: 42,
+        positionRef: "chapter-7"
+      }
+    });
+
+    expect(updateResponse.statusCode).toBe(200);
+
+    const syncResponse = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/sync`
+    });
+
+    expect(syncResponse.statusCode).toBe(200);
+    expect(getEntriesByKey(syncResponse.json(), "ChangedReadingState")).toHaveLength(0);
+
+    const stateResponse = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/library/${bookId}/state`
+    });
+
+    expect(stateResponse.statusCode).toBe(200);
+    expect(stateResponse.json()).toEqual([]);
+
+    const libraryBookResponse = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${koboToken}/v1/user/library/books/${bookId}`
+    });
+
+    expect(libraryBookResponse.statusCode).toBe(200);
+    expect(libraryBookResponse.json()).toMatchObject({
+      ReadingState: {
+        EntitlementId: String(bookId),
+        CurrentBookmark: {
+          ProgressPercent: 0
+        }
+      }
+    });
   });
 
   it("ignores unknown entitlement reading-state updates", async () => {

@@ -219,7 +219,7 @@ export const DocsPage: React.FC = () => {
             </div>
             <ul className="space-y-1.5">
               <BulletItem>Only EPUB and KEPUB books sync to Kobo.</BulletItem>
-              <BulletItem>Reading progress syncs Kobo → BookLite automatically. Enable Two-way progress sync in settings for the reverse direction.</BulletItem>
+              <BulletItem>Reading progress syncs from Kobo into BookLite automatically.</BulletItem>
               <BulletItem>If you share the setup with someone else, they can use the same API endpoint. There is no need to regenerate the token.</BulletItem>
             </ul>
           </div>

@@ -12,7 +12,6 @@ import { ensureSystemCollectionsForUser } from "../services/systemCollections";
 const settingsSchema = z.object({
   syncEnabled: z.boolean(),
   syncAllBooks: z.boolean(),
-  twoWayProgressSync: z.boolean(),
   markReadingThreshold: z.coerce.number().min(0).max(100),
   markFinishedThreshold: z.coerce.number().min(0).max(100),
   syncCollectionIds: z.array(z.coerce.number().int().positive())
@@ -40,7 +39,6 @@ export const koboSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       token: settings.token,
       syncEnabled: Boolean(settings.syncEnabled),
       syncAllBooks: Boolean(settings.syncAllBooks),
-      twoWayProgressSync: Boolean(settings.twoWayProgressSync),
       markReadingThreshold: settings.markReadingThreshold,
       markFinishedThreshold: settings.markFinishedThreshold,
       syncCollectionIds: syncRows.map((row) => row.collectionId)
@@ -79,7 +77,7 @@ export const koboSettingsRoutes: FastifyPluginAsync = async (fastify) => {
         .set({
           syncEnabled: body.syncEnabled ? 1 : 0,
           syncAllBooks: body.syncAllBooks ? 1 : 0,
-          twoWayProgressSync: body.twoWayProgressSync ? 1 : 0,
+          twoWayProgressSync: 0,
           markReadingThreshold: body.markReadingThreshold,
           markFinishedThreshold: body.markFinishedThreshold,
           updatedAt: nowIso()
@@ -120,7 +118,6 @@ export const koboSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       token: updated.token,
       syncEnabled: Boolean(updated.syncEnabled),
       syncAllBooks: Boolean(updated.syncAllBooks),
-      twoWayProgressSync: Boolean(updated.twoWayProgressSync),
       markReadingThreshold: updated.markReadingThreshold,
       markFinishedThreshold: updated.markFinishedThreshold,
       syncCollectionIds: syncRows.map((row) => row.collectionId)
@@ -151,7 +148,6 @@ export const koboSettingsRoutes: FastifyPluginAsync = async (fastify) => {
         token: updated.token,
         syncEnabled: Boolean(updated.syncEnabled),
         syncAllBooks: Boolean(updated.syncAllBooks),
-        twoWayProgressSync: Boolean(updated.twoWayProgressSync),
         markReadingThreshold: updated.markReadingThreshold,
         markFinishedThreshold: updated.markFinishedThreshold,
         syncCollectionIds: syncRows.map((row) => row.collectionId)
