@@ -171,20 +171,47 @@ export const DocsPage: React.FC = () => {
             Kobo setup
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Connect your Kobo e-reader and keep your books and reading progress synced.
+            Setting up Kobo sync with BookLite.
           </p>
-          <ol className="space-y-2.5 mb-6">
-            <Step number={1}>
-              Open{" "}
-              <Link to="/kobo" className="font-medium text-primary hover:underline underline-offset-2">Kobo</Link>{" "}
-              in the menu.
-            </Step>
-            <Step number={2}>Enable sync.</Step>
-            <Step number={3}>Choose to sync all books, or pick specific collections.</Step>
-            <Step number={4}>Copy the API endpoint line from the Kobo page.</Step>
-            <Step number={5}>Paste it into your Kobo configuration.</Step>
-            <Step number={6} isLast>Sync from your device.</Step>
-          </ol>
+          <div className="space-y-6 mb-6">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">In BookLite (one-time setup)</h3>
+              <ol className="space-y-2.5">
+                <Step number={1}>
+                  Go to{" "}
+                  <Link to="/kobo" className="font-medium text-primary hover:underline underline-offset-2">Kobo</Link>{" "}
+                  in the left sidebar.
+                </Step>
+                <Step number={2}>Enable sync.</Step>
+                <Step number={3}>Choose to sync all books, or enable specific collections such as Favorites.</Step>
+                <Step number={4}>Scroll down to the API endpoint field and click Copy endpoint.</Step>
+              </ol>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">On your Mac (one-time device setup)</h3>
+              <ol className="space-y-2.5">
+                <Step number={1}>Connect your Kobo via USB. It will appear in Finder.</Step>
+                <Step number={2}>Open the Kobo volume in Finder.</Step>
+                <Step number={3}>Press Cmd + Shift + . to reveal hidden files and folders.</Step>
+                <Step number={4}>
+                  Navigate to <code>.kobo → Kobo</code>, then open <code>Kobo eReader.conf</code> in TextEdit.
+                </Step>
+                <Step number={5}>Use Cmd + F to search for <code>api_endpoint</code>.</Step>
+                <Step number={6}>Replace that entire line with the endpoint you copied from BookLite.</Step>
+                <Step number={7}>Save with Cmd + S and close the file.</Step>
+                <Step number={8}>Eject the Kobo from Finder.</Step>
+              </ol>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-foreground mb-3">Syncing</h3>
+              <ol className="space-y-2.5">
+                <Step number={1}>On your Kobo, tap the sync icon in the top-right corner.</Step>
+                <Step number={2}>Your books will appear. Covers may take a moment to load.</Step>
+              </ol>
+            </div>
+          </div>
           <div className="rounded-md border border-border bg-muted/15 p-4">
             <div className="flex items-center gap-1.5 mb-2.5">
               <Info className="h-3.5 w-3.5 text-muted-foreground" />
@@ -192,16 +219,8 @@ export const DocsPage: React.FC = () => {
             </div>
             <ul className="space-y-1.5">
               <BulletItem>Only EPUB and KEPUB books sync to Kobo.</BulletItem>
-              <BulletItem>You can sync all books or only books from selected collections.</BulletItem>
-              <BulletItem>Regenerating your token immediately invalidates the old token.</BulletItem>
-            </ul>
-            <div className="flex items-center gap-1.5 mt-4 mb-2.5">
-              <Info className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reading progress</span>
-            </div>
-            <ul className="space-y-1.5">
-              <BulletItem>Kobo → BookLite always works: position, percentage, and reading status sync automatically.</BulletItem>
-              <BulletItem>BookLite → Kobo requires "Two-way progress sync" to be enabled. The percentage and status will update on the Kobo, but because the Kobo tracks its reading position internally, it will still open the book where you last left off on the device — not where you were in BookLite.</BulletItem>
+              <BulletItem>Reading progress syncs Kobo → BookLite automatically. Enable Two-way progress sync in settings for the reverse direction.</BulletItem>
+              <BulletItem>If you share the setup with someone else, they can use the same API endpoint. There is no need to regenerate the token.</BulletItem>
             </ul>
           </div>
         </section>

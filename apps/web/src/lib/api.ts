@@ -8,10 +8,14 @@ const BASE = "";
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
+let tokenVersion = 0;
+let refreshRequest: Promise<boolean> | null = null;
 
 export const getAccessToken = (): string | null => accessToken;
 
 export const setTokens = (tokens: AuthTokens | null): void => {
+  tokenVersion += 1;
+
   if (!tokens) {
     accessToken = null;
     refreshToken = null;
@@ -40,21 +44,37 @@ export const loadTokens = (): AuthTokens | null => {
 
 const doRefresh = async (): Promise<boolean> => {
   if (!refreshToken) return false;
+  if (refreshRequest) return refreshRequest;
 
-  const response = await fetch(`${BASE}/api/v1/auth/refresh`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ refreshToken })
-  });
+  const refreshTokenSnapshot = refreshToken;
+  const versionSnapshot = tokenVersion;
 
-  if (!response.ok) {
-    setTokens(null);
-    return false;
+  refreshRequest = (async () => {
+    const response = await fetch(`${BASE}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken: refreshTokenSnapshot })
+    });
+
+    if (!response.ok) {
+      if (refreshToken === refreshTokenSnapshot && tokenVersion === versionSnapshot) {
+        setTokens(null);
+      }
+      return false;
+    }
+
+    const tokens = (await response.json()) as AuthTokens;
+    if (refreshToken === refreshTokenSnapshot && tokenVersion === versionSnapshot) {
+      setTokens(tokens);
+    }
+    return true;
+  })();
+
+  try {
+    return await refreshRequest;
+  } finally {
+    refreshRequest = null;
   }
-
-  const tokens = (await response.json()) as AuthTokens;
-  setTokens(tokens);
-  return true;
 };
 
 export const apiFetch = async <T>(

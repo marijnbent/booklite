@@ -54,7 +54,7 @@ See `.env.example`:
 - `BOOKS_BIND` (default `./books`)
 - `JWT_SECRET`
 - `BASE_URL`
-- `ACCESS_TOKEN_TTL_SECONDS` (default `900`, 15 minutes)
+- `ACCESS_TOKEN_TTL_SECONDS` (default `3600`, 1 hour)
 - `REFRESH_TOKEN_TTL_SECONDS` (default `7776000`, 90 days)
 - `BOOKLITE_FRONTEND_MODE` (`auto`/`vite`/`static`/`off`, default `auto`)
   - `auto` resolves to `vite` when `NODE_ENV` is not `production`
@@ -98,7 +98,8 @@ npm test
 
 ## Kobo Notes
 
-- Sync endpoint remains at `/api/kobo/{token}/...`
+- Copy the full `api_endpoint=https://your-booklite-host/api/kobo/...` line from the Kobo page into `Kobo eReader.conf`
 - Only EPUB and KEPUB books are synced to Kobo
 - PDF remains library-only
 - Progress sync uses latest timestamp wins
+- The copied API endpoint already includes the unique sync token

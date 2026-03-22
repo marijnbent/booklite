@@ -14,7 +14,7 @@ export const config = {
   webDistDir: process.env.WEB_DIST_DIR ?? path.join(process.cwd(), "apps/web/dist"),
   frontendMode: process.env.BOOKLITE_FRONTEND_MODE ?? "auto",
   jwtSecret: process.env.JWT_SECRET ?? "booklite-dev-secret-change-me",
-  accessTokenTtlSeconds: toInt(process.env.ACCESS_TOKEN_TTL_SECONDS, 900),
+  accessTokenTtlSeconds: toInt(process.env.ACCESS_TOKEN_TTL_SECONDS, 3600),
   refreshTokenTtlSeconds: toInt(process.env.REFRESH_TOKEN_TTL_SECONDS, 7776000),
   uploadLimitMb: toInt(process.env.UPLOAD_LIMIT_MB, 100),
   googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? "",

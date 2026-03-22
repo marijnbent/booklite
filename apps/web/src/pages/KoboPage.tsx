@@ -37,7 +37,7 @@ interface CollectionItem {
 
 export const KoboPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [copiedField, setCopiedField] = useState<"token" | "endpoint" | null>(null);
+  const [copiedField, setCopiedField] = useState<"endpoint" | null>(null);
 
   const settings = useQuery({
     queryKey: ["kobo-settings"],
@@ -67,7 +67,7 @@ export const KoboPage: React.FC = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kobo-settings"] })
   });
 
-  const handleCopy = async (text: string, field: "token" | "endpoint") => {
+  const handleCopy = async (text: string, field: "endpoint") => {
     await navigator.clipboard.writeText(text);
     setCopiedField(field);
     setTimeout(() => {
@@ -266,65 +266,28 @@ export const KoboPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Token & endpoint */}
+      {/* Endpoint */}
       <Card>
         <CardContent className="pt-5 space-y-6">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Kobo Token</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Kobo API Endpoint</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Use this token to authenticate your Kobo device
+              Copy this line into your Kobo configuration file
             </p>
           </div>
 
-          {/* Token */}
           <div className="space-y-2">
-            <Label className="text-xs font-medium text-muted-foreground">Token</Label>
-            <div className="rounded-md border border-border/50 bg-muted/30 px-3.5 py-3">
-              <code className="font-mono text-xs leading-relaxed text-foreground/80 break-all select-all">
-                {model.token}
-              </code>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleCopy(model.token, "token")}
-              className="gap-1.5"
-            >
-              {copiedField === "token" ? (
-                <>
-                  <Check className="size-3.5 text-status-completed" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="size-3.5" />
-                  Copy token
-                </>
-              )}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => regenerateMutation.mutate()}
-              disabled={regenerateMutation.isPending}
-              className="gap-1.5"
-            >
-              <RefreshCw className={`size-3.5 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
-              Regenerate
-            </Button>
-          </div>
-
-          {/* API endpoint */}
-          <div className="border-t border-border/50 pt-6 space-y-2">
-            <Label className="text-xs font-medium text-muted-foreground">API endpoint (put this in your Kobo config)</Label>
+            <Label className="text-xs font-medium text-muted-foreground">API endpoint</Label>
             <div className="rounded-md border border-border/50 bg-muted/30 px-3.5 py-3">
               <code className="font-mono text-xs leading-relaxed text-foreground/80 break-all select-all">
                 {koboConfigEndpoint}
               </code>
             </div>
+            <p className="text-xs text-muted-foreground">
+              This already includes the unique sync token, so you only need to copy one line.
+            </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
@@ -349,6 +312,16 @@ export const KoboPage: React.FC = () => {
                 <ExternalLink className="size-3.5" />
                 Setup instructions
               </Link>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => regenerateMutation.mutate()}
+              disabled={regenerateMutation.isPending}
+              className="gap-1.5"
+            >
+              <RefreshCw className={`size-3.5 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
+              Regenerate endpoint
             </Button>
           </div>
         </CardContent>
