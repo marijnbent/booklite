@@ -1,5 +1,7 @@
 # BookLite
 
+<img width="1936" height="1352" alt="image" src="https://github.com/user-attachments/assets/bf36eaee-3880-42d8-a54c-906536dc590d" />
+
 BookLite is a self-hosted digital book library for people who want a clean personal or family bookshelf without the heavier feature surface of larger library servers. You can upload books, organize them, enrich metadata from multiple providers, read in the browser, share books between users, and sync selected books to Kobo.
 
 It is inspired by [BookLore](https://github.com/booklore-app/booklore), but deliberately keeps a tighter scope: no OPDS feeds, no KOReader sync, no comics or audiobooks, and no BookDrop-style ingestion pipeline.
