@@ -110,6 +110,59 @@ describe("kobo contract", () => {
     await app.close();
   });
 
+  it("defaults sync all books to off in the Kobo settings payload", async () => {
+    const username = "owner4-defaults";
+    const password = "secret123";
+
+    const createUser = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload: {
+        email: "owner4-defaults@example.com",
+        username,
+        password,
+        role: "MEMBER"
+      }
+    });
+
+    expect(createUser.statusCode).toBe(201);
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: username,
+        password
+      }
+    });
+
+    expect(login.statusCode).toBe(200);
+    const freshAccessToken = login.json().accessToken as string;
+
+    const collectionsResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/collections",
+      headers: { authorization: `Bearer ${freshAccessToken}` }
+    });
+
+    expect(collectionsResponse.statusCode).toBe(200);
+    const favoritesId = collectionsResponse.json().find((collection: any) => collection.slug === "favorites")?.id;
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/kobo/settings",
+      headers: { authorization: `Bearer ${freshAccessToken}` }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      syncEnabled: false,
+      syncAllBooks: false
+    });
+    expect(response.json().syncCollectionIds).toContain(favoritesId);
+  });
+
   it("returns Kobo sync headers and entitlement-like payload", async () => {
     const response = await app.inject({
       method: "GET",

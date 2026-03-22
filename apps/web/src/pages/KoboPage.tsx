@@ -32,7 +32,12 @@ interface CollectionItem {
   icon: string | null;
   is_system?: number;
   slug?: string | null;
+  book_count?: number;
+  kobo_syncable_count?: number;
 }
+
+const formatBooksLabel = (count: number, syncable: boolean) =>
+  `${count} ${syncable ? "syncable " : ""}${count === 1 ? "book" : "books"}`;
 
 export const KoboPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -101,7 +106,11 @@ export const KoboPage: React.FC = () => {
 
   const apiEndpoint = `${window.location.origin}/api/kobo/${model.token}`;
   const koboConfigEndpoint = `api_endpoint=${apiEndpoint}`;
-  const collectionItems = collections.data ?? [];
+  const collectionItems = [...(collections.data ?? [])].sort((a, b) => {
+    if (a.slug === "favorites" && b.slug !== "favorites") return -1;
+    if (b.slug === "favorites" && a.slug !== "favorites") return 1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -135,7 +144,12 @@ export const KoboPage: React.FC = () => {
               <Switch
                 id="sync-enabled"
                 checked={model.syncEnabled}
-                onCheckedChange={(checked) => updateSettings({ syncEnabled: checked })}
+                onCheckedChange={(checked) =>
+                  updateSettings({
+                    syncEnabled: checked,
+                    ...(checked && !model.syncEnabled ? { syncAllBooks: false } : {})
+                  })
+                }
               />
             </div>
 
@@ -181,6 +195,10 @@ export const KoboPage: React.FC = () => {
               <div className="max-h-52 overflow-y-auto">
                 {collectionItems.map((collection) => {
                   const checked = model.syncCollectionIds.includes(collection.id);
+                  const hasSyncableCount = typeof collection.kobo_syncable_count === "number";
+                  const visibleCount = hasSyncableCount
+                    ? collection.kobo_syncable_count ?? 0
+                    : collection.book_count ?? 0;
                   return (
                     <div
                       key={collection.id}
@@ -188,9 +206,9 @@ export const KoboPage: React.FC = () => {
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{collection.name}</p>
-                        {collection.slug === "favorites" && (
-                          <p className="text-xs text-muted-foreground">Default favorites collection</p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {formatBooksLabel(visibleCount, hasSyncableCount)}
+                        </p>
                       </div>
                       <Switch
                         checked={checked}

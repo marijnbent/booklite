@@ -147,6 +147,16 @@ export const appSettings = sqliteTable("app_settings", {
   valueJson: text("value_json").notNull()
 });
 
+export const apiTokens = sqliteTable("api_tokens", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id").notNull(),
+  jti: text("jti").notNull().unique(),
+  label: text("label"),
+  expiresAt: text("expires_at").notNull(),
+  revokedAt: text("revoked_at"),
+  createdAt: text("created_at").notNull()
+});
+
 export const adminActivityLog = sqliteTable("admin_activity_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   scope: text("scope", { enum: ["metadata", "upload", "kobo"] }).notNull(),
@@ -164,6 +174,7 @@ export const adminActivityLog = sqliteTable("admin_activity_log", {
 export const schema = {
   users,
   refreshTokens,
+  apiTokens,
   books,
   bookProgress,
   collections,

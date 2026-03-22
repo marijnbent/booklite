@@ -1,8 +1,8 @@
 import { FastifyPluginAsync } from "fastify";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
-import { refreshTokens, users } from "../db/schema";
+import { apiTokens, refreshTokens, users } from "../db/schema";
 import { verifyPassword } from "../auth/password";
 import { randomToken, sha256 } from "../utils/hash";
 import { nowIso } from "../utils/time";
@@ -188,22 +188,55 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       const expiresInSeconds = body.expiresInDays * 24 * 60 * 60;
       const issuedAt = nowIso();
       const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
-      const token = signAccessToken(
-        {
-          userId,
-          role,
-          username
-        },
-        { expiresInSeconds }
-      );
+      const jti = randomToken();
+      const token = signAccessToken({ userId, role, username, jti }, { expiresInSeconds });
+
+      const inserted = await db
+        .insert(apiTokens)
+        .values({ userId, jti, label: body.label || null, expiresAt, createdAt: issuedAt })
+        .returning({ id: apiTokens.id });
 
       return {
+        id: inserted[0].id,
         token,
         issuedAt,
         expiresAt,
         expiresInDays: body.expiresInDays,
         label: body.label || null
       };
+    }
+  );
+
+  fastify.get(
+    "/api/v1/admin/api-docs/tokens",
+    { preHandler: requireOwner },
+    async () => {
+      return db
+        .select({
+          id: apiTokens.id,
+          label: apiTokens.label,
+          expiresAt: apiTokens.expiresAt,
+          revokedAt: apiTokens.revokedAt,
+          createdAt: apiTokens.createdAt
+        })
+        .from(apiTokens)
+        .orderBy(desc(apiTokens.createdAt));
+    }
+  );
+
+  fastify.delete(
+    "/api/v1/admin/api-docs/tokens/:id",
+    { preHandler: requireOwner },
+    async (request, reply) => {
+      const id = Number((request.params as { id: string }).id);
+      const result = await db
+        .update(apiTokens)
+        .set({ revokedAt: nowIso() })
+        .where(and(eq(apiTokens.id, id), isNull(apiTokens.revokedAt)))
+        .returning({ id: apiTokens.id });
+
+      if (result.length === 0) return reply.code(404).send({ error: "Not found" });
+      return { ok: true };
     }
   );
 };

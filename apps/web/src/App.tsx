@@ -58,6 +58,11 @@ const DocsPage = lazy(async () => {
   return { default: module.DocsPage };
 });
 
+const LlmDocsPage = lazy(async () => {
+  const module = await import("@/pages/LlmDocsPage");
+  return { default: module.LlmDocsPage };
+});
+
 const ReaderPage = lazy(async () => {
   const module = await import("@/pages/ReaderPage");
   return { default: module.ReaderPage };
@@ -82,6 +87,7 @@ export const App: React.FC = () => (
   <Routes>
     <Route path="/setup" element={withSuspense(<SetupPage />)} />
     <Route path="/login" element={withSuspense(<LoginPage />)} />
+    <Route path="/llm-docs" element={withSuspense(<LlmDocsPage />)} />
 
     <Route element={<ProtectedRoute />}>
       <Route element={withSuspense(<AppShell />)}>

@@ -21,6 +21,7 @@ interface CoverOptionGridProps {
   selectedActionLabel?: string;
   idleActionLabel?: string;
   emptyState?: React.ReactNode;
+  loading?: boolean;
   compact?: boolean;
   className?: string;
 }
@@ -36,9 +37,28 @@ export const CoverOptionGrid: React.FC<CoverOptionGridProps> = ({
   selectedActionLabel = "Using this cover",
   idleActionLabel = "Click to select",
   emptyState,
+  loading,
   compact,
   className,
 }) => {
+  if (loading) {
+    return (
+      <div className={cn("grid", compact ? "gap-2" : "grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4", className)}>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={cn("overflow-hidden rounded-xl border border-border/40 bg-card/60", compact ? "rounded-lg" : "rounded-xl")}>
+            <div className="aspect-[2/3] animate-pulse bg-muted/50" style={{ animationDelay: `${i * 80}ms` }} />
+            {!compact && (
+              <div className="space-y-1.5 border-t border-border/40 px-3 py-2.5">
+                <div className="h-2.5 w-3/5 animate-pulse rounded-full bg-muted/60" style={{ animationDelay: `${i * 80}ms` }} />
+                <div className="h-2 w-2/5 animate-pulse rounded-full bg-muted/40" style={{ animationDelay: `${i * 80}ms` }} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className={cn("grid", compact ? "gap-2" : "grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4", className)}>
       <button
@@ -66,65 +86,65 @@ export const CoverOptionGrid: React.FC<CoverOptionGridProps> = ({
         )}
       </button>
 
-      {options.length > 0
-        ? options.map((option, index) => {
-            const selectedCover = selectedCoverPath === option.coverPath;
+      {options.length === 0 && emptyState}
 
-            return (
-              <button
-                key={`${option.coverPath}-${index}`}
-                type="button"
-                onClick={() => onSelectCover(option.coverPath)}
-                className={cn(
-                  "group relative overflow-hidden border bg-card text-left transition-all duration-150",
-                  compact ? "rounded-lg" : "rounded-xl",
-                  selectedCover
-                    ? "border-primary ring-2 ring-primary/20"
-                    : "border-border/60 hover:border-primary/40 hover:bg-accent/20"
+      {options.map((option, index) => {
+        const selectedCover = selectedCoverPath === option.coverPath;
+
+        return (
+          <button
+            key={`${option.coverPath}-${index}`}
+            type="button"
+            onClick={() => onSelectCover(option.coverPath)}
+            className={cn(
+              "group relative overflow-hidden border bg-card text-left transition-all duration-150",
+              compact ? "rounded-lg" : "rounded-xl",
+              selectedCover
+                ? "border-primary ring-2 ring-primary/20"
+                : "border-border/60 hover:border-primary/40 hover:bg-accent/20"
+            )}
+            aria-pressed={selectedCover}
+          >
+            <div className="relative aspect-[2/3] bg-muted/60">
+              <img
+                src={toRenderableCoverSrc(option.coverPath) ?? option.coverPath}
+                alt={`Cover option ${index + 1}`}
+                className="size-full object-cover"
+                loading="lazy"
+              />
+              <div className={cn("absolute inset-x-0 top-0 flex items-start justify-between", compact ? "p-1" : "p-2")}>
+                {option.badgeLabel && !compact ? (
+                  <Badge
+                    variant={index === 0 ? "secondary" : "outline"}
+                    className="bg-background/90 text-[10px] shadow-sm backdrop-blur"
+                  >
+                    {option.badgeLabel}
+                  </Badge>
+                ) : (
+                  <span />
                 )}
-                aria-pressed={selectedCover}
-              >
-                <div className="relative aspect-[2/3] bg-muted/60">
-                  <img
-                    src={toRenderableCoverSrc(option.coverPath) ?? option.coverPath}
-                    alt={`Cover option ${index + 1}`}
-                    className="size-full object-cover"
-                    loading="lazy"
-                  />
-                  <div className={cn("absolute inset-x-0 top-0 flex items-start justify-between", compact ? "p-1" : "p-2")}>
-                    {option.badgeLabel && !compact ? (
-                      <Badge
-                        variant={index === 0 ? "secondary" : "outline"}
-                        className="bg-background/90 text-[10px] shadow-sm backdrop-blur"
-                      >
-                        {option.badgeLabel}
-                      </Badge>
-                    ) : (
-                      <span />
-                    )}
-                    <span
-                      className={cn(
-                        "inline-flex items-center justify-center rounded-full border bg-background/90 text-muted-foreground shadow-sm transition-colors",
-                        compact ? "size-5" : "size-6",
-                        selectedCover && "border-primary bg-primary text-primary-foreground"
-                      )}
-                    >
-                      <Check className={cn(compact ? "size-3" : "size-3.5")} />
-                    </span>
-                  </div>
-                </div>
-                {!compact && (
-                  <div className="space-y-1 border-t border-border/40 px-3 py-2.5">
-                    <p className="text-xs font-medium">
-                      {selectedCover ? selectedActionLabel : idleActionLabel}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">{option.metaLabel}</p>
-                  </div>
-                )}
-              </button>
-            );
-          })
-        : emptyState}
+                <span
+                  className={cn(
+                    "inline-flex items-center justify-center rounded-full border bg-background/90 text-muted-foreground shadow-sm transition-colors",
+                    compact ? "size-5" : "size-6",
+                    selectedCover && "border-primary bg-primary text-primary-foreground"
+                  )}
+                >
+                  <Check className={cn(compact ? "size-3" : "size-3.5")} />
+                </span>
+              </div>
+            </div>
+            {!compact && (
+              <div className="space-y-1 border-t border-border/40 px-3 py-2.5">
+                <p className="text-xs font-medium">
+                  {selectedCover ? selectedActionLabel : idleActionLabel}
+                </p>
+                <p className="text-[11px] text-muted-foreground">{option.metaLabel}</p>
+              </div>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 };

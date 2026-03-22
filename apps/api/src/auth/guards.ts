@@ -1,5 +1,8 @@
 import { FastifyReply, FastifyRequest } from "fastify";
+import { eq } from "drizzle-orm";
 import { verifyAccessToken } from "./jwt";
+import { db } from "../db/client";
+import { apiTokens } from "../db/schema";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -23,6 +26,17 @@ export const requireAuth = async (
 
   try {
     const payload = verifyAccessToken(authHeader.slice(7));
+    if (payload.jti) {
+      const row = await db
+        .select({ revokedAt: apiTokens.revokedAt })
+        .from(apiTokens)
+        .where(eq(apiTokens.jti, payload.jti))
+        .limit(1);
+      if (!row[0] || row[0].revokedAt) {
+        void reply.code(401).send({ error: "Token revoked" });
+        return;
+      }
+    }
     request.auth = {
       userId: payload.userId,
       role: payload.role,

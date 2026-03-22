@@ -147,7 +147,7 @@ interface PanelCoverOption extends MetadataCoverOption {
 }
 
 type StatusFilter = "ALL" | "UNREAD" | "READING" | "READ" | "ABANDONED";
-type SortOption = "updated" | "title" | "author";
+type SortOption = "created" | "updated" | "title" | "author";
 type ViewMode = "grid" | "list";
 type DisplayStatus = Exclude<ReadStatus, "UNSET">;
 type StatusBadgeVariant = "secondary" | "info" | "success" | "warning" | "destructive" | "outline";
@@ -207,6 +207,8 @@ function formatSize(bytes: number): string {
 }
 
 function sortBooks(a: BookItem, b: BookItem, sort: SortOption): number {
+  if (sort === "created")
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   if (sort === "title")
     return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
   if (sort === "author")
@@ -248,6 +250,38 @@ function buildPanelCoverOptions(
 
 function isVirtualCollection(collection: CollectionItem | null | undefined): boolean {
   return Boolean(collection && (collection.virtual === 1 || collection.id === UNCOLLECTED_COLLECTION_ID));
+}
+
+type CollectionIconLike = {
+  icon: string | null;
+  slug?: string | null;
+};
+
+function renderCollectionIcon(
+  collection: CollectionIconLike,
+  options?: {
+    fallback?: boolean;
+    svgClassName?: string;
+    textClassName?: string;
+  }
+): React.ReactNode {
+  if (collection.slug === "favorites") {
+    return <Star className={cn(options?.svgClassName ?? "size-3.5", "fill-current")} />;
+  }
+
+  if (collection.slug === "uncollected") {
+    return <FolderOpen className={options?.svgClassName ?? "size-3.5"} />;
+  }
+
+  if (collection.icon) {
+    return <span className={options?.textClassName ?? "text-sm leading-none"}>{collection.icon}</span>;
+  }
+
+  if (options?.fallback) {
+    return <FolderOpen className={options.svgClassName ?? "size-3.5"} />;
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -543,7 +577,7 @@ const AddBooksDialog: React.FC<{
       <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col rounded-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {collection.icon && <span className="text-lg">{collection.icon}</span>}
+            {renderCollectionIcon(collection, { svgClassName: "size-4", textClassName: "text-lg leading-none" })}
             Add books to {collection.name}
           </DialogTitle>
           <DialogDescription>Search your library and click to add.</DialogDescription>
@@ -686,7 +720,7 @@ const BookMenuItems: React.FC<{
                   })}
                   className={cn("gap-2 text-xs", col.id === activeCollectionId && "bg-accent")}
                 >
-                  {col.icon ? <span className="text-sm leading-none">{col.icon}</span> : <FolderOpen className="size-3.5" />}
+                  {renderCollectionIcon(col, { fallback: true })}
                   <span className="truncate">{col.name}</span>
                   {col.id === activeCollectionId ? (
                     <Check className="size-3 ml-auto text-primary" />
@@ -781,13 +815,15 @@ export const LibraryPage: React.FC = () => {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
-  const [sort, setSort] = useState<SortOption>("updated");
+  const [sort, setSort] = useState<SortOption>("created");
   const [view, setView] = useState<ViewMode>("grid");
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState({ title: "", author: "", series: "", description: "" });
   const [showPanelCoverImage, setShowPanelCoverImage] = useState(false);
   const [coverOptionsRequested, setCoverOptionsRequested] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [refreshMetadataStatus, setRefreshMetadataStatus] = useState<"idle" | "refreshing" | "done" | "error">("idle");
 
   // Collection state
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
@@ -1005,6 +1041,8 @@ export const LibraryPage: React.FC = () => {
     setShowPanelCoverImage(false);
     setCoverOptionsRequested(false);
     setEditMode(false);
+    setDescriptionExpanded(false);
+    setRefreshMetadataStatus("idle");
   }, [selectedBook.data]);
 
   // Mutations
@@ -1068,8 +1106,16 @@ export const LibraryPage: React.FC = () => {
 
   const refreshMetadata = useCallback(
     async (bookId: number) => {
-      await apiFetch(`/api/v1/books/${bookId}/metadata/fetch`, { method: "POST" });
-      invalidateAll();
+      setRefreshMetadataStatus("refreshing");
+      try {
+        await apiFetch(`/api/v1/books/${bookId}/metadata/fetch`, { method: "POST" });
+        invalidateAll();
+        setRefreshMetadataStatus("done");
+        setTimeout(() => setRefreshMetadataStatus("idle"), 2000);
+      } catch {
+        setRefreshMetadataStatus("error");
+        setTimeout(() => setRefreshMetadataStatus("idle"), 3000);
+      }
     },
     [invalidateAll],
   );
@@ -1312,11 +1358,12 @@ export const LibraryPage: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-            <SelectTrigger className="h-9 w-[150px] text-xs">
+            <SelectTrigger className="h-9 w-[190px] text-xs">
               <ArrowDownAZ className="size-3.5 text-muted-foreground/60" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="created">Upload date: new first</SelectItem>
               <SelectItem value="updated">Recently updated</SelectItem>
               <SelectItem value="title">Title A-Z</SelectItem>
               <SelectItem value="author">Author A-Z</SelectItem>
@@ -1407,7 +1454,7 @@ export const LibraryPage: React.FC = () => {
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
-              {col.icon && <span className="text-sm leading-none">{col.icon}</span>}
+              {renderCollectionIcon(col)}
               {col.name}
               <span className="text-[10px] tabular-nums ml-0.5 opacity-40">
                 {col.book_count}
@@ -1425,7 +1472,7 @@ export const LibraryPage: React.FC = () => {
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
-                  {col.icon && <span className="text-sm leading-none">{col.icon}</span>}
+                  {renderCollectionIcon(col)}
                   {col.name}
                   <span className="text-[10px] tabular-nums ml-0.5 opacity-40">
                     {col.book_count}
@@ -1706,6 +1753,14 @@ export const LibraryPage: React.FC = () => {
                 </div>
               </div>
 
+              {refreshMetadataStatus !== "idle" && (
+                <div className="flex items-center gap-2 border-b border-border bg-secondary/50 px-4 py-2 text-xs text-muted-foreground">
+                  {refreshMetadataStatus === "refreshing" && <><Loader2 className="size-3 animate-spin" /> Refreshing metadata…</>}
+                  {refreshMetadataStatus === "done" && <><Check className="size-3 text-green-500" /> Metadata updated</>}
+                  {refreshMetadataStatus === "error" && <><X className="size-3 text-destructive" /> Failed to refresh metadata</>}
+                </div>
+              )}
+
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="flex justify-center border-b border-border bg-gradient-to-b from-secondary/30 to-secondary/10 px-5 py-8">
                   <div className="aspect-[2/3] w-36 overflow-hidden rounded-lg shadow-md shadow-black/10">
@@ -1716,6 +1771,51 @@ export const LibraryPage: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                {coverOptionsRequested && (
+                  <div className="animate-fade-in border-b border-border px-5 py-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <ImageIcon className="size-3" />
+                        {coverPreviewQuery.isLoading ? "Searching for covers…" : "Change cover"}
+                        {(setBookCover.isPending || coverPreviewQuery.isLoading) && <Loader2 className="size-3 animate-spin" />}
+                      </span>
+                      <button onClick={() => setCoverOptionsRequested(false)} className="text-muted-foreground/50 hover:text-foreground">
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                    <CoverOptionGrid
+                      selectedCoverPath={panelBook.coverPath ?? ""}
+                      options={coverPreviewQuery.isLoading ? [] : panelCoverOptions.map((option) => ({
+                        ...option,
+                        badgeLabel: option.label,
+                        metaLabel:
+                          option.label === "Current cover"
+                            ? "Saved on this book"
+                            : sourceLabel(option.source)
+                      }))}
+                      onSelectCover={(coverPath) => {
+                        setShowPanelCoverImage(true);
+                        setBookCover.mutate(coverPath);
+                      }}
+                      onClearCover={() => {
+                        setShowPanelCoverImage(false);
+                        setBookCover.mutate(null);
+                      }}
+                      clearSelectedLabel="Using title card"
+                      clearIdleLabel="Remove cover"
+                      idleActionLabel="Click to use"
+                      className="xl:grid-cols-2"
+                      loading={coverPreviewQuery.isLoading}
+                      emptyState={
+                        <div className="flex items-center gap-2 rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 py-2">
+                          <ImageIcon className="size-4 shrink-0 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">No cover suggestions found</p>
+                        </div>
+                      }
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-4 px-5 py-5">
                   <div className="space-y-1 text-center">
@@ -1786,9 +1886,19 @@ export const LibraryPage: React.FC = () => {
                   )}
 
                   {panelBook.description && !editMode && (
-                    <p className="text-[13px] leading-relaxed text-muted-foreground">
-                      {panelBook.description}
-                    </p>
+                    <div>
+                      <p className={cn("text-[13px] leading-relaxed text-muted-foreground", !descriptionExpanded && "line-clamp-4")}>
+                        {panelBook.description}
+                      </p>
+                      {panelBook.description.length > 200 && (
+                        <button
+                          onClick={() => setDescriptionExpanded((v) => !v)}
+                          className="mt-1 text-xs text-muted-foreground/60 hover:text-muted-foreground"
+                        >
+                          {descriptionExpanded ? "Show less" : "Show more"}
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {bookCollections.isLoading && (
@@ -1809,62 +1919,10 @@ export const LibraryPage: React.FC = () => {
                               : "bg-secondary text-muted-foreground hover:text-foreground",
                           )}
                         >
-                          {collection.icon && <span className="text-xs">{collection.icon}</span>}
+                          {renderCollectionIcon(collection, { svgClassName: "size-3", textClassName: "text-xs leading-none" })}
                           {collection.name}
                         </button>
                       ))}
-                    </div>
-                  )}
-
-                  {coverOptionsRequested && (
-                    <div className="animate-fade-in">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                          <ImageIcon className="size-3" />
-                          Change cover
-                          {(setBookCover.isPending || coverPreviewQuery.isLoading) && <Loader2 className="size-3 animate-spin" />}
-                        </span>
-                        <button onClick={() => setCoverOptionsRequested(false)} className="text-muted-foreground/50 hover:text-foreground">
-                          <X className="size-3.5" />
-                        </button>
-                      </div>
-                      <CoverOptionGrid
-                        selectedCoverPath={panelBook.coverPath ?? ""}
-                        options={
-                          panelCoverOptions.map((option) => ({
-                            ...option,
-                            badgeLabel: option.label,
-                            metaLabel:
-                              option.label === "Current cover"
-                                ? "Saved on this book"
-                                : sourceLabel(option.source)
-                          }))
-                        }
-                        onSelectCover={(coverPath) => {
-                          setShowPanelCoverImage(true);
-                          setBookCover.mutate(coverPath);
-                        }}
-                        onClearCover={() => {
-                          setShowPanelCoverImage(false);
-                          setBookCover.mutate(null);
-                        }}
-                        clearSelectedLabel="Using title card"
-                        clearIdleLabel="Remove cover"
-                        idleActionLabel="Click to use"
-                        className="xl:grid-cols-2"
-                        emptyState={
-                          coverPreviewQuery.isLoading ? (
-                            <div className="col-span-1 flex min-h-24 items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/20">
-                              <Loader2 className="size-4 animate-spin text-muted-foreground/50" />
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 py-2">
-                              <ImageIcon className="size-4 shrink-0 text-muted-foreground" />
-                              <p className="text-xs text-muted-foreground">No cover suggestions found</p>
-                            </div>
-                          )
-                        }
-                      />
                     </div>
                   )}
 
@@ -1973,7 +2031,7 @@ const SelectionToolbar: React.FC<{
                 onClick={() => onAddToCollection(col.id)}
                 className="gap-2 text-xs"
               >
-                {col.icon ? <span className="text-sm leading-none">{col.icon}</span> : <FolderOpen className="size-3.5" />}
+                {renderCollectionIcon(col, { fallback: true })}
                 <span className="truncate">{col.name}</span>
               </DropdownMenuItem>
             ))}

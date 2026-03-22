@@ -40,9 +40,21 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       query.includeVirtual === "1" || query.includeVirtual === "true";
 
     const rows = await db.all(sql`
-      SELECT c.*, COUNT(cb.book_id) AS book_count
+      SELECT
+        c.*,
+        COUNT(cb.book_id) AS book_count,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN lower(b.file_ext) IN ('epub', 'kepub') THEN 1
+              ELSE 0
+            END
+          ),
+          0
+        ) AS kobo_syncable_count
       FROM collections c
       LEFT JOIN collection_books cb ON cb.collection_id = c.id
+      LEFT JOIN books b ON b.id = cb.book_id
       WHERE c.user_id = ${userId}
       GROUP BY c.id
       ORDER BY c.updated_at DESC
@@ -52,8 +64,18 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
       return rows;
     }
 
-    const uncollectedRows = await db.all<{ book_count: number }>(sql`
-      SELECT COUNT(*) AS book_count
+    const uncollectedRows = await db.all<{ book_count: number; kobo_syncable_count: number }>(sql`
+      SELECT
+        COUNT(*) AS book_count,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN lower(b.file_ext) IN ('epub', 'kepub') THEN 1
+              ELSE 0
+            END
+          ),
+          0
+        ) AS kobo_syncable_count
       FROM books b
       WHERE NOT EXISTS (
         SELECT 1
@@ -61,7 +83,6 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         INNER JOIN collections c ON c.id = cb.collection_id
         WHERE cb.book_id = b.id
           AND c.user_id = ${userId}
-          AND c.is_system = 0
       )
     `);
 
@@ -71,12 +92,13 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         id: -1,
         user_id: userId,
         name: "Uncollected",
-        icon: "🗃️",
+        icon: null,
         slug: "uncollected",
         is_system: 1,
         created_at: "",
         updated_at: "",
         book_count: uncollectedRows[0]?.book_count ?? 0,
+        kobo_syncable_count: uncollectedRows[0]?.kobo_syncable_count ?? 0,
         virtual: 1
       }
     ];
@@ -301,7 +323,6 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
           INNER JOIN collections c2 ON c2.id = cb2.collection_id
           WHERE cb2.book_id = b.id
             AND c2.user_id = ${userId}
-            AND c2.is_system = 0
         )
         ORDER BY b.updated_at DESC
       `);
