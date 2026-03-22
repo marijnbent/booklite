@@ -78,16 +78,20 @@ export const SetupPage: React.FC = () => {
 
             <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="setup-email" className="text-[13px]">
-                  Email
-                </Label>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="setup-email" className="text-[13px]">
+                    Email
+                  </Label>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                    Optional
+                  </span>
+                </div>
                 <Input
                   id="setup-email"
                   type="email"
                   placeholder="admin@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
                 />
               </div>
 

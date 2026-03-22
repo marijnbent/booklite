@@ -8,8 +8,15 @@ import { nowIso } from "../utils/time";
 import { ensureKoboSettingsRow } from "../services/koboSettings";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
 
+const nullableEmailSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed.toLowerCase();
+}, z.union([z.string().email(), z.null()]));
+
 const setupSchema = z.object({
-  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  email: nullableEmailSchema.optional().default(null),
   username: z.string().trim().min(3),
   password: z.string().min(6)
 });

@@ -16,10 +16,11 @@ export const bootstrapOwnerFromEnv = async (): Promise<void> => {
     return;
   }
 
-  const email = process.env.BOOTSTRAP_OWNER_EMAIL?.trim().toLowerCase();
+  const rawEmail = process.env.BOOTSTRAP_OWNER_EMAIL?.trim();
+  const email = rawEmail ? rawEmail.toLowerCase() : null;
   const username = process.env.BOOTSTRAP_OWNER_USERNAME?.trim();
   const password = process.env.BOOTSTRAP_OWNER_PASSWORD;
-  if (!email || !username || !password) return;
+  if (!username || !password) return;
 
   const timestamp = nowIso();
   const [owner] = await db

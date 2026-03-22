@@ -12,7 +12,7 @@ import { READ_STATUSES } from "@booklite/shared";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  email: text("email").notNull().unique(),
+  email: text("email").unique(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: ["OWNER", "MEMBER"] }).notNull().default("MEMBER"),

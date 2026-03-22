@@ -1,8 +1,8 @@
 import { FastifyPluginAsync } from "fastify";
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
-import { users } from "../db/schema";
+import { books, users } from "../db/schema";
 import { getAuth, requireAuth, requireOwner } from "../auth/guards";
 import { hashPassword } from "../auth/password";
 import { issueTokens } from "../auth/tokens";
@@ -12,14 +12,31 @@ import { ensureSystemCollectionsForUser } from "../services/systemCollections";
 import { logAdminActivity } from "../services/adminActivityLog";
 import { idParams } from "../schemas";
 
+const nullableEmailSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed.toLowerCase();
+}, z.union([z.string().email(), z.null()]));
+
+const updatableEmailSchema = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed.toLowerCase();
+}, z.union([z.string().email(), z.null()]).optional());
+
 const createUserSchema = z.object({
-  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  email: nullableEmailSchema.optional().default(null),
   username: z.string().trim().min(3),
   password: z.string().min(6),
   role: z.enum(["OWNER", "MEMBER"]).default("MEMBER")
 });
 
 const patchUserSchema = z.object({
+  email: updatableEmailSchema,
+  username: z.string().trim().min(3).optional(),
   role: z.enum(["OWNER", "MEMBER"]).optional(),
   disabled: z.boolean().optional()
 });
@@ -91,13 +108,29 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
       const body = patchUserSchema.parse(request.body);
 
       const set: Record<string, unknown> = {};
+      if (body.email !== undefined) set.email = body.email;
+      if (body.username !== undefined) set.username = body.username;
       if (body.role) set.role = body.role;
       if (body.disabled !== undefined) {
         set.disabledAt = body.disabled ? nowIso() : null;
       }
 
       if (Object.keys(set).length === 0) {
-        return reply.code(400).send({ error: "No fields to update" });
+        const [existing] = await db
+          .select({
+            id: users.id,
+            email: users.email,
+            username: users.username,
+            role: users.role,
+            createdAt: users.createdAt,
+            disabledAt: users.disabledAt
+          })
+          .from(users)
+          .where(eq(users.id, params.id))
+          .limit(1);
+
+        if (!existing) return reply.code(404).send({ error: "User not found" });
+        return existing;
       }
 
       const [updated] = await db
@@ -115,6 +148,46 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!updated) return reply.code(404).send({ error: "User not found" });
       return updated;
+    }
+  );
+
+  fastify.delete(
+    "/api/v1/users/:id",
+    { preHandler: requireOwner },
+    async (request, reply) => {
+      const params = idParams.parse(request.params);
+      const actor = getAuth(request);
+
+      const found = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          disabledAt: users.disabledAt
+        })
+        .from(users)
+        .where(eq(users.id, params.id))
+        .limit(1);
+
+      const target = found[0];
+      if (!target) return reply.code(404).send({ error: "User not found" });
+      if (!target.disabledAt) {
+        return reply.code(409).send({ error: "Only disabled users can be deleted" });
+      }
+      if (target.id === actor.userId) {
+        return reply.code(400).send({ error: "You cannot delete your own account" });
+      }
+
+      const [{ ownedBooks }] = await db
+        .select({ ownedBooks: count() })
+        .from(books)
+        .where(eq(books.ownerUserId, target.id));
+
+      if (ownedBooks > 0) {
+        return reply.code(409).send({ error: "Disabled users with books cannot be deleted" });
+      }
+
+      await db.delete(users).where(eq(users.id, target.id));
+      return { ok: true };
     }
   );
 

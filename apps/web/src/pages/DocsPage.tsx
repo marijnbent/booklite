@@ -1,23 +1,21 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertTriangle,
   BookOpen,
-  TabletSmartphone,
+  ChevronDown,
+  ChevronRight,
+  Info,
+  Lock,
+  Share2,
+  Shield,
   Sparkles,
+  Star,
+  TabletSmartphone,
+  Upload,
   Users,
   Wrench,
-  ChevronRight,
-  ChevronDown,
-  ArrowRight,
-  Shield,
-  Info,
-  AlertTriangle,
-  Lock,
-  Search,
-  RefreshCw,
-  Library,
-  Star,
 } from "lucide-react";
 
 const TroubleshootItem: React.FC<{
@@ -32,7 +30,7 @@ const TroubleshootItem: React.FC<{
       type="button"
       onClick={() => setOpen((o) => !o)}
       className={[
-        "group w-full text-left rounded-md border transition-colors duration-150",
+        "group w-full rounded-md border text-left transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         open
           ? "border-border bg-muted/20"
@@ -67,10 +65,9 @@ const TroubleshootItem: React.FC<{
 
 const Step: React.FC<{
   number: number;
-  isLast?: boolean;
   children: React.ReactNode;
-}> = ({ number, isLast = false, children }) => (
-  <li className="flex items-start gap-3 text-sm text-foreground/85 leading-relaxed">
+}> = ({ number, children }) => (
+  <li className="flex items-start gap-3 text-sm leading-relaxed text-foreground/85">
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
       {number}
     </span>
@@ -79,43 +76,71 @@ const Step: React.FC<{
 );
 
 const OwnerNote: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="border-l-2 border-primary/40 pl-4 py-3 mt-4">
-    <div className="flex items-center gap-1.5 mb-1">
+  <div className="mt-4 border-l-2 border-primary/40 py-3 pl-4">
+    <div className="mb-1 flex items-center gap-1.5">
       <Shield className="h-3.5 w-3.5 text-primary" />
       <span className="text-xs font-semibold uppercase tracking-wide text-primary/80">
         Owner note
       </span>
     </div>
-    <p className="text-sm text-foreground/75 leading-relaxed">{children}</p>
+    <p className="text-sm leading-relaxed text-foreground/75">{children}</p>
   </div>
 );
 
 const BulletItem: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <li className="text-sm text-foreground/80 leading-relaxed list-disc ml-4">
-    {children}
-  </li>
+  <li className="ml-4 list-disc text-sm leading-relaxed text-foreground/80">{children}</li>
 );
 
 const NAV_ITEMS = [
   { id: "about", label: "About", icon: BookOpen },
   { id: "features", label: "Features", icon: Star },
-  { id: "kobo-setup", label: "Kobo setup", icon: TabletSmartphone },
+  { id: "upload-flow", label: "Upload flow", icon: Upload },
   { id: "metadata-and-ai", label: "Metadata & AI", icon: Sparkles },
-  { id: "accounts-and-roles", label: "Accounts & roles", icon: Users },
+  { id: "sharing-books", label: "Sharing books", icon: Share2 },
+  { id: "accounts-and-admin", label: "Accounts & admin", icon: Users },
+  { id: "kobo-setup", label: "Kobo setup", icon: TabletSmartphone },
   { id: "troubleshooting", label: "Troubleshooting", icon: Wrench },
 ] as const;
 
 export const DocsPage: React.FC = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const hash = location.hash.slice(1);
+    if (!hash) return;
+
+    let frameId = 0;
+    let attempts = 0;
+
+    const scrollToHashTarget = () => {
+      const target = document.getElementById(decodeURIComponent(hash));
+      if (target) {
+        target.scrollIntoView({ block: "start" });
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 10) {
+        frameId = window.requestAnimationFrame(scrollToHashTarget);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(scrollToHashTarget);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [location.hash]);
+
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold tracking-tight">Docs</h1>
-      <p className="mt-1 text-sm text-muted-foreground mb-10">
+      <p className="mb-10 mt-1 text-sm text-muted-foreground">
         Everything you need to know about BookLite.
       </p>
 
-      {/* Table of contents */}
       <nav className="mb-12 rounded-md border border-border bg-muted/20 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           On this page
         </p>
         <ul className="space-y-1.5">
@@ -123,9 +148,9 @@ export const DocsPage: React.FC = () => {
             <li key={item.id}>
               <a
                 href={`#${item.id}`}
-                className="group flex items-center gap-2 text-sm text-foreground/80 hover:text-primary transition-colors duration-150"
+                className="group flex items-center gap-2 text-sm text-foreground/80 transition-colors duration-150 hover:text-primary"
               >
-                <ChevronRight className="h-3 w-3 text-muted-foreground/40 group-hover:text-primary transition-colors duration-150" />
+                <ChevronRight className="h-3 w-3 text-muted-foreground/40 transition-colors duration-150 group-hover:text-primary" />
                 {item.label}
               </a>
             </li>
@@ -134,188 +159,323 @@ export const DocsPage: React.FC = () => {
       </nav>
 
       <div className="space-y-14">
-        {/* ---- About ---- */}
         <section id="about" className="scroll-mt-20">
-          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
             About
           </h2>
-          <p className="text-sm text-foreground/85 leading-relaxed mb-4">
-            BookLite is a simple, self-hosted digital book library. Upload books, organize them in collections, fetch metadata, and sync to your Kobo &mdash; nothing more, nothing less.
+          <p className="mb-4 text-sm leading-relaxed text-foreground/85">
+            BookLite is a focused, self-hosted digital book library. Upload books, organize them,
+            enrich their metadata, read in the browser, share them with other users, and sync
+            selected titles to your Kobo.
           </p>
-          <p className="text-sm text-foreground/85 leading-relaxed mb-4">
+          <p className="text-sm leading-relaxed text-foreground/85">
             It is inspired by{" "}
-            <a href="https://github.com/booklore-app/booklore" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline underline-offset-2">BookLore</a>,
-            a full-featured self-hosted library with OPDS, KOReader sync, comic and audiobook support, BookDrop imports, and much more. BookLite deliberately leaves all of that out to stay lightweight and focused. If you need those features, BookLore is the project for you.
+            <a
+              href="https://github.com/booklore-app/booklore"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline underline-offset-2"
+            >
+              BookLore
+            </a>
+            , but keeps a smaller scope on purpose. BookLite leaves out OPDS, KOReader sync,
+            comics, audiobooks, and other larger-library features so the day-to-day workflow stays
+            simple.
           </p>
         </section>
 
-        {/* ---- Features ---- */}
         <section id="features" className="scroll-mt-20">
-          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
             Features
           </h2>
           <ul className="space-y-2">
             <BulletItem>Upload EPUB, KEPUB, and PDF files from the web UI.</BulletItem>
-            <BulletItem>Organize books into collections with drag and drop.</BulletItem>
-            <BulletItem>Automatic metadata from 7 providers (Open Library, Google Books, Amazon, bol.com, Hardcover, Goodreads, Douban).</BulletItem>
-            <BulletItem>Kobo sync &mdash; books and reading progress over the built-in Kobo API.</BulletItem>
-            <BulletItem>Multi-user with simple Owner/Member roles.</BulletItem>
-            <BulletItem>Built-in EPUB and KEPUB reader.</BulletItem>
+            <BulletItem>Read EPUB and KEPUB books directly in BookLite.</BulletItem>
+            <BulletItem>
+              Organize books with custom collections plus built-in Favorites, Shared with me, and
+              Uncollected shelves.
+            </BulletItem>
+            <BulletItem>
+              Fetch and merge metadata from 7 providers instead of relying on a single source.
+            </BulletItem>
+            <BulletItem>Review cover suggestions and switch covers later from the library.</BulletItem>
+            <BulletItem>Share books directly between users.</BulletItem>
+            <BulletItem>Kobo sync for EPUB and KEPUB, including reading progress sync.</BulletItem>
+            <BulletItem>
+              Owner tools for user management, impersonation, provider settings, upload limits,
+              diagnostics, and API tokens.
+            </BulletItem>
             <BulletItem>Full-text search powered by SQLite FTS5.</BulletItem>
           </ul>
         </section>
 
-        {/* ---- Kobo setup ---- */}
+        <section id="upload-flow" className="scroll-mt-20">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
+            Upload flow
+          </h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            What happens between dropping a file and seeing a finished book in your library.
+          </p>
+          <ol className="space-y-2.5">
+            <Step number={1}>
+              Go to <Link to="/uploads" className="font-medium text-primary hover:underline underline-offset-2">Upload</Link>{" "}
+              and drag in one or more files, or click to browse.
+            </Step>
+            <Step number={2}>
+              BookLite extracts an initial title from the filename and immediately runs metadata
+              preview for each draft.
+            </Step>
+            <Step number={3}>
+              Review the draft before import. You can edit title, author, series, description,
+              choose a suggested cover, mark it as a favorite, and assign collections.
+            </Step>
+            <Step number={4}>
+              Click <span className="font-medium text-foreground">Add selected</span>. Files are
+              uploaded in batches and queued as background import jobs.
+            </Step>
+            <Step number={5}>
+              During processing, BookLite creates the book record, applies filename defaults,
+              optionally enriches metadata again, localizes the chosen cover, and adds the book to
+              the selected collections and Favorites if requested.
+            </Step>
+          </ol>
+          <div className="mt-5 rounded-md border border-border bg-muted/15 p-4">
+            <div className="mb-2.5 flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Good to know
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              <BulletItem>Only EPUB, KEPUB, and PDF files are accepted.</BulletItem>
+              <BulletItem>Manual title, author, and description edits are preserved during enrichment.</BulletItem>
+              <BulletItem>Owners can change the upload size limit in Administration.</BulletItem>
+            </ul>
+          </div>
+        </section>
+
+        <section id="metadata-and-ai" className="scroll-mt-20">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
+            Metadata and AI
+          </h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            How BookLite chooses metadata, covers, and when the optional AI resolver is involved.
+          </p>
+          <ul className="mb-5 space-y-2">
+            <BulletItem>
+              Enabled providers are queried in parallel: Open Library, Google Books, Amazon,
+              bol.com, Hardcover, Goodreads, and Douban.
+            </BulletItem>
+            <BulletItem>
+              Provider results are scored by title match, author match, completeness, and provider
+              trust.
+            </BulletItem>
+            <BulletItem>
+              The final title, author, series, and description can come from different providers if
+              that produces a better result.
+            </BulletItem>
+            <BulletItem>
+              Covers are ranked separately, with extra weighting for provider preference and image
+              quality hints.
+            </BulletItem>
+            <BulletItem>
+              <span className="font-medium text-foreground">Refresh metadata</span> re-runs the
+              provider pass for a book. You can also refresh multiple selected books at once from
+              the library toolbar.
+            </BulletItem>
+          </ul>
+          <OwnerNote>
+            OpenRouter is optional. When enabled, BookLite uses the filename-derived title and
+            author as the source of truth, asks the model to discard wrong matches, normalize
+            fields like series, and fill gaps when confident. Descriptions and covers still stay
+            grounded in provider data.
+          </OwnerNote>
+        </section>
+
+        <section id="sharing-books" className="scroll-mt-20">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
+            Sharing books
+          </h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Share owned books with other active users without duplicating the source file.
+          </p>
+          <ul className="space-y-2">
+            <BulletItem>
+              Owners can share a book from the book menu, the detail drawer, or the multi-select
+              toolbar.
+            </BulletItem>
+            <BulletItem>
+              Recipients see shared books in the built-in{" "}
+              <span className="font-medium text-foreground">Shared with me</span> collection.
+            </BulletItem>
+            <BulletItem>
+              Recipients can read, download, and track their own status and progress on shared
+              books.
+            </BulletItem>
+            <BulletItem>
+              Hiding a shared book only removes it from the recipient&apos;s view. It does not delete
+              the owner&apos;s book.
+            </BulletItem>
+            <BulletItem>
+              Ownership stays with the original user, and only that owner can manage outgoing
+              shares for the book.
+            </BulletItem>
+          </ul>
+        </section>
+
+        <section id="accounts-and-admin" className="scroll-mt-20">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
+            Accounts and admin
+          </h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Member permissions, owner-only controls, and how impersonation works.
+          </p>
+          <div className="mb-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-md border border-border p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Badge variant="secondary" className="text-[11px] font-semibold">
+                  Member
+                </Badge>
+              </div>
+              <ul className="space-y-1.5">
+                <BulletItem>Library, collections, uploads, Kobo, reader, and profile.</BulletItem>
+                <BulletItem>Receive shared books from other users.</BulletItem>
+                <BulletItem>Hide shared books from your own library when you no longer want them.</BulletItem>
+              </ul>
+            </div>
+            <div className="rounded-md border border-border p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Badge variant="default" className="text-[11px] font-semibold">
+                  Owner
+                </Badge>
+              </div>
+              <ul className="space-y-1.5">
+                <BulletItem>Everything members can do.</BulletItem>
+                <BulletItem>Create users, change roles, disable accounts, and delete eligible users.</BulletItem>
+                <BulletItem>Configure metadata providers, AI resolver, upload limits, and diagnostics.</BulletItem>
+                <BulletItem>View admin activity logs and generate API/LLM tokens.</BulletItem>
+                <BulletItem>Impersonate active member accounts for support or debugging.</BulletItem>
+              </ul>
+            </div>
+          </div>
+          <div className="mb-4 flex items-start gap-2.5 rounded-md border border-border bg-muted/15 p-4">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <p className="text-sm text-foreground/80">
+              Disabled users cannot log in, and only active member accounts can be impersonated.
+            </p>
+          </div>
+          <OwnerNote>
+            Impersonation switches this browser into the member session and keeps your owner session
+            parked behind a restore overlay so you can come back when you are done.
+          </OwnerNote>
+        </section>
+
         <section id="kobo-setup" className="scroll-mt-20">
-          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
             Kobo setup
           </h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <p className="mb-4 text-sm text-muted-foreground">
             Setting up Kobo sync with BookLite.
           </p>
-          <div className="space-y-6 mb-6">
+          <div className="mb-6 space-y-6">
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">In BookLite (one-time setup)</h3>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">In BookLite (one-time setup)</h3>
               <ol className="space-y-2.5">
                 <Step number={1}>
                   Go to{" "}
-                  <Link to="/kobo" className="font-medium text-primary hover:underline underline-offset-2">Kobo</Link>{" "}
+                  <Link to="/kobo" className="font-medium text-primary hover:underline underline-offset-2">
+                    Kobo
+                  </Link>{" "}
                   in the left sidebar.
                 </Step>
                 <Step number={2}>Enable sync.</Step>
-                <Step number={3}>Choose to sync all books, or enable specific collections such as Favorites.</Step>
-                <Step number={4}>Scroll down to the API endpoint field and click Copy endpoint.</Step>
+                <Step number={3}>Choose to sync all books, or select specific collections.</Step>
+                <Step number={4}>Copy the full endpoint from the API endpoint field.</Step>
               </ol>
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">On your Mac (one-time device setup)</h3>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">On your Mac (one-time device setup)</h3>
               <ol className="space-y-2.5">
                 <Step number={1}>Connect your Kobo via USB. It will appear in Finder.</Step>
                 <Step number={2}>Open the Kobo volume in Finder.</Step>
                 <Step number={3}>Press Cmd + Shift + . to reveal hidden files and folders.</Step>
                 <Step number={4}>
-                  Navigate to <code>.kobo → Kobo</code>, then open <code>Kobo eReader.conf</code> in TextEdit.
+                  Navigate to <code>.kobo → Kobo</code>, then open <code>Kobo eReader.conf</code>
+                  in TextEdit.
                 </Step>
                 <Step number={5}>Use Cmd + F to search for <code>api_endpoint</code>.</Step>
-                <Step number={6}>Replace that entire line with the endpoint you copied from BookLite.</Step>
-                <Step number={7}>Save with Cmd + S and close the file.</Step>
-                <Step number={8}>Eject the Kobo from Finder.</Step>
+                <Step number={6}>Replace that full line with the endpoint you copied from BookLite.</Step>
+                <Step number={7}>Save the file and eject the Kobo.</Step>
               </ol>
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-3">Syncing</h3>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Syncing</h3>
               <ol className="space-y-2.5">
-                <Step number={1}>On your Kobo, tap the sync icon in the top-right corner.</Step>
-                <Step number={2}>Your books will appear. Covers may take a moment to load.</Step>
+                <Step number={1}>Tap the sync icon on your Kobo.</Step>
+                <Step number={2}>Your books will appear. Covers can take a moment to populate.</Step>
               </ol>
             </div>
           </div>
           <div className="rounded-md border border-border bg-muted/15 p-4">
-            <div className="flex items-center gap-1.5 mb-2.5">
+            <div className="mb-2.5 flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Good to know</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Good to know
+              </span>
             </div>
             <ul className="space-y-1.5">
               <BulletItem>Only EPUB and KEPUB books sync to Kobo.</BulletItem>
-              <BulletItem>Reading progress syncs from Kobo into BookLite automatically.</BulletItem>
-              <BulletItem>If you share the setup with someone else, they can use the same API endpoint. There is no need to regenerate the token.</BulletItem>
+              <BulletItem>Each user has their own Kobo token and sync settings.</BulletItem>
+              <BulletItem>Regenerating the token invalidates the previous endpoint.</BulletItem>
+              <BulletItem>Reading progress syncs from Kobo back into BookLite automatically.</BulletItem>
             </ul>
           </div>
         </section>
 
-        {/* ---- Metadata and AI ---- */}
-        <section id="metadata-and-ai" className="scroll-mt-20">
-          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
-            Metadata and AI
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            How metadata is found for your books and when AI is used.
-          </p>
-          <ul className="space-y-2 mb-5">
-            <BulletItem>When uploading files, BookLite runs metadata preview automatically.</BulletItem>
-            <BulletItem>Source labels in upload cards show where metadata came from.</BulletItem>
-            <BulletItem>Manual edits you make in upload/review fields are preserved.</BulletItem>
-            <BulletItem>
-              Each book supports{" "}
-              <span className="font-medium text-foreground">Fetch metadata</span> for a single refresh.
-            </BulletItem>
-            <BulletItem>
-              Library toolbar supports{" "}
-              <span className="font-medium text-foreground">Refresh all metadata</span> for a full-library pass.
-            </BulletItem>
-          </ul>
-          <OwnerNote>
-            Owners can enable/disable metadata providers in Administration &gt; System Settings. AI-assisted metadata resolution is optional and only applies when OpenRouter settings are enabled in instance configuration.
-          </OwnerNote>
-        </section>
-
-        {/* ---- Accounts and roles ---- */}
-        <section id="accounts-and-roles" className="scroll-mt-20">
-          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
-            Accounts and roles
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Member and owner permissions at a glance.
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2 mb-5">
-            <div className="rounded-md border border-border p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Badge variant="secondary" className="text-[11px] font-semibold">Member</Badge>
-              </div>
-              <ul className="space-y-1.5">
-                <BulletItem>Library, Collections, Uploads</BulletItem>
-                <BulletItem>Kobo sync and Profile</BulletItem>
-              </ul>
-            </div>
-            <div className="rounded-md border border-border p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Badge variant="default" className="text-[11px] font-semibold">Owner</Badge>
-              </div>
-              <ul className="space-y-1.5">
-                <BulletItem>Everything members can do</BulletItem>
-                <BulletItem>Administration panel access</BulletItem>
-                <BulletItem>Create users, change roles, manage settings</BulletItem>
-                <BulletItem>Enable/disable accounts</BulletItem>
-              </ul>
-            </div>
-          </div>
-          <div className="rounded-md border border-border bg-muted/15 p-4 flex items-start gap-2.5 mb-4">
-            <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground/80">Disabled users cannot log in.</p>
-          </div>
-          <OwnerNote>Keep at least one active owner account so administration access is never lost.</OwnerNote>
-        </section>
-
-        {/* ---- Troubleshooting ---- */}
         <section id="troubleshooting" className="scroll-mt-20">
-          <h2 className="text-xl font-semibold tracking-tight pb-2 border-b border-border mb-5">
+          <h2 className="mb-5 border-b border-border pb-2 text-xl font-semibold tracking-tight">
             Troubleshooting
           </h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <p className="mb-4 text-sm text-muted-foreground">
             Quick fixes for common issues.
           </p>
           <div className="space-y-2">
-            <TroubleshootItem title="No books on Kobo" icon={<TabletSmartphone className="h-4 w-4" />} defaultOpen>
+            <TroubleshootItem
+              title="No books on Kobo"
+              icon={<TabletSmartphone className="h-4 w-4" />}
+              defaultOpen
+            >
               <ul className="space-y-1.5">
-                <BulletItem>Check Kobo sync is enabled.</BulletItem>
-                <BulletItem>Make sure at least one sync collection is selected.</BulletItem>
-                <BulletItem>Only EPUB and KEPUB files are synced.</BulletItem>
-                <BulletItem>If token was regenerated, update Kobo config with the new endpoint.</BulletItem>
+                <BulletItem>Check that Kobo sync is enabled.</BulletItem>
+                <BulletItem>Make sure sync all books is on, or at least one sync collection is selected.</BulletItem>
+                <BulletItem>Only EPUB and KEPUB files are eligible for Kobo sync.</BulletItem>
+                <BulletItem>If you regenerated the token, update the device endpoint in Kobo config.</BulletItem>
               </ul>
             </TroubleshootItem>
-            <TroubleshootItem title="Metadata missing or wrong" icon={<AlertTriangle className="h-4 w-4" />}>
+            <TroubleshootItem
+              title="Metadata missing or wrong"
+              icon={<AlertTriangle className="h-4 w-4" />}
+            >
               <ul className="space-y-1.5">
-                <BulletItem>Edit metadata manually from upload review or Library details.</BulletItem>
-                <BulletItem>Use Fetch metadata per book to retry with current providers.</BulletItem>
-                <BulletItem>Owners can adjust enabled providers in Administration.</BulletItem>
+                <BulletItem>Edit metadata manually from upload review or the library detail drawer.</BulletItem>
+                <BulletItem>Use Refresh metadata to retry with the currently enabled providers.</BulletItem>
+                <BulletItem>Try switching the cover manually if the text metadata is correct but the image is not.</BulletItem>
+                <BulletItem>Owners can adjust provider and OpenRouter settings in Administration.</BulletItem>
+              </ul>
+            </TroubleshootItem>
+            <TroubleshootItem title="A shared book disappeared" icon={<Share2 className="h-4 w-4" />}>
+              <ul className="space-y-1.5">
+                <BulletItem>Check the Shared with me collection in the Library view.</BulletItem>
+                <BulletItem>If you hid the share, ask the owner to share the book again.</BulletItem>
+                <BulletItem>If the owner revoked the share, the book will no longer appear for recipients.</BulletItem>
               </ul>
             </TroubleshootItem>
             <TroubleshootItem title="Cannot log in" icon={<Lock className="h-4 w-4" />}>
               <ul className="space-y-1.5">
-                <BulletItem>Confirm username/email and password.</BulletItem>
-                <BulletItem>Ask an owner to verify your account is not disabled.</BulletItem>
+                <BulletItem>Confirm your username or email and password.</BulletItem>
+                <BulletItem>Ask an owner to verify that your account is not disabled.</BulletItem>
               </ul>
             </TroubleshootItem>
           </div>

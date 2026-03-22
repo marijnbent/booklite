@@ -59,7 +59,7 @@ export const ProfilePage: React.FC = () => {
             <dl className="divide-y divide-border/50">
               {[
                 { label: "Username", value: me.username },
-                { label: "Email", value: me.email },
+                { label: "Email", value: me.email ?? "Not set" },
                 { label: "Role", value: me.role },
                 { label: "Member since", value: createdDate },
               ].map((item) => (

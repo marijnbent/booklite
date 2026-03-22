@@ -16,7 +16,7 @@ export type ReadStatus = (typeof READ_STATUSES)[number];
 
 export interface ApiUser {
   id: number;
-  email: string;
+  email: string | null;
   username: string;
   role: Role;
   disabledAt: string | null;

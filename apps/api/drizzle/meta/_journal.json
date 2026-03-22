@@ -8,6 +8,13 @@
       "when": 1774202466213,
       "tag": "0000_daily_carlie_cooper",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1774204471123,
+      "tag": "0001_mute_giant_man",
+      "breakpoints": true
     }
   ]
 }

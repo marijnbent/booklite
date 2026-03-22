@@ -15,7 +15,7 @@ type Role = "OWNER" | "MEMBER";
 
 export interface Me {
   id: number;
-  email: string;
+  email: string | null;
   username: string;
   role: Role;
   disabledAt: string | null;

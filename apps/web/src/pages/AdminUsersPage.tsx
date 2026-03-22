@@ -56,6 +56,8 @@ import {
   Link2,
   LogIn,
   TerminalSquare,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -64,7 +66,7 @@ import {
 
 interface UserItem {
   id: number;
-  email: string;
+  email: string | null;
   username: string;
   role: "OWNER" | "MEMBER";
   disabledAt: string | null;
@@ -165,13 +167,17 @@ const providerMeta: Record<
 // ---------------------------------------------------------------------------
 
 export const AdminUsersPage: React.FC = () => {
-  const { me, beginImpersonation } = useAuth();
+  const { me, beginImpersonation, refreshMe } = useAuth();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"OWNER" | "MEMBER">("MEMBER");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editTarget, setEditTarget] = useState<UserItem | null>(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null);
   const [impersonationTarget, setImpersonationTarget] = useState<UserItem | null>(null);
   const [expandedProviders, setExpandedProviders] = useState<Set<EnabledMetadataProvider>>(
     new Set()
@@ -203,14 +209,46 @@ export const AdminUsersPage: React.FC = () => {
     },
   });
 
-  const patchUser = useMutation({
+  const updateUserAccess = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Record<string, unknown> }) =>
-      apiFetch(`/api/v1/users/${id}`, {
+      apiFetch<UserItem>(`/api/v1/users/${id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: async (updatedUser) => {
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      if (updatedUser.id === me?.id) {
+        await refreshMe();
+      }
+    },
+  });
+
+  const updateUserDetails = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: Record<string, unknown> }) =>
+      apiFetch<UserItem>(`/api/v1/users/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: async (updatedUser) => {
+      setEditTarget(null);
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      if (updatedUser.id === me?.id) {
+        await refreshMe();
+      }
+    },
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<{ ok: true }>(`/api/v1/users/${id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: async () => {
+      setDeleteTarget(null);
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
   });
 
   const patchSettings = useMutation({
@@ -260,6 +298,24 @@ export const AdminUsersPage: React.FC = () => {
 
   const canImpersonateUser = (user: UserItem): boolean =>
     !user.disabledAt && user.role === "MEMBER" && user.id !== me?.id;
+
+  const canDeleteUser = (user: UserItem): boolean => Boolean(user.disabledAt) && user.id !== me?.id;
+
+  const openEditDialog = (user: UserItem): void => {
+    setEditTarget(user);
+    setEditEmail(user.email ?? "");
+    setEditUsername(user.username);
+    updateUserDetails.reset();
+  };
+
+  const closeEditDialog = (): void => {
+    setEditTarget(null);
+    setEditEmail("");
+    setEditUsername("");
+    updateUserDetails.reset();
+  };
+
+  const getEmailLabel = (emailValue: string | null): string => emailValue ?? "No email";
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -322,35 +378,66 @@ export const AdminUsersPage: React.FC = () => {
                     createUser.mutate();
                   }}
                   className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                  autoComplete="off"
+                  data-form-type="other"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-bwignore="true"
                 >
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Email</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs text-muted-foreground">Email</Label>
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                        Optional
+                      </Badge>
+                    </div>
                     <Input
                       type="email"
+                      name="admin-create-user-email"
                       placeholder="user@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      required
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      data-form-type="other"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-bwignore="true"
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">Username</Label>
                     <Input
                       type="text"
+                      name="admin-create-user-username"
                       placeholder="username"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       required
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      data-form-type="other"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-bwignore="true"
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">Password</Label>
                     <Input
                       type="password"
+                      name="admin-create-user-password"
                       placeholder="Strong password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      autoComplete="new-password"
+                      data-form-type="other"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-bwignore="true"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -383,6 +470,9 @@ export const AdminUsersPage: React.FC = () => {
                       )}
                     </Button>
                   </div>
+                  {createUser.error instanceof Error && (
+                    <p className="sm:col-span-2 text-sm text-destructive">{createUser.error.message}</p>
+                  )}
                 </form>
               </div>
             )}
@@ -432,7 +522,7 @@ export const AdminUsersPage: React.FC = () => {
                             </div>
                             <div>
                               <p className="font-medium text-sm">{user.username}</p>
-                              <p className="text-xs text-muted-foreground">{user.email}</p>
+                              <p className="text-xs text-muted-foreground">{getEmailLabel(user.email)}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -440,7 +530,7 @@ export const AdminUsersPage: React.FC = () => {
                           <Select
                             value={user.role}
                             onValueChange={(v) =>
-                              patchUser.mutate({ id: user.id, payload: { role: v } })
+                              updateUserAccess.mutate({ id: user.id, payload: { role: v } })
                             }
                           >
                             <SelectTrigger className="h-7 w-[6.5rem] text-xs">
@@ -468,6 +558,15 @@ export const AdminUsersPage: React.FC = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => openEditDialog(user)}
+                            >
+                              <Pencil className="size-3.5" />
+                              Edit
+                            </Button>
                             {canImpersonateUser(user) && (
                               <Button
                                 variant="outline"
@@ -484,7 +583,7 @@ export const AdminUsersPage: React.FC = () => {
                               size="sm"
                               className="h-7 text-xs"
                               onClick={() =>
-                                patchUser.mutate({
+                                updateUserAccess.mutate({
                                   id: user.id,
                                   payload: { disabled: !user.disabledAt },
                                 })
@@ -492,6 +591,17 @@ export const AdminUsersPage: React.FC = () => {
                             >
                               {user.disabledAt ? "Enable" : "Disable"}
                             </Button>
+                            {canDeleteUser(user) && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => setDeleteTarget(user)}
+                              >
+                                <Trash2 className="size-3.5" />
+                                Delete
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -502,6 +612,182 @@ export const AdminUsersPage: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        <Dialog
+          open={editTarget !== null}
+          onOpenChange={(open) => {
+            if (!open && !updateUserDetails.isPending) {
+              closeEditDialog();
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit user</DialogTitle>
+              <DialogDescription>
+                Update the username or email address for this account.
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!editTarget) return;
+                const normalizedEmail =
+                  editEmail.trim().length > 0 ? editEmail.trim().toLowerCase() : null;
+                const normalizedUsername = editUsername.trim();
+                updateUserDetails.mutate({
+                  id: editTarget.id,
+                  payload: {
+                    email: normalizedEmail,
+                    username: normalizedUsername,
+                  },
+                });
+              }}
+              className="space-y-4"
+              autoComplete="off"
+              data-form-type="other"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-bwignore="true"
+            >
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="edit-user-email" className="text-xs text-muted-foreground">
+                    Email
+                  </Label>
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                    Optional
+                  </Badge>
+                </div>
+                <Input
+                  id="edit-user-email"
+                  type="email"
+                  name="admin-edit-user-email"
+                  placeholder="user@example.com"
+                  value={editEmail}
+                  onChange={(event) => {
+                    setEditEmail(event.target.value);
+                    if (updateUserDetails.error) updateUserDetails.reset();
+                  }}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-form-type="other"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-bwignore="true"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-user-username" className="text-xs text-muted-foreground">
+                  Username
+                </Label>
+                <Input
+                  id="edit-user-username"
+                  type="text"
+                  name="admin-edit-user-username"
+                  placeholder="username"
+                  value={editUsername}
+                  onChange={(event) => {
+                    setEditUsername(event.target.value);
+                    if (updateUserDetails.error) updateUserDetails.reset();
+                  }}
+                  required
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-form-type="other"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-bwignore="true"
+                />
+              </div>
+              {updateUserDetails.error instanceof Error && editTarget && (
+                <p className="text-sm text-destructive">{updateUserDetails.error.message}</p>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeEditDialog}
+                  disabled={updateUserDetails.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!editTarget || updateUserDetails.isPending}>
+                  {updateUserDetails.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="size-4" />
+                      Save changes
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={deleteTarget !== null}
+          onOpenChange={(open) => {
+            if (!open && !deleteUser.isPending) setDeleteTarget(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete disabled user</DialogTitle>
+              <DialogDescription>
+                This permanently removes the account. Only disabled users without owned books can
+                be deleted.
+              </DialogDescription>
+            </DialogHeader>
+            {deleteTarget && (
+              <div className="rounded-xl border border-border bg-muted/30 p-4">
+                <p className="text-sm font-semibold">{deleteTarget.username}</p>
+                <p className="text-xs text-muted-foreground">{getEmailLabel(deleteTarget.email)}</p>
+              </div>
+            )}
+            {deleteUser.error instanceof Error && (
+              <p className="text-sm text-destructive">{deleteUser.error.message}</p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteUser.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={!deleteTarget || deleteUser.isPending}
+                onClick={() => {
+                  if (!deleteTarget) return;
+                  deleteUser.mutate(deleteTarget.id);
+                }}
+              >
+                {deleteUser.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="size-4" />
+                    Delete user
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog
           open={impersonationTarget !== null}
@@ -520,7 +806,7 @@ export const AdminUsersPage: React.FC = () => {
             {impersonationTarget && (
               <div className="rounded-xl border border-border bg-muted/30 p-4">
                 <p className="text-sm font-semibold">{impersonationTarget.username}</p>
-                <p className="text-xs text-muted-foreground">{impersonationTarget.email}</p>
+                <p className="text-xs text-muted-foreground">{getEmailLabel(impersonationTarget.email)}</p>
               </div>
             )}
             {impersonateUser.error instanceof Error && (
