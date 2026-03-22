@@ -1,9 +1,9 @@
 import { FastifyPluginAsync } from "fastify";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client";
 import { users } from "../db/schema";
-import { requireOwner } from "../auth/guards";
+import { getAuth, requireAuth, requireOwner } from "../auth/guards";
 import { hashPassword } from "../auth/password";
 import { nowIso } from "../utils/time";
 import { ensureKoboSettingsRow } from "../services/koboSettings";
@@ -36,6 +36,19 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
       .from(users)
       .orderBy(users.id)
   );
+
+  fastify.get("/api/v1/users/peers", { preHandler: requireAuth }, async (request) => {
+    const { userId } = getAuth(request);
+
+    return db
+      .select({
+        id: users.id,
+        username: users.username
+      })
+      .from(users)
+      .where(and(ne(users.id, userId), isNull(users.disabledAt)))
+      .orderBy(users.username);
+  });
 
   fastify.post("/api/v1/users", { preHandler: requireOwner }, async (request, reply) => {
     const body = createUserSchema.parse(request.body);

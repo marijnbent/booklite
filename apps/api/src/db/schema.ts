@@ -36,6 +36,15 @@ export const books = sqliteTable("books", {
   updatedAt: text("updated_at").notNull()
 });
 
+export const bookShares = sqliteTable("book_shares", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  bookId: integer("book_id").notNull(),
+  ownerUserId: integer("owner_user_id").notNull(),
+  recipientUserId: integer("recipient_user_id").notNull(),
+  sharedAt: text("shared_at").notNull(),
+  removedAt: text("removed_at")
+});
+
 export const bookProgress = sqliteTable(
   "book_progress",
   {
@@ -176,6 +185,7 @@ export const schema = {
   refreshTokens,
   apiTokens,
   books,
+  bookShares,
   bookProgress,
   collections,
   collectionBooks,

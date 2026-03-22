@@ -7,7 +7,7 @@ import { getAuth, requireAuth } from "../auth/guards";
 import { idParams } from "../schemas";
 import { nowIso } from "../utils/time";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
-import { bookJoins, bookSelectFields, mapBookRow } from "./books";
+import { bookJoins, bookSelectFields, bookVisibleToUserWhere, mapBookRow } from "./books";
 
 const createCollectionSchema = z.object({
   name: z.string().min(1),
@@ -42,7 +42,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
     const rows = await db.all(sql`
       SELECT
         c.*,
-        COUNT(cb.book_id) AS book_count,
+        COUNT(b.id) AS book_count,
         COALESCE(
           SUM(
             CASE
@@ -54,7 +54,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         ) AS kobo_syncable_count
       FROM collections c
       LEFT JOIN collection_books cb ON cb.collection_id = c.id
-      LEFT JOIN books b ON b.id = cb.book_id
+      LEFT JOIN books b ON b.id = cb.book_id AND ${bookVisibleToUserWhere(userId)}
       WHERE c.user_id = ${userId}
       GROUP BY c.id
       ORDER BY c.updated_at DESC
@@ -77,7 +77,8 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
           0
         ) AS kobo_syncable_count
       FROM books b
-      WHERE NOT EXISTS (
+      WHERE ${bookVisibleToUserWhere(userId)}
+        AND NOT EXISTS (
         SELECT 1
         FROM collection_books cb
         INNER JOIN collections c ON c.id = cb.collection_id
@@ -214,6 +215,17 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: "Collection not found" });
       }
 
+      const visibleBook = await db.all<{ id: number }>(sql`
+        SELECT b.id
+        FROM books b
+        WHERE b.id = ${params.bookId}
+          AND ${bookVisibleToUserWhere(userId)}
+        LIMIT 1
+      `);
+      if (!visibleBook[0]) {
+        return reply.code(404).send({ error: "Book not found" });
+      }
+
       const maxSort = await db
         .select({ maxSort: sql<number>`COALESCE(MAX(${collectionBooks.sortOrder}), 0)` })
         .from(collectionBooks)
@@ -249,6 +261,16 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
           bookId: z.coerce.number().int().positive()
         })
         .parse(request.params);
+
+      const collectionExists = await db
+        .select({ id: collections.id })
+        .from(collections)
+        .where(and(eq(collections.id, params.id), eq(collections.userId, userId)))
+        .limit(1);
+
+      if (!collectionExists[0]) {
+        return reply.code(404).send({ error: "Collection not found" });
+      }
 
       await db
         .delete(collectionBooks)
@@ -317,7 +339,8 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         SELECT ${bookSelectFields(userId)}
         FROM books b
         ${bookJoins(userId)}
-        WHERE NOT EXISTS (
+        WHERE ${bookVisibleToUserWhere(userId)}
+          AND NOT EXISTS (
           SELECT 1
           FROM collection_books cb2
           INNER JOIN collections c2 ON c2.id = cb2.collection_id
@@ -343,7 +366,7 @@ export const collectionsRoutes: FastifyPluginAsync = async (fastify) => {
         SELECT ${bookSelectFields(userId)}, cb.sort_order
         FROM collection_books cb
         JOIN collections c ON c.id = cb.collection_id
-        JOIN books b ON b.id = cb.book_id
+        JOIN books b ON b.id = cb.book_id AND ${bookVisibleToUserWhere(userId)}
         ${bookJoins(userId)}
         WHERE c.user_id = ${userId} AND c.id = ${params.id}
         ORDER BY cb.sort_order ASC

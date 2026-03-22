@@ -67,6 +67,9 @@ export const mapBookRow = (row: any) => ({
   fileSize: row.file_size,
   koboSyncable: row.kobo_syncable,
   isFavorite: row.is_favorite === 1,
+  isShared: row.is_shared === 1,
+  shareCount: Number(row.share_count ?? 0),
+  sharedByUsername: row.shared_by_username ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   progress:
@@ -101,6 +104,18 @@ export const koboSyncableCase = (userId: number) => sql`
   END
 `;
 
+export const bookVisibleToUserWhere = (userId: number) => sql`
+  (
+    b.owner_user_id = ${userId}
+    OR EXISTS (
+      SELECT 1 FROM book_shares visible_bs
+      WHERE visible_bs.book_id = b.id
+        AND visible_bs.recipient_user_id = ${userId}
+        AND visible_bs.removed_at IS NULL
+    )
+  )
+`;
+
 export const bookSelectFields = (userId: number) => sql`
   b.id,
   b.owner_user_id,
@@ -119,13 +134,22 @@ export const bookSelectFields = (userId: number) => sql`
   bp.progress_percent,
   bp.position_ref,
   bp.updated_at AS progress_updated_at,
-  CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite
+  CASE WHEN fav_cb.book_id IS NULL THEN 0 ELSE 1 END AS is_favorite,
+  CASE WHEN b.owner_user_id = ${userId} THEN 0 ELSE 1 END AS is_shared,
+  (
+    SELECT COUNT(*)
+    FROM book_shares active_bs
+    WHERE active_bs.book_id = b.id
+      AND active_bs.removed_at IS NULL
+  ) AS share_count,
+  owner_u.username AS shared_by_username
 `;
 
 export const bookJoins = (userId: number) => sql`
   LEFT JOIN book_progress bp ON bp.book_id = b.id AND bp.user_id = ${userId}
   LEFT JOIN collections fav ON fav.user_id = ${userId} AND fav.slug = 'favorites'
   LEFT JOIN collection_books fav_cb ON fav_cb.collection_id = fav.id AND fav_cb.book_id = b.id
+  LEFT JOIN users owner_u ON owner_u.id = b.owner_user_id AND b.owner_user_id != ${userId}
 `;
 
 type BookMetadataRefreshTarget = {
@@ -226,13 +250,33 @@ const refreshBookMetadata = async (
   return { source: metadata.source, updated: changed };
 };
 
-const ensureBookExists = async (bookId: number): Promise<boolean> => {
-  const found = await db
-    .select({ id: books.id })
-    .from(books)
-    .where(eq(books.id, bookId))
-    .limit(1);
-  return Boolean(found[0]);
+const getVisibleBookRecord = async (
+  bookId: number,
+  userId: number
+): Promise<{
+  id: number;
+  owner_user_id: number;
+  cover_path: string | null;
+  file_path: string;
+} | null> => {
+  const rows = await db.all<{
+    id: number;
+    owner_user_id: number;
+    cover_path: string | null;
+    file_path: string;
+  }>(sql`
+    SELECT b.id, b.owner_user_id, b.cover_path, b.file_path
+    FROM books b
+    WHERE b.id = ${bookId}
+      AND ${bookVisibleToUserWhere(userId)}
+    LIMIT 1
+  `);
+
+  return rows[0] ?? null;
+};
+
+const ensureBookVisibleToUser = async (bookId: number, userId: number): Promise<boolean> => {
+  return Boolean(await getVisibleBookRecord(bookId, userId));
 };
 
 export const booksRoutes: FastifyPluginAsync = async (fastify) => {
@@ -256,6 +300,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
             JOIN book_search bs ON bs.rowid = b.id
             ${bookJoins(userId)}
             WHERE book_search MATCH ${query.q}
+              AND ${bookVisibleToUserWhere(userId)}
             ORDER BY b.updated_at DESC
             LIMIT ${query.limit} OFFSET ${query.offset}
           `
@@ -265,6 +310,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
             SELECT ${bookSelectFields(userId)}
             FROM books b
             ${bookJoins(userId)}
+            WHERE ${bookVisibleToUserWhere(userId)}
             ORDER BY b.updated_at DESC
             LIMIT ${query.limit} OFFSET ${query.offset}
           `
@@ -286,19 +332,22 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(401).send({ error: "Missing bearer token" });
     }
 
+    let payload: { userId: number };
     try {
-      verifyAccessToken(token);
+      payload = verifyAccessToken(token);
     } catch {
       return reply.code(401).send({ error: "Invalid token" });
     }
 
-    const found = await db
-      .select({ coverPath: books.coverPath })
-      .from(books)
-      .where(eq(books.id, params.id))
-      .limit(1);
+    const found = await db.all<{ cover_path: string | null }>(sql`
+      SELECT b.cover_path
+      FROM books b
+      WHERE b.id = ${params.id}
+        AND ${bookVisibleToUserWhere(payload.userId)}
+      LIMIT 1
+    `);
 
-    const resolved = resolveManagedCoverPath(found[0]?.coverPath);
+    const resolved = resolveManagedCoverPath(found[0]?.cover_path);
     if (!resolved || resolved.bookId !== params.id || !fs.existsSync(resolved.absolutePath)) {
       return reply.code(404).send({ error: "Cover not found" });
     }
@@ -326,6 +375,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           FROM books b
           ${bookJoins(userId)}
           WHERE b.id = ${params.id}
+            AND ${bookVisibleToUserWhere(userId)}
           LIMIT 1
         `
       );
@@ -345,14 +395,19 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
 
       const params = idParams.parse(request.params);
       const body = patchBookSchema.parse(request.body);
+      const updatesMetadata =
+        body.title !== undefined ||
+        body.author !== undefined ||
+        body.series !== undefined ||
+        body.description !== undefined ||
+        body.coverPath !== undefined;
 
-      const existing = await db
-        .select({ id: books.id, coverPath: books.coverPath })
-        .from(books)
-        .where(eq(books.id, params.id))
-        .limit(1);
+      const existing = await getVisibleBookRecord(params.id, userId);
 
-      if (!existing[0]) return reply.code(404).send({ error: "Book not found" });
+      if (!existing) return reply.code(404).send({ error: "Book not found" });
+      if (updatesMetadata && existing.owner_user_id !== userId) {
+        return reply.code(403).send({ error: "Only the owner can edit metadata" });
+      }
 
       const bookSet: Record<string, unknown> = {};
       if (body.title !== undefined) bookSet.title = body.title;
@@ -364,7 +419,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           bookSet.coverPath = await resolveStoredCoverPathForWrite({
             bookId: params.id,
             coverPath: body.coverPath,
-            currentStoredCoverPath: existing[0].coverPath
+            currentStoredCoverPath: existing.cover_path
           });
         } catch (error) {
           return reply.code(400).send({
@@ -377,14 +432,14 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
         const nextStoredCoverPath =
           body.coverPath !== undefined
             ? (bookSet.coverPath as string | null | undefined) ?? null
-            : existing[0].coverPath;
+            : existing.cover_path;
         bookSet.updatedAt = nowIso();
         await db.update(books).set(bookSet).where(eq(books.id, params.id));
 
-        if (body.coverPath !== undefined && existing[0].coverPath !== nextStoredCoverPath) {
+        if (body.coverPath !== undefined && existing.cover_path !== nextStoredCoverPath) {
           deleteManagedCoverIfPresent(
-            existing[0].coverPath && existing[0].coverPath !== nextStoredCoverPath
-              ? existing[0].coverPath
+            existing.cover_path && existing.cover_path !== nextStoredCoverPath
+              ? existing.cover_path
               : null
           );
         }
@@ -459,14 +514,10 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
 
       const params = idParams.parse(request.params);
 
-      const existing = await db
-        .select({ id: books.id, filePath: books.filePath, ownerUserId: books.ownerUserId })
-        .from(books)
-        .where(eq(books.id, params.id))
-        .limit(1);
+      const existing = await getVisibleBookRecord(params.id, userId);
 
-      if (!existing[0]) return reply.code(404).send({ error: "Book not found" });
-      if (existing[0].ownerUserId !== userId) {
+      if (!existing) return reply.code(404).send({ error: "Book not found" });
+      if (existing.owner_user_id !== userId) {
         return reply.code(403).send({ error: "Forbidden" });
       }
 
@@ -477,7 +528,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Delete file from disk (best effort)
       try {
-        const fullPath = path.resolve(config.booksDir, existing[0].filePath);
+        const fullPath = path.resolve(config.booksDir, existing.file_path);
         if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
       } catch {
         // ignore file deletion errors
@@ -495,7 +546,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       await ensureSystemCollectionsForUser(userId);
 
       const params = idParams.parse(request.params);
-      if (!(await ensureBookExists(params.id))) {
+      if (!(await ensureBookVisibleToUser(params.id, userId))) {
         return reply.code(404).send({ error: "Book not found" });
       }
 
@@ -533,7 +584,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       const params = idParams.parse(request.params);
       const body = updateBookCollectionsSchema.parse(request.body);
 
-      if (!(await ensureBookExists(params.id))) {
+      if (!(await ensureBookVisibleToUser(params.id, userId))) {
         return reply.code(404).send({ error: "Book not found" });
       }
 
@@ -618,7 +669,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       const params = idParams.parse(request.params);
       const body = favoriteSchema.parse(request.body);
 
-      if (!(await ensureBookExists(params.id))) {
+      if (!(await ensureBookVisibleToUser(params.id, userId))) {
         return reply.code(404).send({ error: "Book not found" });
       }
 
@@ -673,7 +724,8 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
           coverPath: books.coverPath,
           filePath: books.filePath
         })
-        .from(books);
+        .from(books)
+        .where(eq(books.ownerUserId, userId));
 
       let refreshed = 0;
       let updated = 0;
@@ -725,12 +777,13 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/books/:id/metadata/fetch",
     { preHandler: requireAuth },
     async (request, reply) => {
-      getAuth(request);
+      const { userId } = getAuth(request);
       const params = idParams.parse(request.params);
 
       const found = await db
         .select({
           id: books.id,
+          ownerUserId: books.ownerUserId,
           title: books.title,
           author: books.author,
           series: books.series,
@@ -743,6 +796,9 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
         .limit(1);
 
       if (!found[0]) return reply.code(404).send({ error: "Book not found" });
+      if (found[0].ownerUserId !== userId) {
+        return reply.code(403).send({ error: "Only the owner can refresh metadata" });
+      }
 
       try {
         const result = await refreshBookMetadata(found[0]);
@@ -770,22 +826,25 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
     "/api/v1/books/:id/download",
     { preHandler: requireAuth },
     async (request, reply) => {
+      const { userId } = getAuth(request);
       const params = idParams.parse(request.params);
-      const rows = await db
-        .select({ filePath: books.filePath, title: books.title, fileExt: books.fileExt })
-        .from(books)
-        .where(eq(books.id, params.id))
-        .limit(1);
+      const rows = await db.all<{ file_path: string; title: string; file_ext: string }>(sql`
+        SELECT b.file_path, b.title, b.file_ext
+        FROM books b
+        WHERE b.id = ${params.id}
+          AND ${bookVisibleToUserWhere(userId)}
+        LIMIT 1
+      `);
       const row = rows[0];
       if (!row) return reply.code(404).send({ error: "Book not found" });
 
-      const absolutePath = path.join(config.booksDir, row.filePath);
+      const absolutePath = path.join(config.booksDir, row.file_path);
       if (!fs.existsSync(absolutePath)) {
         return reply.code(404).send({ error: "File not found" });
       }
 
       const stats = fs.statSync(absolutePath);
-      applyDownloadHeaders(reply, `${row.title}.${row.fileExt}`, stats.size);
+      applyDownloadHeaders(reply, `${row.title}.${row.file_ext}`, stats.size);
       return reply.send(fs.createReadStream(absolutePath));
     }
   );

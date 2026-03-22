@@ -98,6 +98,99 @@ describe("auth", () => {
     });
   });
 
+  it("lists and revokes API docs tokens", async () => {
+    const tokens = await setupOwnerAndLogin(app);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/api-docs/token",
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`
+      },
+      payload: {
+        expiresInDays: 30,
+        label: "Agent"
+      }
+    });
+
+    expect(created.statusCode).toBe(200);
+    const apiToken = created.json<{
+      id: number;
+      token: string;
+      label: string | null;
+      revokedAt?: string | null;
+    }>();
+
+    const beforeRevoke = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${apiToken.token}`
+      }
+    });
+
+    expect(beforeRevoke.statusCode).toBe(200);
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/api-docs/tokens",
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`
+      }
+    });
+
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: apiToken.id,
+          label: "Agent",
+          revokedAt: null
+        })
+      ])
+    );
+
+    const revoked = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/admin/api-docs/tokens/${apiToken.id}`,
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`
+      }
+    });
+
+    expect(revoked.statusCode).toBe(200);
+    expect(revoked.json()).toEqual({ ok: true });
+
+    const afterRevoke = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: {
+        authorization: `Bearer ${apiToken.token}`
+      }
+    });
+
+    expect(afterRevoke.statusCode).toBe(401);
+
+    const listedAfterRevoke = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/api-docs/tokens",
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`
+      }
+    });
+
+    expect(listedAfterRevoke.statusCode).toBe(200);
+    expect(listedAfterRevoke.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: apiToken.id,
+          label: "Agent",
+          revokedAt: expect.any(String)
+        })
+      ])
+    );
+  });
+
   it("rejects API docs token generation for members", async () => {
     const ownerTokens = await setupOwnerAndLogin(app);
 

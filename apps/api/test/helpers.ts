@@ -51,3 +51,44 @@ export const setupOwnerAndLogin = async (
 
   return res.json() as AuthTokens;
 };
+
+export const createUserAndLogin = async (
+  app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>,
+  ownerAccessToken: string,
+  {
+    email,
+    username,
+    password = "secret123",
+    role = "MEMBER"
+  }: {
+    email: string;
+    username: string;
+    password?: string;
+    role?: "OWNER" | "MEMBER";
+  }
+): Promise<AuthTokens> => {
+  await app.inject({
+    method: "POST",
+    url: "/api/v1/users",
+    headers: {
+      authorization: `Bearer ${ownerAccessToken}`
+    },
+    payload: {
+      email,
+      username,
+      password,
+      role
+    }
+  });
+
+  const login = await app.inject({
+    method: "POST",
+    url: "/api/v1/auth/login",
+    payload: {
+      usernameOrEmail: username,
+      password
+    }
+  });
+
+  return login.json() as AuthTokens;
+};

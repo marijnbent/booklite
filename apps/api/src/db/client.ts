@@ -58,6 +58,19 @@ CREATE TABLE IF NOT EXISTS books (
   FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
 
+CREATE TABLE IF NOT EXISTS book_shares (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id INTEGER NOT NULL,
+  owner_user_id INTEGER NOT NULL,
+  recipient_user_id INTEGER NOT NULL,
+  shared_at TEXT NOT NULL,
+  removed_at TEXT,
+  FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+  FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE (book_id, recipient_user_id)
+);
+
 CREATE TABLE IF NOT EXISTS book_progress (
   user_id INTEGER NOT NULL,
   book_id INTEGER NOT NULL,
@@ -215,6 +228,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_user_slug
 ON collections(user_id, slug)
 WHERE slug IS NOT NULL;
 `);
+
+sqlite.exec(`
+CREATE INDEX IF NOT EXISTS idx_book_shares_recipient
+ON book_shares(recipient_user_id, removed_at, book_id);
+`);
+
+sqlite
+  .prepare(
+    `
+      INSERT OR IGNORE INTO book_shares (
+        book_id,
+        owner_user_id,
+        recipient_user_id,
+        shared_at,
+        removed_at
+      )
+      SELECT DISTINCT
+        cb.book_id,
+        b.owner_user_id,
+        c.user_id,
+        ?,
+        NULL
+      FROM collection_books cb
+      INNER JOIN collections c ON c.id = cb.collection_id
+      INNER JOIN books b ON b.id = cb.book_id
+      WHERE c.user_id != b.owner_user_id
+    `
+  )
+  .run(new Date().toISOString());
 
 sqlite.exec(`
 CREATE INDEX IF NOT EXISTS idx_admin_activity_log_created_at

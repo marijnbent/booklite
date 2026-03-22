@@ -12,7 +12,6 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type { ReadStatus } from "@booklite/shared";
-import { useNavigate } from "react-router-dom";
 import { apiFetch, apiFetchRaw } from "@/lib/api";
 import { isBrowserReadableBookExt } from "@/lib/bookFormats";
 import { toRenderableCoverSrc } from "@/lib/covers";
@@ -24,6 +23,7 @@ import { CoverOptionGrid } from "@/components/CoverOptionGrid";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -68,6 +68,7 @@ import {
   AlertCircle,
   ArrowDownAZ,
   Book,
+  BookMinus,
   BookMarked,
   BookOpen,
   Check,
@@ -90,6 +91,7 @@ import {
   Search,
   Star,
   Trash2,
+  Users,
   X,
   Minus,
 } from "lucide-react";
@@ -109,6 +111,9 @@ interface BookItem {
   fileSize: number;
   koboSyncable: number;
   isFavorite?: boolean;
+  isShared?: boolean;
+  shareCount?: number;
+  sharedByUsername?: string | null;
   createdAt: string;
   updatedAt: string;
   progress: {
@@ -142,6 +147,18 @@ interface MetadataPreview {
   coverOptions: MetadataCoverOption[];
 }
 
+interface SharePeer {
+  id: number;
+  username: string;
+}
+
+interface BookShare {
+  id: number;
+  recipientUserId: number;
+  username: string;
+  sharedAt: string;
+}
+
 interface PanelCoverOption extends MetadataCoverOption {
   label: string;
 }
@@ -151,6 +168,11 @@ type SortOption = "created" | "updated" | "title" | "author";
 type ViewMode = "grid" | "list";
 type DisplayStatus = Exclude<ReadStatus, "UNSET">;
 type StatusBadgeVariant = "secondary" | "info" | "success" | "warning" | "destructive" | "outline";
+
+type BookPages = {
+  pages: BookItem[][];
+  pageParams: unknown[];
+};
 
 const PAGE_SIZE = 50;
 const UNCOLLECTED_COLLECTION_ID = -1;
@@ -204,6 +226,99 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getUserInitials(username: string): string {
+  return username
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("")
+    .slice(0, 2) || "?";
+}
+
+function getShareBadgeData(
+  book: Pick<BookItem, "isShared" | "shareCount" | "sharedByUsername">
+): { label: string; title: string; truncate?: boolean } | null {
+  if (book.isShared && book.sharedByUsername) {
+    return {
+      label: book.sharedByUsername,
+      title: `Shared by ${book.sharedByUsername}`,
+      truncate: true,
+    };
+  }
+
+  const shareCount = book.shareCount ?? 0;
+  if (!book.isShared && shareCount > 0) {
+    return {
+      label: String(shareCount),
+      title: `Shared with ${shareCount} ${shareCount === 1 ? "person" : "people"}`,
+    };
+  }
+
+  return null;
+}
+
+const BookShareBadge: React.FC<{
+  book: Pick<BookItem, "isShared" | "shareCount" | "sharedByUsername">;
+  className?: string;
+}> = ({ book, className }) => {
+  const badge = getShareBadgeData(book);
+
+  if (!badge) return null;
+
+  return (
+    <Badge
+      variant="outline"
+      title={badge.title}
+      className={cn(
+        "gap-1 border-border/60 bg-background/85 px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur-sm",
+        className
+      )}
+    >
+      <Users className="size-2.5" />
+      <span className={badge.truncate ? "max-w-[84px] truncate" : "tabular-nums"}>{badge.label}</span>
+    </Badge>
+  );
+};
+
+function updateBookInData<T>(
+  data: T,
+  bookId: number,
+  updater: (book: BookItem) => BookItem
+): T {
+  if (!data) return data;
+
+  if (Array.isArray(data)) {
+    return data.map((item) =>
+      typeof item === "object" && item !== null && "id" in item && (item as BookItem).id === bookId
+        ? updater(item as BookItem)
+        : item
+    ) as T;
+  }
+
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "pages" in data &&
+    Array.isArray((data as unknown as BookPages).pages)
+  ) {
+    const pages = (data as unknown as BookPages).pages.map((page) =>
+      page.map((book) => (book.id === bookId ? updater(book) : book))
+    );
+    return { ...(data as unknown as BookPages), pages } as T;
+  }
+
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "id" in data &&
+    (data as unknown as BookItem).id === bookId
+  ) {
+    return updater(data as unknown as BookItem) as T;
+  }
+
+  return data;
 }
 
 function sortBooks(a: BookItem, b: BookItem, sort: SortOption): number {
@@ -635,6 +750,298 @@ const AddBooksDialog: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
+// Share book submenu
+// ---------------------------------------------------------------------------
+
+const ShareBookMenuSub: React.FC<{
+  book: BookItem;
+  onMenuAction: () => void;
+  onShareCountChange: (bookId: number, delta: number) => void;
+  MenuItem: React.FC<{
+    children?: React.ReactNode;
+    className?: string;
+    onSelect?: (event: Event) => void;
+  }>;
+  MenuSub: React.FC<{ children: React.ReactNode }>;
+  MenuSubTrigger: React.FC<{ children: React.ReactNode; className?: string }>;
+  MenuSubContent: React.FC<{ children: React.ReactNode; className?: string }>;
+}> = ({
+  book,
+  onMenuAction,
+  onShareCountChange,
+  MenuItem,
+  MenuSub,
+  MenuSubTrigger,
+  MenuSubContent,
+}) => {
+  const queryClient = useQueryClient();
+
+  const peersQuery = useQuery({
+    queryKey: ["users", "peers"],
+    queryFn: () => apiFetch<SharePeer[]>("/api/v1/users/peers"),
+    staleTime: 60_000,
+  });
+
+  const sharesQuery = useQuery({
+    queryKey: ["book-shares", book.id],
+    queryFn: () => apiFetch<BookShare[]>(`/api/v1/books/${book.id}/shares`),
+  });
+
+  const rows = useMemo(() => {
+    const activeShares = new Map((sharesQuery.data ?? []).map((share) => [share.recipientUserId, share]));
+
+    return (peersQuery.data ?? [])
+      .map((peer) => {
+        const activeShare = activeShares.get(peer.id);
+        return {
+          ...peer,
+          isShared: Boolean(activeShare),
+          shareId: activeShare?.id ?? null,
+        };
+      })
+      .sort((a, b) => {
+        if (a.isShared !== b.isShared) return a.isShared ? -1 : 1;
+        return a.username.localeCompare(b.username, undefined, { sensitivity: "base" });
+      });
+  }, [peersQuery.data, sharesQuery.data]);
+
+  const toggleShareMutation = useMutation({
+    mutationFn: async (peer: { id: number; username: string; isShared: boolean; shareId: number | null }) => {
+      if (peer.isShared && peer.shareId) {
+        await apiFetch(`/api/v1/books/${book.id}/shares/${peer.shareId}`, { method: "DELETE" });
+        return { action: "revoke" as const, peer };
+      }
+
+      const share = await apiFetch<BookShare>(`/api/v1/books/${book.id}/shares`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ recipientUserId: peer.id }),
+      });
+      return { action: "share" as const, peer, share };
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData<BookShare[]>(["book-shares", book.id], (current = []) => {
+        if (result.action === "revoke") {
+          return current.filter((share) => share.id !== result.peer.shareId);
+        }
+
+        const next = current.filter((share) => share.recipientUserId !== result.share.recipientUserId);
+        next.push(result.share);
+        return next.sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: "base" }));
+      });
+
+      onShareCountChange(book.id, result.action === "share" ? 1 : -1);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["book-shares", book.id] });
+    },
+  });
+
+  const handlePeerSelect = useCallback(
+    (peer: { id: number; username: string; isShared: boolean; shareId: number | null }) =>
+      (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onMenuAction();
+        toggleShareMutation.mutate(peer);
+      },
+    [onMenuAction, toggleShareMutation],
+  );
+
+  const pendingPeerId = toggleShareMutation.isPending ? toggleShareMutation.variables?.id ?? null : null;
+  const isLoading = peersQuery.isLoading || sharesQuery.isLoading;
+
+  return (
+    <MenuSub>
+      <MenuSubTrigger className="gap-2 text-xs">
+        <Users className="size-3.5" />
+        Share
+      </MenuSubTrigger>
+      <MenuSubContent className="w-56">
+        {isLoading && (
+          <MenuItem className="gap-2 text-xs opacity-70">
+            <Loader2 className="size-3.5 animate-spin" />
+            Loading people...
+          </MenuItem>
+        )}
+        {!isLoading && rows.length === 0 && (
+          <MenuItem className="gap-2 text-xs opacity-70">
+            <Users className="size-3.5" />
+            No users available
+          </MenuItem>
+        )}
+        {!isLoading &&
+          rows.map((peer) => {
+            const isPending = pendingPeerId === peer.id;
+
+            return (
+              <MenuItem
+                key={peer.id}
+                onSelect={handlePeerSelect(peer)}
+                className={cn("gap-2 text-xs", peer.isShared && "bg-accent")}
+              >
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-muted text-[10px] font-medium">
+                  {getUserInitials(peer.username)}
+                </span>
+                <span className="truncate">{peer.username}</span>
+                {isPending ? (
+                  <Loader2 className="ml-auto size-3 animate-spin" />
+                ) : peer.isShared ? (
+                  <Check className="ml-auto size-3 text-primary" />
+                ) : (
+                  <Plus className="ml-auto size-3 text-muted-foreground/50" />
+                )}
+              </MenuItem>
+            );
+          })}
+      </MenuSubContent>
+    </MenuSub>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Share selected books dialog
+// ---------------------------------------------------------------------------
+
+const ShareSelectedBooksDialog: React.FC<{
+  bookIds: number[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}> = ({ bookIds, open, onOpenChange }) => {
+  const [search, setSearch] = useState("");
+  const [sharedRecipientIds, setSharedRecipientIds] = useState<Set<number>>(new Set());
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setSharedRecipientIds(new Set());
+    }
+  }, [open]);
+
+  const peersQuery = useQuery({
+    queryKey: ["users", "peers"],
+    queryFn: () => apiFetch<SharePeer[]>("/api/v1/users/peers"),
+    enabled: open,
+  });
+
+  const shareMutation = useMutation({
+    mutationFn: async (recipientUserId: number) => {
+      await Promise.all(
+        bookIds.map((bookId) =>
+          apiFetch(`/api/v1/books/${bookId}/shares`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ recipientUserId }),
+          })
+        )
+      );
+      return recipientUserId;
+    },
+    onSuccess: (recipientUserId) => {
+      setSharedRecipientIds((prev) => new Set(prev).add(recipientUserId));
+      void queryClient.invalidateQueries({ queryKey: ["books"] });
+      void queryClient.invalidateQueries({ queryKey: ["collection-books"] });
+    },
+  });
+
+  const rows = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return (peersQuery.data ?? []).filter((peer) =>
+      normalizedSearch.length === 0 ? true : peer.username.toLowerCase().includes(normalizedSearch)
+    );
+  }, [peersQuery.data, search]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg rounded-xl">
+        <DialogHeader>
+          <DialogTitle>Share {bookIds.length} {bookIds.length === 1 ? "book" : "books"}</DialogTitle>
+          <DialogDescription>Choose who should get this selection in their library.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search users..."
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+
+          <div className="max-h-[360px] overflow-y-auto rounded-lg border border-border/60">
+            {peersQuery.isLoading && (
+              <div className="flex items-center justify-center gap-2 px-4 py-10 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Loading people...
+              </div>
+            )}
+
+            {!peersQuery.isLoading && rows.length === 0 && (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                {search ? "No matching users found." : "No other users are available right now."}
+              </div>
+            )}
+
+            {!peersQuery.isLoading && rows.length > 0 && (
+              <div className="divide-y divide-border/60">
+                {rows.map((peer) => {
+                  const isSharing =
+                    shareMutation.isPending && shareMutation.variables === peer.id;
+                  const alreadyShared = sharedRecipientIds.has(peer.id);
+
+                  return (
+                    <div key={peer.id} className="flex items-center gap-3 px-4 py-3">
+                      <Avatar className="size-8">
+                        <AvatarFallback className="text-xs">
+                          {getUserInitials(peer.username)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{peer.username}</p>
+                      </div>
+                      {alreadyShared ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-secondary px-2 py-1 text-[11px] font-medium text-secondary-foreground">
+                          <Check className="size-3" />
+                          Shared
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="gap-1.5"
+                          disabled={isSharing}
+                          onClick={() => shareMutation.mutate(peer.id)}
+                        >
+                          {isSharing ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Users className="size-3.5" />
+                          )}
+                          Share
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Shared context menu items for books
 // ---------------------------------------------------------------------------
 
@@ -647,6 +1054,8 @@ const BookMenuItems: React.FC<{
   onStatusChange: (id: number, status: string) => void;
   onRefreshMetadata: (id: number) => void;
   onDownload: (id: number) => void;
+  onShareCountChange: (bookId: number, delta: number) => void;
+  onRemoveShare: (id: number) => void;
   onAddToCollection: (bookId: number, collectionId: number) => void;
   onRemoveFromCollection: (bookId: number, collectionId: number) => void;
   onDelete: (id: number) => void;
@@ -670,6 +1079,8 @@ const BookMenuItems: React.FC<{
   onStatusChange,
   onRefreshMetadata,
   onDownload,
+  onShareCountChange,
+  onRemoveShare,
   onAddToCollection,
   onRemoveFromCollection,
   onDelete,
@@ -733,7 +1144,7 @@ const BookMenuItems: React.FC<{
           </MenuSub>
           {canRemoveFromActiveCollection && (
             <MenuItem
-              onSelect={runMenuAction(() => onRemoveFromCollection(book.id, activeCollectionId))}
+              onSelect={runMenuAction(() => onRemoveFromCollection(book.id, activeCollectionId!))}
               className="gap-2 text-xs text-destructive focus:text-destructive"
             >
               <X className="size-3.5" />
@@ -778,10 +1189,31 @@ const BookMenuItems: React.FC<{
 
       <MenuSeparator />
 
-      <MenuItem onSelect={runMenuAction(() => onRefreshMetadata(book.id))} className="gap-2 text-xs">
-        <RefreshCw className="size-3.5" />
-        Refresh metadata
-      </MenuItem>
+      {!book.isShared ? (
+        <ShareBookMenuSub
+          book={book}
+          onMenuAction={onMenuAction}
+          onShareCountChange={onShareCountChange}
+          MenuItem={MenuItem}
+          MenuSub={MenuSub}
+          MenuSubTrigger={MenuSubTrigger}
+          MenuSubContent={MenuSubContent}
+        />
+      ) : (
+        <MenuItem
+          onSelect={runMenuAction(() => onRemoveShare(book.id))}
+          className="gap-2 text-xs text-muted-foreground focus:text-foreground"
+        >
+          <BookMinus className="size-3.5" />
+          Hide from library
+        </MenuItem>
+      )}
+      {!book.isShared && (
+        <MenuItem onSelect={runMenuAction(() => onRefreshMetadata(book.id))} className="gap-2 text-xs">
+          <RefreshCw className="size-3.5" />
+          Refresh metadata
+        </MenuItem>
+      )}
       <MenuItem onSelect={runMenuAction(() => onDownload(book.id))} className="gap-2 text-xs">
         <Download className="size-3.5" />
         Download
@@ -791,17 +1223,21 @@ const BookMenuItems: React.FC<{
         <CheckSquare className="size-3.5" />
         Select
       </MenuItem>
-      <MenuSeparator />
-      <MenuItem
-        onSelect={runMenuAction(() => {
-          if (window.confirm(`Delete "${book.title}"? This cannot be undone.`))
-            onDelete(book.id);
-        })}
-        className="gap-2 text-xs text-destructive focus:text-destructive"
-      >
-        <Trash2 className="size-3.5" />
-        Delete
-      </MenuItem>
+      {!book.isShared && (
+        <>
+          <MenuSeparator />
+          <MenuItem
+            onSelect={runMenuAction(() => {
+              if (window.confirm(`Delete "${book.title}"? This cannot be undone.`))
+                onDelete(book.id);
+            })}
+            className="gap-2 text-xs text-destructive focus:text-destructive"
+          >
+            <Trash2 className="size-3.5" />
+            Delete
+          </MenuItem>
+        </>
+      )}
     </>
   );
 };
@@ -811,7 +1247,6 @@ const BookMenuItems: React.FC<{
 // ---------------------------------------------------------------------------
 
 export const LibraryPage: React.FC = () => {
-  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -830,6 +1265,7 @@ export const LibraryPage: React.FC = () => {
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [addBooksDialogOpen, setAddBooksDialogOpen] = useState(false);
+  const [sharingSelectionOpen, setSharingSelectionOpen] = useState(false);
 
   // Multi-select state
   const [selectedBookIds, setSelectedBookIds] = useState<Set<number>>(new Set());
@@ -845,6 +1281,10 @@ export const LibraryPage: React.FC = () => {
     const timer = setTimeout(() => setDebouncedQuery(searchInput), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => {
+    if (!selectionActive) setSharingSelectionOpen(false);
+  }, [selectionActive]);
 
   // Clear selection when filters change
   useEffect(() => {
@@ -994,6 +1434,15 @@ export const LibraryPage: React.FC = () => {
     return [...result].sort((a, b) => sortBooks(a, b, sort));
   }, [allBooks, statusFilter, sort]);
 
+  const selectedBooks = useMemo(
+    () => filteredAndSorted.filter((book) => selectedBookIds.has(book.id)),
+    [filteredAndSorted, selectedBookIds],
+  );
+  const selectedOwnedBooks = useMemo(
+    () => selectedBooks.filter((book) => !book.isShared),
+    [selectedBooks],
+  );
+
   // Detail panel queries
   const selectedBook = useQuery({
     queryKey: ["books", "detail", selectedBookId],
@@ -1092,6 +1541,41 @@ export const LibraryPage: React.FC = () => {
     void queryClient.invalidateQueries({ queryKey: ["collection-books"] });
   }, [queryClient]);
 
+  const patchVisibleBook = useCallback(
+    (bookId: number, updater: (book: BookItem) => BookItem) => {
+      queryClient.setQueryData(["books", debouncedQuery], (current: BookPages | undefined) =>
+        updateBookInData(current, bookId, updater)
+      );
+
+      if (selectedCollectionId === UNCOLLECTED_COLLECTION_ID) {
+        queryClient.setQueryData(["collection-books", "uncollected"], (current: BookItem[] | undefined) =>
+          updateBookInData(current, bookId, updater)
+        );
+      } else if (selectedCollectionId !== null) {
+        queryClient.setQueryData(["collection-books", selectedCollectionId], (current: BookItem[] | undefined) =>
+          updateBookInData(current, bookId, updater)
+        );
+      }
+
+      queryClient.setQueryData(["books", "detail", bookId], (current: BookItem | undefined) =>
+        updateBookInData(current, bookId, updater)
+      );
+    },
+    [debouncedQuery, queryClient, selectedCollectionId],
+  );
+
+  const handleShareCountChange = useCallback(
+    (bookId: number, delta: number) => {
+      patchVisibleBook(bookId, (book) => ({
+        ...book,
+        shareCount: Math.max(0, (book.shareCount ?? 0) + delta),
+      }));
+      invalidateAll();
+      void queryClient.invalidateQueries({ queryKey: ["books", "detail", bookId] });
+    },
+    [invalidateAll, patchVisibleBook, queryClient],
+  );
+
   const changeStatus = useCallback(
     async (bookId: number, status: string) => {
       await apiFetch(`/api/v1/books/${bookId}`, {
@@ -1128,9 +1612,25 @@ export const LibraryPage: React.FC = () => {
         setEditMode(false);
         setCoverOptionsRequested(false);
       }
+      if (selectedBookIds.has(bookId)) setSharingSelectionOpen(false);
       invalidateAll();
     },
-    [invalidateAll, selectedBookId],
+    [invalidateAll, selectedBookId, selectedBookIds],
+  );
+
+  const removeSharedBook = useCallback(
+    async (bookId: number) => {
+      await apiFetch(`/api/v1/books/${bookId}/share`, { method: "DELETE" });
+      if (selectedBookId === bookId) {
+        setSelectedBookId(null);
+        setEditMode(false);
+        setCoverOptionsRequested(false);
+      }
+      if (selectedBookIds.has(bookId)) setSharingSelectionOpen(false);
+      invalidateAll();
+      void queryClient.invalidateQueries({ queryKey: ["books", "detail", bookId] });
+    },
+    [invalidateAll, queryClient, selectedBookId, selectedBookIds],
   );
 
   const toggleFavorite = useCallback(
@@ -1299,6 +1799,8 @@ export const LibraryPage: React.FC = () => {
       onStatusChange: (id: number, status: string) => void changeStatus(id, status),
       onRefreshMetadata: (id: number) => void refreshMetadata(id),
       onDownload: (id: number) => void handleDownload(id),
+      onShareCountChange: handleShareCountChange,
+      onRemoveShare: (id: number) => void removeSharedBook(id),
       onAddToCollection: (bookId: number, collectionId: number) => void addToCollection(bookId, collectionId),
       onRemoveFromCollection: (bookId: number, collectionId: number) => void removeFromCollection(bookId, collectionId),
       onDelete: (id: number) => void deleteBook(id),
@@ -1306,7 +1808,7 @@ export const LibraryPage: React.FC = () => {
       onBookClick: handleBookClick,
       onToggleSelect: handleToggleSelect,
     }),
-    [collections, selectedCollectionId, toggleFavorite, changeStatus, refreshMetadata, handleDownload, addToCollection, removeFromCollection, deleteBook, suppressBookClickOnce, handleBookClick, handleToggleSelect],
+    [collections, selectedCollectionId, toggleFavorite, changeStatus, refreshMetadata, handleDownload, handleShareCountChange, removeSharedBook, addToCollection, removeFromCollection, deleteBook, suppressBookClickOnce, handleBookClick, handleToggleSelect],
   );
 
   return (
@@ -1636,6 +2138,7 @@ export const LibraryPage: React.FC = () => {
       {selectionActive && (
         <SelectionToolbar
           selectedCount={selectedBookIds.size}
+          selectedBooks={selectedBooks}
           collections={collections}
           onAddToCollection={async (collectionId) => {
             await Promise.all([...selectedBookIds].map((id) => addToCollection(id, collectionId)));
@@ -1645,8 +2148,9 @@ export const LibraryPage: React.FC = () => {
             await Promise.all([...selectedBookIds].map((id) => changeStatus(id, status)));
             setSelectedBookIds(new Set());
           }}
+          onShare={() => setSharingSelectionOpen(true)}
           onRefreshMetadata={async () => {
-            await Promise.all([...selectedBookIds].map((id) => refreshMetadata(id)));
+            await Promise.all(selectedOwnedBooks.map((book) => refreshMetadata(book.id)));
             setSelectedBookIds(new Set());
           }}
           onDownload={async () => {
@@ -1654,9 +2158,9 @@ export const LibraryPage: React.FC = () => {
             setSelectedBookIds(new Set());
           }}
           onDelete={async () => {
-            const count = selectedBookIds.size;
+            const count = selectedOwnedBooks.length;
             if (!window.confirm(`Delete ${count} book${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
-            await Promise.all([...selectedBookIds].map((id) => deleteBook(id)));
+            await Promise.all(selectedOwnedBooks.map((book) => deleteBook(book.id)));
             setSelectedBookIds(new Set());
             setSelectionMode(false);
           }}
@@ -1715,39 +2219,57 @@ export const LibraryPage: React.FC = () => {
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => void refreshMetadata(panelBook.id)}>
-                        <RefreshCw className="mr-2 size-3.5" />
-                        Refresh metadata
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          if (!coverOptionsRequested) {
-                            setCoverOptionsRequested(true);
-                            setShowPanelCoverImage(true);
-                          } else {
-                            setCoverOptionsRequested(false);
-                          }
-                        }}
-                      >
-                        <ImageIcon className="mr-2 size-3.5" />
-                        Change cover
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setEditMode(!editMode)}>
-                        <Pencil className="mr-2 size-3.5" />
-                        Edit metadata
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          if (window.confirm(`Delete "${panelBook.title}"? This cannot be undone.`)) {
-                            void deleteBook(panelBook.id);
-                          }
-                        }}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="mr-2 size-3.5" />
-                        Delete
-                      </DropdownMenuItem>
+                      {!panelBook.isShared ? (
+                        <>
+                          <ShareBookMenuSub
+                            book={panelBook}
+                            onMenuAction={suppressBookClickOnce}
+                            onShareCountChange={handleShareCountChange}
+                            MenuItem={DropdownMenuItem as any}
+                            MenuSub={DropdownMenuSub as any}
+                            MenuSubTrigger={DropdownMenuSubTrigger as any}
+                            MenuSubContent={DropdownMenuSubContent as any}
+                          />
+                          <DropdownMenuItem onSelect={() => void refreshMetadata(panelBook.id)}>
+                            <RefreshCw className="mr-2 size-3.5" />
+                            Refresh metadata
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              if (!coverOptionsRequested) {
+                                setCoverOptionsRequested(true);
+                                setShowPanelCoverImage(true);
+                              } else {
+                                setCoverOptionsRequested(false);
+                              }
+                            }}
+                          >
+                            <ImageIcon className="mr-2 size-3.5" />
+                            Change cover
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setEditMode(!editMode)}>
+                            <Pencil className="mr-2 size-3.5" />
+                            Edit metadata
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              if (window.confirm(`Delete "${panelBook.title}"? This cannot be undone.`)) {
+                                void deleteBook(panelBook.id);
+                              }
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 size-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <DropdownMenuItem onSelect={() => void removeSharedBook(panelBook.id)}>
+                          <BookMinus className="mr-2 size-3.5" />
+                          Hide from library
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -1822,6 +2344,12 @@ export const LibraryPage: React.FC = () => {
                     <h2 className="text-base font-semibold leading-snug">{panelBook.title}</h2>
                     {panelBook.author && (
                       <p className="text-sm text-muted-foreground">{panelBook.author}</p>
+                    )}
+                    {panelBook.isShared && panelBook.sharedByUsername && (
+                      <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                        <Users className="size-3" />
+                        Shared by {panelBook.sharedByUsername}
+                      </p>
                     )}
                     {panelBook.series && (
                       <p className="text-xs text-muted-foreground/70">{panelBook.series}</p>
@@ -1990,6 +2518,11 @@ export const LibraryPage: React.FC = () => {
           onOpenChange={setAddBooksDialogOpen}
         />
       )}
+      <ShareSelectedBooksDialog
+        bookIds={selectedOwnedBooks.map((book) => book.id)}
+        open={sharingSelectionOpen}
+        onOpenChange={setSharingSelectionOpen}
+      />
     </div>
   );
 };
@@ -2000,15 +2533,18 @@ export const LibraryPage: React.FC = () => {
 
 const SelectionToolbar: React.FC<{
   selectedCount: number;
+  selectedBooks: BookItem[];
   collections: CollectionItem[];
   onAddToCollection: (collectionId: number) => void;
   onSetStatus: (status: string) => void;
+  onShare: () => void;
   onRefreshMetadata: () => void;
   onDownload: () => void;
   onDelete: () => void;
   onClear: () => void;
-}> = ({ selectedCount, collections, onAddToCollection, onSetStatus, onRefreshMetadata, onDownload, onDelete, onClear }) => {
+}> = ({ selectedCount, selectedBooks, collections, onAddToCollection, onSetStatus, onShare, onRefreshMetadata, onDownload, onDelete, onClear }) => {
   const assignableCollections = collections.filter((c) => !isVirtualCollection(c));
+  const allOwned = selectedBooks.length > 0 && selectedBooks.every((book) => !book.isShared);
 
   return (
     <div className="fixed bottom-6 left-1/2 z-50 flex items-center gap-1 rounded-xl border border-border/60 bg-background/95 backdrop-blur-md shadow-xl shadow-black/[0.08] px-3 py-2 animate-slide-up">
@@ -2058,21 +2594,30 @@ const SelectionToolbar: React.FC<{
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button variant="ghost" size="icon" className="size-8" title="Refresh metadata" onClick={onRefreshMetadata}>
-        <RefreshCw className="size-4" />
-      </Button>
+      {allOwned && (
+        <Button variant="ghost" size="icon" className="size-8" title="Share selected" onClick={onShare}>
+          <Users className="size-4" />
+        </Button>
+      )}
+      {allOwned && (
+        <Button variant="ghost" size="icon" className="size-8" title="Refresh metadata" onClick={onRefreshMetadata}>
+          <RefreshCw className="size-4" />
+        </Button>
+      )}
       <Button variant="ghost" size="icon" className="size-8" title="Download" onClick={onDownload}>
         <Download className="size-4" />
       </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-        title="Delete"
-        onClick={onDelete}
-      >
-        <Trash2 className="size-4" />
-      </Button>
+      {allOwned && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+          title="Delete"
+          onClick={onDelete}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      )}
 
       <div className="h-5 w-px bg-border/60 mx-0.5" />
       <Button variant="ghost" size="icon" className="size-7" onClick={onClear}>
@@ -2094,6 +2639,8 @@ type BookMenuProps = {
   onStatusChange: (id: number, status: string) => void;
   onRefreshMetadata: (id: number) => void;
   onDownload: (id: number) => void;
+  onShareCountChange: (bookId: number, delta: number) => void;
+  onRemoveShare: (id: number) => void;
   onAddToCollection: (bookId: number, collectionId: number) => void;
   onRemoveFromCollection: (bookId: number, collectionId: number) => void;
   onDelete: (id: number) => void;
@@ -2112,6 +2659,7 @@ const GridCard: React.FC<{
   const statusBucket = getStatusFilterBucket(book.progress?.status);
   const config = statusConfig[status];
   const percent = book.progress?.progressPercent ?? 0;
+  const shareBadge = getShareBadgeData(book);
 
   return (
     <ContextMenu>
@@ -2123,11 +2671,14 @@ const GridCard: React.FC<{
           )}>
             <BookCover book={book} className="h-full w-full" />
 
+            {shareBadge && <BookShareBadge book={book} className="absolute left-1.5 top-1.5 text-[9px]" />}
+
             {/* Selection checkbox / Favorite */}
             {selectionActive ? (
               <button
                 className={cn(
-                  "absolute top-1.5 left-1.5 flex items-center justify-center size-6 rounded-full border-2 transition-all",
+                  "absolute left-1.5 flex size-6 items-center justify-center rounded-full border-2 transition-all",
+                  shareBadge ? "top-8" : "top-1.5",
                   isSelected
                     ? "bg-primary border-primary"
                     : "bg-black/25 border-white/60 backdrop-blur-sm",
@@ -2139,7 +2690,8 @@ const GridCard: React.FC<{
             ) : (
               <button
                 className={cn(
-                  "absolute top-1.5 left-1.5 flex items-center justify-center size-6 rounded transition-all",
+                  "absolute left-1.5 flex size-6 items-center justify-center rounded transition-all",
+                  shareBadge ? "top-8" : "top-1.5",
                   book.isFavorite
                     ? "bg-yellow-400/20 backdrop-blur-sm"
                     : "bg-black/25 backdrop-blur-sm opacity-0 group-hover:opacity-100",
@@ -2237,6 +2789,7 @@ const ListRow: React.FC<{
   const statusBucket = getStatusFilterBucket(book.progress?.status);
   const config = statusConfig[status];
   const percent = book.progress?.progressPercent ?? 0;
+  const shareBadge = getShareBadgeData(book);
 
   return (
     <ContextMenu>
@@ -2268,10 +2821,11 @@ const ListRow: React.FC<{
 
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium truncate group-hover:text-primary transition-colors">{book.title}</h3>
-              <p className="text-xs text-muted-foreground/60 truncate mt-0.5">
-                {book.author ?? "Unknown author"}
-                {book.series && <span className="text-muted-foreground/35"> &middot; {book.series}</span>}
-              </p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground/60">
+                <span className="truncate">{book.author ?? "Unknown author"}</span>
+                {book.series && <span className="truncate text-muted-foreground/35">&middot; {book.series}</span>}
+                {shareBadge && <BookShareBadge book={book} className="h-4 px-1.5" />}
+              </div>
               {statusBucket === "READING" && percent > 0 && (
                 <div className="mt-1 flex items-center gap-2">
                   <div className="h-1 flex-1 max-w-20 rounded-full bg-muted/60 overflow-hidden">
