@@ -20,7 +20,23 @@ import {
   type ReaderRendition,
 } from "@/lib/epub";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
+import {
+  type FontSizeOption,
+  type FontFamilyOption,
+  type ThemeOption,
+  type ReaderSettings,
+  fontSizeValues,
+  fontSizeMap,
+  fontSizeLabelMap,
+  fontFamilyMap,
+  getDefaultReaderTheme,
+  hasStoredManualThemePreference,
+  themeStyles,
+  readStoredSettings,
+  writeStoredSettings,
+} from "@/components/reader/readerSettings";
 
 interface ReaderBookItem {
   id: number;
@@ -34,63 +50,7 @@ interface ReaderBookItem {
 }
 
 const SAVE_DEBOUNCE_MS = 1500;
-const READER_SETTINGS_KEY = "booklite_reader_settings_v2";
 const MIN_SPREAD_WIDTH = 950;
-
-type FontSizeOption = "small" | "medium" | "large" | "xlarge" | "xxlarge";
-type FontFamilyOption = "publisher" | "serif" | "sans";
-type ThemeOption = "paper" | "sepia" | "night";
-
-type ReaderSettings = {
-  fontSize: FontSizeOption;
-  fontFamily: FontFamilyOption;
-  theme: ThemeOption;
-};
-
-const defaultReaderSettings: ReaderSettings = {
-  fontSize: "medium",
-  fontFamily: "serif",
-  theme: "paper",
-};
-
-const fontSizeValues: FontSizeOption[] = ["small", "medium", "large", "xlarge", "xxlarge"];
-const fontSizeMap: Record<FontSizeOption, string> = {
-  small: "90%",
-  medium: "100%",
-  large: "110%",
-  xlarge: "125%",
-  xxlarge: "150%",
-};
-
-const fontSizeLabelMap: Record<FontSizeOption, string> = {
-  small: "0.9",
-  medium: "1.0",
-  large: "1.1",
-  xlarge: "1.25",
-  xxlarge: "1.5",
-};
-
-const fontFamilyMap: Record<FontFamilyOption, string | null> = {
-  publisher: null,
-  serif: `Georgia, "Iowan Old Style", "Palatino Linotype", serif`,
-  sans: `"Helvetica Neue", Arial, sans-serif`,
-};
-
-const themeStyles: Record<ThemeOption, { bg: string; text: string; surface: string }> = {
-  paper: { bg: "bg-[#fffaf0]", text: "text-[#1f2937]", surface: "#fffaf0" },
-  sepia: { bg: "bg-[#f3e6cd]", text: "text-[#433422]", surface: "#f3e6cd" },
-  night: { bg: "bg-[#171923]", text: "text-[#e5e7eb]", surface: "#171923" },
-};
-
-const readStoredSettings = (): ReaderSettings => {
-  try {
-    const raw = localStorage.getItem(READER_SETTINGS_KEY);
-    if (!raw) return defaultReaderSettings;
-    return { ...defaultReaderSettings, ...(JSON.parse(raw) as Partial<ReaderSettings>) };
-  } catch {
-    return defaultReaderSettings;
-  }
-};
 
 const clampPercent = (value: number): number =>
   Math.max(0, Math.min(100, Math.round(value)));
@@ -117,6 +77,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 };
 
 export const ReaderPage: React.FC = () => {
+  const { resolved: appTheme } = useTheme();
   const params = useParams<{ bookId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -140,8 +101,10 @@ export const ReaderPage: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [pageNumber, setPageNumber] = useState<number | null>(null);
   const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [settings, setSettings] = useState<ReaderSettings>(defaultReaderSettings);
-  const [settingsReady, setSettingsReady] = useState(false);
+  const [settings, setSettings] = useState<ReaderSettings>(() => readStoredSettings(appTheme));
+  const [hasManualThemePreference, setHasManualThemePreference] = useState(() =>
+    hasStoredManualThemePreference(appTheme)
+  );
 
   // Touch/swipe state
   const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -163,14 +126,21 @@ export const ReaderPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setSettings(readStoredSettings());
-    setSettingsReady(true);
-  }, []);
+    setSettings(readStoredSettings(appTheme));
+    setHasManualThemePreference(hasStoredManualThemePreference(appTheme));
+  }, [appTheme]);
 
   useEffect(() => {
-    if (!settingsReady) return;
-    localStorage.setItem(READER_SETTINGS_KEY, JSON.stringify(settings));
-  }, [settings, settingsReady]);
+    writeStoredSettings(settings, { persistTheme: hasManualThemePreference });
+  }, [hasManualThemePreference, settings]);
+
+  useEffect(() => {
+    if (hasManualThemePreference) return;
+    const defaultTheme = getDefaultReaderTheme(appTheme);
+    setSettings((current) =>
+      current.theme === defaultTheme ? current : { ...current, theme: defaultTheme }
+    );
+  }, [appTheme, hasManualThemePreference]);
 
   useEffect(() => {
     const savedPercent = clampPercent(bookQuery.data?.progress?.progressPercent ?? 0);
@@ -483,13 +453,16 @@ export const ReaderPage: React.FC = () => {
     navigate("/library");
   }, [flushProgress, invalidateLibraryQueries, navigate]);
 
+  const applyThemeSelection = useCallback((nextTheme: ThemeOption) => {
+    setHasManualThemePreference(nextTheme !== getDefaultReaderTheme(appTheme));
+    setSettings((current) => (current.theme === nextTheme ? current : { ...current, theme: nextTheme }));
+  }, [appTheme]);
+
   const cycleTheme = useCallback(() => {
     const order: ThemeOption[] = ["paper", "sepia", "night"];
-    setSettings((s) => {
-      const idx = order.indexOf(s.theme);
-      return { ...s, theme: order[(idx + 1) % order.length] };
-    });
-  }, []);
+    const idx = order.indexOf(settings.theme);
+    applyThemeSelection(order[(idx + 1) % order.length]);
+  }, [applyThemeSelection, settings.theme]);
 
   const cycleFont = useCallback(() => {
     const order: FontFamilyOption[] = ["serif", "sans", "publisher"];
@@ -714,7 +687,11 @@ export const ReaderPage: React.FC = () => {
                 size="sm"
                 className={cn(
                   "flex-1 h-9",
-                  settings.theme === "night" && "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                  settings.theme === "night"
+                    ? "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                    : settings.theme === "sepia"
+                      ? "border-[#cfbe9d] bg-[#e8dbc2] text-[#433422] hover:bg-[#e1d2b6]"
+                      : "border-black/10 bg-black/5 text-black/70 hover:bg-black/10"
                 )}
                 onClick={() => void renditionRef.current?.prev()}
                 disabled={!canGoPrev}
@@ -727,7 +704,11 @@ export const ReaderPage: React.FC = () => {
                 size="sm"
                 className={cn(
                   "flex-1 h-9",
-                  settings.theme === "night" && "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                  settings.theme === "night"
+                    ? "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                    : settings.theme === "sepia"
+                      ? "border-[#cfbe9d] bg-[#e8dbc2] text-[#433422] hover:bg-[#e1d2b6]"
+                      : "border-black/10 bg-black/5 text-black/70 hover:bg-black/10"
                 )}
                 onClick={() => void renditionRef.current?.next()}
                 disabled={!canGoNext}
@@ -825,13 +806,13 @@ export const ReaderPage: React.FC = () => {
                           t === "paper" && "bg-[#fffaf0]",
                           t === "sepia" && "bg-[#f3e6cd]",
                           t === "night" && "bg-[#171923]",
-                          settings.theme === t
+                        settings.theme === t
                             ? "border-primary scale-110"
                             : settings.theme === "night"
                               ? "border-white/20"
                               : "border-black/10"
                         )}
-                        onClick={() => setSettings((s) => ({ ...s, theme: t }))}
+                        onClick={() => applyThemeSelection(t)}
                         title={t}
                       />
                     ))}
