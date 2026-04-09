@@ -209,6 +209,8 @@ const sortDrafts = (drafts: UploadDraft[]): UploadDraft[] => {
   });
 };
 
+let draftId = 0;
+
 export const UploadsPage: React.FC = () => {
   const [drafts, setDrafts] = useState<UploadDraft[]>([]);
   const [jobs, setJobs] = useState<UploadJob[]>([]);
@@ -414,7 +416,7 @@ export const UploadsPage: React.FC = () => {
       if (!isUploadableBookName(file.name)) return;
       const fileNameTitle = toInitialBookTitle(file.name);
       next.push({
-        id: crypto.randomUUID(),
+        id: `draft-${draftId++}`,
         file,
         fileNameTitle,
         title: fileNameTitle,
