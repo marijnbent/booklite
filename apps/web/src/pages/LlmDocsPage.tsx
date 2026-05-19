@@ -92,6 +92,54 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    title: "Admin",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/v1/users",
+        description: "List all user accounts.",
+        curl: (base, token) =>
+          `curl -s "${base}/api/v1/users" \\\n  -H "Authorization: Bearer ${token}"`,
+      },
+      {
+        method: "POST",
+        path: "/api/v1/admin/users/:id/impersonate",
+        description: "Create a member session for user-specific support checks.",
+        curl: (base, token) =>
+          `curl -s -X POST "${base}/api/v1/admin/users/42/impersonate" \\\n  -H "Authorization: Bearer ${token}"`,
+      },
+    ],
+  },
+  {
+    title: "Diagnostics",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/v1/admin/diagnostics",
+        description: "Get settings status, per-user summaries, and recent activity.",
+        params: "scope (metadata | upload | kobo | auth), level (ERROR | WARN | INFO), limit (default 100, max 250)",
+        curl: (base, token) =>
+          `curl -s "${base}/api/v1/admin/diagnostics?limit=100" \\\n  -H "Authorization: Bearer ${token}"`,
+      },
+      {
+        method: "GET",
+        path: "/api/v1/admin/activity-log",
+        description: "List recent operational log entries.",
+        params: "scope (metadata | upload | kobo | auth), level (ERROR | WARN | INFO), limit (default 100, max 250)",
+        curl: (base, token) =>
+          `curl -s "${base}/api/v1/admin/activity-log?scope=kobo&level=INFO&limit=100" \\\n  -H "Authorization: Bearer ${token}"`,
+      },
+      {
+        method: "PATCH",
+        path: "/api/v1/app-settings",
+        description: "Update diagnostics-related app settings.",
+        body: `{ "koboDebugLogging": true }`,
+        curl: (base, token) =>
+          `curl -s -X PATCH "${base}/api/v1/app-settings" \\\n  -H "Authorization: Bearer ${token}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"koboDebugLogging":true}'`,
+      },
+    ],
+  },
+  {
     title: "Metadata",
     endpoints: [
       {

@@ -17,6 +17,7 @@ import { koboDeviceRoutes } from "./routes/koboDevice";
 import { appSettingsRoutes } from "./routes/appSettings";
 import { metadataRoutes } from "./routes/metadata";
 import { adminActivityRoutes } from "./routes/adminActivity";
+import { adminDiagnosticsRoutes } from "./routes/adminDiagnostics";
 import { sharesRoutes } from "./routes/shares";
 
 export const buildApp = () => {
@@ -48,6 +49,7 @@ export const buildApp = () => {
   app.register(usersRoutes);
   app.register(appSettingsRoutes);
   app.register(adminActivityRoutes);
+  app.register(adminDiagnosticsRoutes);
   app.register(metadataRoutes);
   app.register(uploadRoutes);
   app.register(importJobRoutes);
