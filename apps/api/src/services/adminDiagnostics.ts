@@ -167,39 +167,56 @@ const getDiagnosticsUsers = async () => {
     ORDER BY u.id
   `);
 
-  return rows.map((row) => ({
-    id: row.id,
-    email: row.email,
-    username: row.username,
-    role: row.role,
-    createdAt: row.created_at,
-    disabledAt: row.disabled_at,
-    library: {
-      ownedBookCount: Number(row.owned_book_count),
-      sharedInCount: Number(row.shared_in_count),
-      sharedOutCount: Number(row.shared_out_count),
-      collectionCount: Number(row.collection_count),
-      progressCount: Number(row.progress_count),
-      readingCount: Number(row.reading_count),
-      readCount: Number(row.read_count)
-    },
-    importJobs: {
-      queued: Number(row.queued_job_count),
-      processing: Number(row.processing_job_count),
-      completed: Number(row.completed_job_count),
-      failed: Number(row.failed_job_count)
-    },
-    kobo: {
-      settingsCreated: row.kobo_sync_enabled !== null,
-      syncEnabled: row.kobo_sync_enabled === 1,
-      syncAllBooks: row.kobo_sync_all_books === 1,
-      twoWayProgressSync: row.kobo_two_way_progress_sync === 1,
-      syncCollectionCount: Number(row.kobo_sync_collection_count),
-      readingStateCount: Number(row.kobo_reading_state_count),
-      pendingRedeliveryCount: Number(row.kobo_pending_redelivery_count),
-      snapshotCount: Number(row.kobo_snapshot_count)
-    }
-  }));
+  return rows.map((row) => {
+    const settingsCreated = row.kobo_sync_enabled !== null;
+    const syncEnabled = row.kobo_sync_enabled === 1;
+    const syncAllBooks = row.kobo_sync_all_books === 1;
+    const syncCollectionCount = Number(row.kobo_sync_collection_count);
+    const syncStatus = !settingsCreated
+      ? "missing_settings"
+      : !syncEnabled
+        ? "sync_disabled"
+        : syncAllBooks
+          ? "sync_all_books"
+          : syncCollectionCount > 0
+            ? "sync_selected_collections"
+            : "sync_enabled_no_scope";
+
+    return {
+      id: row.id,
+      email: row.email,
+      username: row.username,
+      role: row.role,
+      createdAt: row.created_at,
+      disabledAt: row.disabled_at,
+      library: {
+        ownedBookCount: Number(row.owned_book_count),
+        sharedInCount: Number(row.shared_in_count),
+        sharedOutCount: Number(row.shared_out_count),
+        collectionCount: Number(row.collection_count),
+        progressCount: Number(row.progress_count),
+        readingCount: Number(row.reading_count),
+        readCount: Number(row.read_count)
+      },
+      importJobs: {
+        queued: Number(row.queued_job_count),
+        processing: Number(row.processing_job_count),
+        completed: Number(row.completed_job_count),
+        failed: Number(row.failed_job_count)
+      },
+      kobo: {
+        settingsCreated,
+        syncStatus,
+        syncEnabled,
+        syncAllBooks,
+        twoWayProgressSync: row.kobo_two_way_progress_sync === 1,
+        syncCollectionCount,
+        readingStateCount: Number(row.kobo_reading_state_count),
+        pendingRedeliveryCount: Number(row.kobo_pending_redelivery_count),
+        snapshotCount: Number(row.kobo_snapshot_count)
+      }
+    };
+  });
 };
 
 export const getAdminDiagnostics = async (options: {

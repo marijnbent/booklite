@@ -163,6 +163,7 @@ describe("book progress inference", () => {
 
     const [settings] = await dbModule.db
       .select({
+        syncEnabled: schemaModule.koboUserSettings.syncEnabled,
         markReadingThreshold: schemaModule.koboUserSettings.markReadingThreshold,
         markFinishedThreshold: schemaModule.koboUserSettings.markFinishedThreshold
       })
@@ -171,6 +172,7 @@ describe("book progress inference", () => {
       .limit(1);
 
     expect(settings).toMatchObject({
+      syncEnabled: 1,
       markReadingThreshold: 1,
       markFinishedThreshold: 99
     });

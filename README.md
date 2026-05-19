@@ -51,7 +51,7 @@ It is inspired by [BookLore](https://github.com/booklore-app/booklore), but deli
 - Sync all books or only selected collections
 - Reading progress sync with latest timestamp wins
 - Only `EPUB` and `KEPUB` are synced to Kobo
-- New accounts automatically get a `Favorites` collection, which is preselected for Kobo sync
+- New accounts have Kobo sync enabled with a `Favorites` collection preselected
 
 ## Stack
 

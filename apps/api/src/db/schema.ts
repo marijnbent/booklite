@@ -126,7 +126,7 @@ export const koboUserSettings = sqliteTable("kobo_user_settings", {
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   token: text("token").notNull().unique(),
-  syncEnabled: integer("sync_enabled").notNull().default(0),
+  syncEnabled: integer("sync_enabled").notNull().default(1),
   syncAllBooks: integer("sync_all_books").notNull().default(0),
   twoWayProgressSync: integer("two_way_progress_sync").notNull().default(0),
   markReadingThreshold: real("mark_reading_threshold").notNull().default(1),

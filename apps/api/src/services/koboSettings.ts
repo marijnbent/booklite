@@ -37,7 +37,7 @@ export const ensureKoboSettingsRow = async (userId: number) => {
     .values({
       userId,
       token: randomToken(),
-      syncEnabled: 0,
+      syncEnabled: 1,
       syncAllBooks: 0,
       twoWayProgressSync: 0,
       markReadingThreshold: 1,

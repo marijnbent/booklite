@@ -110,7 +110,7 @@ describe("kobo contract", () => {
     await app.close();
   });
 
-  it("defaults sync all books to off in the Kobo settings payload", async () => {
+  it("defaults Kobo sync on and sync all books off in the settings payload", async () => {
     const username = "owner4-defaults";
     const password = "secret123";
 
@@ -157,7 +157,7 @@ describe("kobo contract", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      syncEnabled: false,
+      syncEnabled: true,
       syncAllBooks: false
     });
     expect(response.json().syncCollectionIds).toContain(favoritesId);
@@ -663,6 +663,126 @@ describe("kobo contract", () => {
             statusCode: 200,
             headers: expect.objectContaining({
               "content-type": "application/octet-stream"
+            })
+          })
+        })
+      ])
+    );
+  });
+
+  it("marks disabled Kobo sync clearly in debug logs", async () => {
+    const createUser = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload: {
+        email: "disabled-kobo@example.com",
+        username: "disabled-kobo",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+
+    expect(createUser.statusCode).toBe(201);
+    const disabledUserId = createUser.json<{ id: number }>().id;
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: "disabled-kobo",
+        password: "secret123"
+      }
+    });
+
+    expect(login.statusCode).toBe(200);
+    const disabledAccessToken = login.json().accessToken as string;
+
+    const settings = await app.inject({
+      method: "GET",
+      url: "/api/v1/kobo/settings",
+      headers: { authorization: `Bearer ${disabledAccessToken}` }
+    });
+
+    expect(settings.statusCode).toBe(200);
+    const disabledKoboToken = settings.json().token as string;
+
+    const updateSettings = await app.inject({
+      method: "PUT",
+      url: "/api/v1/kobo/settings",
+      headers: { authorization: `Bearer ${disabledAccessToken}` },
+      payload: {
+        syncEnabled: false,
+        syncAllBooks: false,
+        markReadingThreshold: 1,
+        markFinishedThreshold: 99,
+        syncCollectionIds: settings.json().syncCollectionIds
+      }
+    });
+
+    expect(updateSettings.statusCode).toBe(200);
+
+    await app.inject({
+      method: "DELETE",
+      url: "/api/v1/admin/activity-log",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        scope: "kobo"
+      }
+    });
+
+    await app.inject({
+      method: "PATCH",
+      url: "/api/v1/app-settings",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        koboDebugLogging: true
+      }
+    });
+
+    const syncResponse = await app.inject({
+      method: "GET",
+      url: `/api/kobo/${disabledKoboToken}/v1/library/sync`
+    });
+
+    expect(syncResponse.statusCode).toBe(401);
+
+    const activityResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/activity-log?scope=kobo&level=INFO&limit=20",
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+
+    expect(activityResponse.statusCode).toBe(200);
+    expect(activityResponse.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "kobo.debug.request",
+          actorUserId: disabledUserId,
+          details: expect.objectContaining({
+            auth: expect.objectContaining({
+              status: "sync_disabled",
+              userId: disabledUserId,
+              syncEnabled: false
+            })
+          })
+        }),
+        expect.objectContaining({
+          event: "kobo.debug.response",
+          actorUserId: disabledUserId,
+          details: expect.objectContaining({
+            statusCode: 401,
+            authFailureReason: "sync_disabled",
+            auth: expect.objectContaining({
+              status: "sync_disabled",
+              userId: disabledUserId,
+              syncEnabled: false
             })
           })
         })

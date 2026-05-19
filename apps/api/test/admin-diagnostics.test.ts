@@ -104,7 +104,10 @@ describe("admin diagnostics", () => {
           id: memberId,
           username: "memberdiag",
           role: "MEMBER",
-          importJobs: expect.any(Object)
+          importJobs: expect.any(Object),
+          kobo: expect.objectContaining({
+            syncStatus: "sync_selected_collections"
+          })
         })
       ]),
       activityLog: expect.arrayContaining([

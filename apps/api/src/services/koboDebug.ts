@@ -7,6 +7,14 @@ type KoboDebugRequest = FastifyRequest & {
   koboDebugEnabled?: boolean;
   koboDebugStartAt?: number;
   koboDebugActorUserId?: number | null;
+  koboDebugAuth?: KoboDebugAuth;
+};
+
+type KoboDebugAuth = {
+  status: "missing_token" | "token_not_found" | "sync_disabled" | "ok";
+  userId: number | null;
+  syncEnabled?: boolean;
+  syncAllBooks?: boolean;
 };
 
 const KOBO_URL_PREFIX = "/api/kobo/";
@@ -137,11 +145,30 @@ export const prepareKoboDebugRequest = async (request: FastifyRequest): Promise<
   const token = extractKoboToken(request);
   if (!token) {
     debugRequest.koboDebugActorUserId = null;
+    debugRequest.koboDebugAuth = {
+      status: "missing_token",
+      userId: null
+    };
     return;
   }
 
   const user = await getKoboUserByToken(token);
   debugRequest.koboDebugActorUserId = user?.userId ?? null;
+  if (!user) {
+    debugRequest.koboDebugAuth = {
+      status: "token_not_found",
+      userId: null
+    };
+    return;
+  }
+
+  const syncEnabled = user.syncEnabled === 1;
+  debugRequest.koboDebugAuth = {
+    status: syncEnabled ? "ok" : "sync_disabled",
+    userId: user.userId,
+    syncEnabled,
+    syncAllBooks: user.syncAllBooks === 1
+  };
 };
 
 export const logKoboDebugRequest = async (request: FastifyRequest): Promise<void> => {
@@ -159,6 +186,7 @@ export const logKoboDebugRequest = async (request: FastifyRequest): Promise<void
       url: request.raw.url ?? request.url,
       params: summarizeValue(request.params),
       query: summarizeValue(request.query),
+      auth: debugRequest.koboDebugAuth ?? null,
       headers: sanitizeHeaders(request.headers as Record<string, unknown>),
       body: summarizePayload(request.body, request.headers["content-type"])
     }
@@ -188,6 +216,10 @@ export const logKoboDebugResponse = async (
         typeof debugRequest.koboDebugStartAt === "number"
           ? Date.now() - debugRequest.koboDebugStartAt
           : null,
+      auth: debugRequest.koboDebugAuth ?? null,
+      ...(reply.statusCode === 401 && debugRequest.koboDebugAuth?.status !== "ok"
+        ? { authFailureReason: debugRequest.koboDebugAuth?.status ?? "unknown" }
+        : {}),
       headers: sanitizeHeaders(rawHeaders),
       body: summarizePayload(payload, typeof rawHeaders["content-type"] === "string" ? rawHeaders["content-type"] : undefined)
     }
