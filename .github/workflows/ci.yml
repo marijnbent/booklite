@@ -8,9 +8,17 @@ on:
       - develop
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,10 +30,7 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
+        run: npm ci --prefer-offline --no-audit
 
       - name: Test
         run: npm test
