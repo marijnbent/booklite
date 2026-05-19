@@ -233,7 +233,7 @@ describe("buildPanelCoverOptions", () => {
 
   it("includes distinct preview options", () => {
     const previewOptions = [
-      { coverPath: "/other.jpg", source: "GOOGLE_BOOKS" as const },
+      { coverPath: "/other.jpg", source: "GOOGLE" as const },
     ];
     const result = buildPanelCoverOptions("/cover.jpg", previewOptions);
     expect(result).toHaveLength(2);
