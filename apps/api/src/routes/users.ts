@@ -5,7 +5,7 @@ import { db } from "../db/client";
 import { books, users } from "../db/schema";
 import { getAuth, requireAuth, requireOwner } from "../auth/guards";
 import { hashPassword } from "../auth/password";
-import { issueTokens } from "../auth/tokens";
+import { issueTokens, revokeUserTokens } from "../auth/tokens";
 import { nowIso } from "../utils/time";
 import { ensureKoboSettingsRow } from "../services/koboSettings";
 import { ensureSystemCollectionsForUser } from "../services/systemCollections";
@@ -243,6 +243,12 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (!updated) return reply.code(404).send({ error: "User not found" });
+      if (
+        updated.role !== existing.role ||
+        (updated.disabledAt !== null) !== (existing.disabledAt !== null)
+      ) {
+        await revokeUserTokens(updated.id);
+      }
       return updated;
     }
   );

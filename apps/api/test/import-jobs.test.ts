@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import type { AuthTokens } from "@booklite/shared";
 import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
@@ -159,5 +160,70 @@ describe("import jobs", () => {
         }
       ]
     });
+  });
+
+  it("claims one queued job atomically and only recovers stale processing jobs", async () => {
+    const [{ id: ownerUserId }] = await dbModule.db
+      .select({ id: schemaModule.users.id })
+      .from(schemaModule.users)
+      .where(eq(schemaModule.users.username, "owner"))
+      .limit(1);
+
+    await dbModule.db
+      .update(schemaModule.importJobs)
+      .set({ status: "COMPLETED" })
+      .where(eq(schemaModule.importJobs.status, "QUEUED"));
+
+    await dbModule.db.insert(schemaModule.importJobs).values({
+      id: "job-atomic-claim",
+      userId: ownerUserId,
+      status: "QUEUED",
+      type: "UPLOAD",
+      payloadJson: JSON.stringify({ fileName: "atomic.epub" }),
+      resultJson: null,
+      error: null,
+      createdAt: "2026-03-06T10:00:00.000Z",
+      updatedAt: "2026-03-06T10:00:00.000Z"
+    });
+
+    const jobsModule = await import("../src/services/jobs");
+    const claims = await Promise.all([
+      jobsModule.claimNextQueuedJob(),
+      jobsModule.claimNextQueuedJob()
+    ]);
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(claims.find(Boolean)).toMatchObject({ id: "job-atomic-claim" });
+
+    await dbModule.db.insert(schemaModule.importJobs).values([
+      {
+        id: "job-processing-stale",
+        userId: ownerUserId,
+        status: "PROCESSING",
+        type: "UPLOAD",
+        payloadJson: "{}",
+        resultJson: null,
+        error: null,
+        createdAt: "2026-03-06T10:00:00.000Z",
+        updatedAt: "2026-03-06T11:00:00.000Z"
+      },
+      {
+        id: "job-processing-recent",
+        userId: ownerUserId,
+        status: "PROCESSING",
+        type: "UPLOAD",
+        payloadJson: "{}",
+        resultJson: null,
+        error: null,
+        createdAt: "2026-03-06T11:50:00.000Z",
+        updatedAt: "2026-03-06T11:50:00.000Z"
+      }
+    ]);
+
+    expect(await jobsModule.recoverStaleImportJobs(Date.parse("2026-03-06T12:00:00.000Z"))).toBe(1);
+    const rows = await dbModule.db
+      .select({ id: schemaModule.importJobs.id, status: schemaModule.importJobs.status })
+      .from(schemaModule.importJobs);
+    expect(rows.find((row) => row.id === "job-processing-stale")?.status).toBe("QUEUED");
+    expect(rows.find((row) => row.id === "job-processing-recent")?.status).toBe("PROCESSING");
   });
 });

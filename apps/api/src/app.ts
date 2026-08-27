@@ -19,11 +19,20 @@ import { metadataRoutes } from "./routes/metadata";
 import { adminActivityRoutes } from "./routes/adminActivity";
 import { adminDiagnosticsRoutes } from "./routes/adminDiagnostics";
 import { sharesRoutes } from "./routes/shares";
+import { redactRequestUrl } from "./utils/redactRequestUrl";
 
 export const buildApp = () => {
   const app = Fastify({
     logger: {
-      level: process.env.LOG_LEVEL ?? "info"
+      level: process.env.LOG_LEVEL ?? "info",
+      serializers: {
+        req: (request) => ({
+          method: request.method,
+          url: redactRequestUrl(request.url),
+          hostname: request.hostname,
+          remoteAddress: request.ip
+        })
+      }
     }
   });
 

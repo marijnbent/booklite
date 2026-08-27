@@ -1,5 +1,5 @@
 import path from "node:path";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db, getSetting, walCheckpoint } from "../db/client";
 import { books, collectionBooks, collections, importJobs } from "../db/schema";
 import { nowIso } from "../utils/time";
@@ -12,7 +12,17 @@ import {
   resolveStoredCoverPathForWrite
 } from "./coverAssets";
 
-let running = false;
+let runnerTimer: NodeJS.Timeout | null = null;
+let activeRunnerLoop: Promise<void> | null = null;
+let runnerStopping = true;
+const STALE_JOB_MS = 30 * 60 * 1000;
+
+type ClaimedJob = {
+  id: string;
+  userId: number;
+  type: string;
+  payloadJson: string;
+};
 
 interface UploadControls {
   title?: string;
@@ -304,26 +314,42 @@ const processUploadJob = async (job: {
     .where(eq(importJobs.id, job.id));
 };
 
-const processOneQueuedJob = async (): Promise<boolean> => {
-  const jobs = await db
-    .select({
-      id: importJobs.id,
-      userId: importJobs.userId,
-      type: importJobs.type,
-      payloadJson: importJobs.payloadJson
-    })
-    .from(importJobs)
-    .where(eq(importJobs.status, "QUEUED"))
-    .orderBy(sql`${importJobs.createdAt} ASC`)
-    .limit(1);
+export const claimNextQueuedJob = async (): Promise<ClaimedJob | null> => {
+  const claimed = await db.all<ClaimedJob>(sql`
+    UPDATE import_jobs
+    SET status = 'PROCESSING', updated_at = ${nowIso()}
+    WHERE id = (
+      SELECT id
+      FROM import_jobs
+      WHERE status = 'QUEUED'
+      ORDER BY created_at ASC
+      LIMIT 1
+    )
+      AND status = 'QUEUED'
+    RETURNING
+      id,
+      user_id AS userId,
+      type,
+      payload_json AS payloadJson
+  `);
+  return claimed[0] ?? null;
+};
 
-  const job = jobs[0];
-  if (!job) return false;
-
-  await db
+export const recoverStaleImportJobs = async (
+  now = Date.now()
+): Promise<number> => {
+  const staleBefore = new Date(now - STALE_JOB_MS).toISOString();
+  const recovered = await db
     .update(importJobs)
-    .set({ status: "PROCESSING", updatedAt: nowIso() })
-    .where(eq(importJobs.id, job.id));
+    .set({ status: "QUEUED", updatedAt: nowIso(), error: null })
+    .where(and(eq(importJobs.status, "PROCESSING"), lt(importJobs.updatedAt, staleBefore)))
+    .returning({ id: importJobs.id });
+  return recovered.length;
+};
+
+const processOneQueuedJob = async (): Promise<boolean> => {
+  const job = await claimNextQueuedJob();
+  if (!job) return false;
 
   try {
     if (job.type === "UPLOAD") {
@@ -369,20 +395,37 @@ const processOneQueuedJob = async (): Promise<boolean> => {
   return true;
 };
 
-export const startJobRunner = (): void => {
-  setInterval(async () => {
-    if (running) return;
-    running = true;
-    try {
-      for (;;) {
+export const startJobRunner = async (): Promise<void> => {
+  if (runnerTimer || activeRunnerLoop) return;
+
+  runnerStopping = false;
+  await recoverStaleImportJobs();
+  if (runnerStopping) return;
+
+  const poll = (): void => {
+    if (runnerStopping || activeRunnerLoop) return;
+
+    activeRunnerLoop = (async () => {
+      await recoverStaleImportJobs();
+      while (!runnerStopping) {
         const hadJob = await processOneQueuedJob();
         if (!hadJob) break;
       }
       walCheckpoint();
-    } finally {
-      running = false;
-    }
-  }, 1500).unref();
+    })().finally(() => {
+      activeRunnerLoop = null;
+    });
+  };
+
+  runnerTimer = setInterval(poll, 1500);
+  runnerTimer.unref();
+};
+
+export const stopJobRunner = async (): Promise<void> => {
+  runnerStopping = true;
+  if (runnerTimer) clearInterval(runnerTimer);
+  runnerTimer = null;
+  await activeRunnerLoop;
 };
 
 export const queueUploadJob = async (input: {

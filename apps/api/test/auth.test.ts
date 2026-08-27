@@ -4,6 +4,7 @@ import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 createTempEnv();
 
 let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
+let ownerAccessToken = "";
 
 describe("auth", () => {
   beforeAll(async () => {
@@ -34,6 +35,7 @@ describe("auth", () => {
 
     expect(login.statusCode).toBe(200);
     const tokens = login.json();
+    ownerAccessToken = tokens.accessToken;
     expect(tokens.accessToken).toBeTypeOf("string");
     expect(tokens.refreshToken).toBeTypeOf("string");
 
@@ -234,6 +236,53 @@ describe("auth", () => {
     expect(response.statusCode).toBe(403);
   });
 
+  it("rejects active and refresh tokens after a user is disabled", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { authorization: `Bearer ${ownerAccessToken}` },
+      payload: {
+        username: "revoked-member",
+        password: "secret123",
+        role: "MEMBER"
+      }
+    });
+    expect(created.statusCode).toBe(201);
+    const memberId = created.json<{ id: number }>().id;
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: "revoked-member",
+        password: "secret123"
+      }
+    });
+    const memberTokens = login.json<{ accessToken: string; refreshToken: string }>();
+
+    const disabled = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${memberId}`,
+      headers: { authorization: `Bearer ${ownerAccessToken}` },
+      payload: { disabled: true }
+    });
+    expect(disabled.statusCode).toBe(200);
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: { authorization: `Bearer ${memberTokens.accessToken}` }
+    });
+    expect(me.statusCode).toBe(401);
+
+    const refreshed = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      payload: { refreshToken: memberTokens.refreshToken }
+    });
+    expect(refreshed.statusCode).toBe(401);
+  });
+
   it("allows owners to impersonate active members", async () => {
     const ownerTokens = await setupOwnerAndLogin(app);
 
@@ -384,14 +433,11 @@ describe("auth", () => {
 
     const login = await app.inject({
       method: "POST",
-      url: "/api/v1/auth/login",
-      payload: {
-        usernameOrEmail: "member-authz",
-        password: "secret123"
-      }
+      url: `/api/v1/admin/users/${member.id}/impersonate`,
+      headers: { authorization: `Bearer ${ownerTokens.accessToken}` }
     });
 
-    const memberTokens = login.json<{ accessToken: string }>();
+    const memberTokens = login.json<{ tokens: { accessToken: string } }>().tokens;
 
     const impersonate = await app.inject({
       method: "POST",

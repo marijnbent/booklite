@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { sql } from "drizzle-orm";
 import { appSettings, schema } from "./schema";
 import { config, dbFilePath } from "../config";
+import { DEFAULT_OPENROUTER_MODEL } from "../services/aiConstants";
 
 const ensureDir = (target: string): void => {
   fs.mkdirSync(target, { recursive: true });
@@ -32,11 +33,21 @@ export const seedDefaultAppSettings = (): void => {
   insertSetting.run("metadata_google_language", JSON.stringify(config.googleBooksLanguage));
   insertSetting.run("metadata_google_api_key", JSON.stringify(config.googleBooksApiKey));
   insertSetting.run("metadata_hardcover_api_key", JSON.stringify(config.hardcoverApiKey));
+  insertSetting.run("metadata_openrouter_model", JSON.stringify(DEFAULT_OPENROUTER_MODEL));
   insertSetting.run("upload_limit_mb", JSON.stringify(config.uploadLimitMb));
+
+  // OpenRouter credentials are environment-only. Remove values saved by older releases.
+  sqlite.prepare("DELETE FROM app_settings WHERE key = ?").run("metadata_openrouter_api_key");
 };
 
 export const walCheckpoint = (): void => {
   sqlite.pragma("wal_checkpoint(TRUNCATE)");
+};
+
+export const closeDatabase = (): void => {
+  if (!sqlite.open) return;
+  walCheckpoint();
+  sqlite.close();
 };
 
 export const getSetting = async <T>(key: string, fallback: T): Promise<T> => {

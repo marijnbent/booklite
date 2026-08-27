@@ -4,16 +4,17 @@
  * Runs each filename twice: once without LLM, once with LLM resolver.
  *
  * Usage:
- *   npx tsx apps/api/test/benchmark-pipeline.ts
+ *   OPENROUTER_API_KEY=... npx tsx apps/api/test/benchmark-pipeline.ts
+ *   BOOKLITE_BENCHMARK_MODEL=... overrides Luna for this benchmark only.
  */
 
-import { filenameToBasicMetadata } from "../src/services/books";
-import { fetchMetadataWithFallback, MetadataResult } from "../src/services/metadata";
-import { db } from "../src/db/client";
-import { appSettings } from "../src/db/schema";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { MetadataResult } from "../src/services/metadata";
 
 const API_KEY = process.env.OPENROUTER_API_KEY?.trim();
-const MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-5.6-luna";
+const MODEL = process.env.BOOKLITE_BENCHMARK_MODEL ?? "openai/gpt-5.6-luna";
 
 if (!API_KEY) {
   throw new Error("OPENROUTER_API_KEY is required");
@@ -62,6 +63,13 @@ interface BenchmarkRow {
   llmMs: number;
 }
 
+let db: typeof import("../src/db/client").db;
+let closeDatabase: typeof import("../src/db/client").closeDatabase;
+let getSetting: typeof import("../src/db/client").getSetting;
+let appSettings: typeof import("../src/db/schema").appSettings;
+let filenameToBasicMetadata: typeof import("../src/services/books").filenameToBasicMetadata;
+let fetchMetadataWithFallback: typeof import("../src/services/metadata").fetchMetadataWithFallback;
+
 const fmt = (value: string | null | undefined, maxLen = 40): string => {
   if (!value) return "—";
   return value.length > maxLen ? `${value.slice(0, maxLen - 1)}…` : value;
@@ -82,7 +90,6 @@ const upsert = async (key: string, value: unknown): Promise<void> => {
 
 const setLlmEnabled = async (enabled: boolean): Promise<void> => {
   await upsert("metadata_openrouter_enabled", enabled);
-  await upsert("metadata_openrouter_api_key", API_KEY);
   await upsert("metadata_openrouter_model", MODEL);
 };
 
@@ -101,6 +108,33 @@ const fetchMeta = async (
 };
 
 const run = async (): Promise<void> => {
+  const benchmarkRoot = fs.mkdtempSync(path.join(os.tmpdir(), "booklite-benchmark-"));
+  const previousEnv = {
+    appDataDir: process.env.APP_DATA_DIR,
+    booksDir: process.env.BOOKS_DIR,
+    jwtSecret: process.env.JWT_SECRET
+  };
+  process.env.APP_DATA_DIR = path.join(benchmarkRoot, "app-data");
+  process.env.BOOKS_DIR = path.join(benchmarkRoot, "books");
+  process.env.JWT_SECRET = process.env.JWT_SECRET || "booklite-benchmark-secret";
+
+  const dbModule = await import("../src/db/client");
+  const schemaModule = await import("../src/db/schema");
+  const migrateModule = await import("../src/db/migrate");
+  const booksModule = await import("../src/services/books");
+  const metadataModule = await import("../src/services/metadata");
+  db = dbModule.db;
+  closeDatabase = dbModule.closeDatabase;
+  getSetting = dbModule.getSetting;
+  appSettings = schemaModule.appSettings;
+  filenameToBasicMetadata = booksModule.filenameToBasicMetadata;
+  fetchMetadataWithFallback = metadataModule.fetchMetadataWithFallback;
+  migrateModule.prepareDatabase();
+
+  const previousEnabled = await getSetting<boolean>("metadata_openrouter_enabled", false);
+  const previousModel = await getSetting<string>("metadata_openrouter_model", MODEL);
+
+  try {
   console.log(`\nBenchmark: ${FILENAMES.length} filenames`);
   console.log(`Model: ${MODEL}\n`);
   console.log("=".repeat(140));
@@ -215,8 +249,19 @@ const run = async (): Promise<void> => {
   Series regressed: ${regressed}
 `);
 
-  // Restore LLM disabled
-  await setLlmEnabled(false);
+  } finally {
+    await upsert("metadata_openrouter_enabled", previousEnabled);
+    await upsert("metadata_openrouter_model", previousModel);
+    closeDatabase();
+    fs.rmSync(benchmarkRoot, { recursive: true, force: true });
+
+    if (previousEnv.appDataDir === undefined) delete process.env.APP_DATA_DIR;
+    else process.env.APP_DATA_DIR = previousEnv.appDataDir;
+    if (previousEnv.booksDir === undefined) delete process.env.BOOKS_DIR;
+    else process.env.BOOKS_DIR = previousEnv.booksDir;
+    if (previousEnv.jwtSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = previousEnv.jwtSecret;
+  }
 };
 
 run().catch((err) => {

@@ -1,4 +1,5 @@
-import { refreshTokens } from "../db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import { apiTokens, refreshTokens } from "../db/schema";
 import { db } from "../db/client";
 import { config } from "../config";
 import { randomToken, sha256 } from "../utils/hash";
@@ -34,4 +35,16 @@ export const issueTokens = async (input: {
     refreshToken,
     expiresInSeconds: config.accessTokenTtlSeconds
   };
+};
+
+export const revokeUserTokens = async (userId: number): Promise<void> => {
+  const revokedAt = nowIso();
+  await db
+    .update(refreshTokens)
+    .set({ revokedAt })
+    .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
+  await db
+    .update(apiTokens)
+    .set({ revokedAt })
+    .where(and(eq(apiTokens.userId, userId), isNull(apiTokens.revokedAt)));
 };

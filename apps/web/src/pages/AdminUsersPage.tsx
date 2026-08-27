@@ -69,7 +69,7 @@ interface AppSettings {
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
-  metadataOpenrouterApiKey: string;
+  metadataOpenrouterApiKeyConfigured: boolean;
   metadataOpenrouterModel: string;
   metadataOpenrouterEnabled: boolean;
   uploadLimitMb: number;
@@ -893,18 +893,13 @@ export const AdminUsersPage: React.FC = () => {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-md border border-border bg-muted/20 p-4">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">API Key</Label>
-                      <Input
-                        type="password"
-                        defaultValue={settings.data.metadataOpenrouterApiKey}
-                        placeholder="sk-or-v1-..."
-                        onBlur={(e) =>
-                          patchSettings.mutate({
-                            metadataOpenrouterApiKey: e.target.value,
-                          })
-                        }
-                      />
+                      <div className="flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm">
+                        {settings.data.metadataOpenrouterApiKeyConfigured
+                          ? "Configured through OPENROUTER_API_KEY"
+                          : "Set OPENROUTER_API_KEY on the server"}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Get your key at openrouter.ai/keys
+                        The key is read from the server environment and is never stored here.
                       </p>
                     </div>
                     <div className="space-y-1.5">

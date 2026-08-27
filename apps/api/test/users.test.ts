@@ -365,6 +365,24 @@ describe("users", () => {
       id: owner.id,
       role: "MEMBER"
     });
+
+    const staleOwnerAccess = await app.inject({
+      method: "GET",
+      url: "/api/v1/users",
+      headers: { authorization: `Bearer ${ownerAccessToken}` }
+    });
+    expect(staleOwnerAccess.statusCode).toBe(403);
+
+    const secondOwnerLogin = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        usernameOrEmail: "second-owner",
+        password: "secret123"
+      }
+    });
+    expect(secondOwnerLogin.statusCode).toBe(200);
+    ownerAccessToken = secondOwnerLogin.json<{ accessToken: string }>().accessToken;
   });
 
   it("deletes disabled users and blocks invalid deletions", async () => {

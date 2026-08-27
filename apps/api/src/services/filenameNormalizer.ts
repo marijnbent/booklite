@@ -1,6 +1,6 @@
 import path from "node:path";
-import { config } from "../config";
 import { getSetting } from "../db/client";
+import { resolveOpenRouterSettings } from "./aiSettings";
 import { filenameToBasicMetadata, ParsedFilename } from "./books";
 import { callOpenRouterJsonObject } from "./openrouter";
 
@@ -56,16 +56,8 @@ const sanitizeSeries = (value: unknown): string | undefined => {
   return normalizeSeriesText(text);
 };
 
-export const resolveFilenameAiSettings = async (): Promise<FilenameAiSettings> => ({
-  openrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false),
-  openrouterApiKey: (
-    (await getSetting<string>("metadata_openrouter_api_key", config.openrouterApiKey ?? "")) ??
-    ""
-  ).trim(),
-  openrouterModel: (
-    (await getSetting<string>("metadata_openrouter_model", "")) ?? ""
-  ).trim()
-});
+export const resolveFilenameAiSettings = async (): Promise<FilenameAiSettings> =>
+  resolveOpenRouterSettings();
 
 export const isLowConfidenceFilenameParse = (
   fileName: string,

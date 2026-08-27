@@ -14,6 +14,7 @@ export const createTempEnv = (): { appDataDir: string; booksDir: string } => {
   delete process.env.BOOTSTRAP_OWNER_EMAIL;
   delete process.env.BOOTSTRAP_OWNER_USERNAME;
   delete process.env.BOOTSTRAP_OWNER_PASSWORD;
+  delete process.env.OPENROUTER_API_KEY;
 
   return { appDataDir, booksDir };
 };

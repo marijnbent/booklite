@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
 import { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
@@ -8,6 +7,7 @@ import { z } from "zod";
 import { db } from "../db/client";
 import { books } from "../db/schema";
 import { config } from "../config";
+import { safeRemoteFetch } from "../services/safeRemoteFetch";
 import {
   buildSyncTokenHeader,
   getBookMetadataForKobo,
@@ -25,6 +25,7 @@ import { koboFallbackResources } from "../services/koboFallbackResources";
 import { logAdminActivity } from "../services/adminActivityLog";
 import { applyDownloadHeaders } from "../services/downloadHeaders";
 import { resolveManagedCoverPath } from "../services/coverAssets";
+import { resolveContainedPath } from "../utils/containedPath";
 import {
   isKoboDebugRoute,
   logKoboDebugEvent,
@@ -136,7 +137,7 @@ const respondCover = async (
     const timeout = setTimeout(() => controller.abort(), 750);
 
     try {
-      const response = await fetch(coverPath, { signal: controller.signal });
+      const response = await safeRemoteFetch(coverPath, { signal: controller.signal });
       if (!response.ok) {
         await logAdminActivity({
           scope: "kobo",
@@ -228,7 +229,12 @@ const respondCover = async (
     return reply.send(fs.readFileSync(managedCover.absolutePath));
   }
 
-  const absolutePath = path.isAbsolute(coverPath) ? coverPath : path.join(config.booksDir, coverPath);
+  let absolutePath: string;
+  try {
+    absolutePath = resolveContainedPath(config.booksDir, coverPath);
+  } catch {
+    return sendPlaceholderCover(reply);
+  }
 
   if (!fs.existsSync(absolutePath)) {
     await logAdminActivity({
@@ -964,7 +970,12 @@ export const koboDeviceRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: "Book not found" });
     }
 
-    const absolute = path.join(config.booksDir, row[0].filePath);
+    let absolute: string;
+    try {
+      absolute = resolveContainedPath(config.booksDir, row[0].filePath);
+    } catch {
+      return reply.code(404).send({ error: "File not found" });
+    }
     if (!fs.existsSync(absolute)) {
       await logAdminActivity({
         scope: "kobo",

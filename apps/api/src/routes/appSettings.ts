@@ -10,6 +10,7 @@ import {
   type MetadataProviderEnabled,
   toMetadataProviderEnabled
 } from "../utils/metadataProviders";
+import { DEFAULT_OPENROUTER_MODEL } from "../services/aiSettings";
 
 const amazonDomainSchema = z.enum([
   "com",
@@ -40,7 +41,6 @@ const patchSettingsSchema = z
     metadataGoogleLanguage: z.string().trim().max(8).optional(),
     metadataGoogleApiKey: z.string().trim().optional(),
     metadataHardcoverApiKey: z.string().trim().optional(),
-    metadataOpenrouterApiKey: z.string().trim().optional(),
     metadataOpenrouterModel: z.string().trim().max(100).optional(),
     metadataOpenrouterEnabled: z.boolean().optional(),
     koboDebugLogging: z.boolean().optional(),
@@ -66,7 +66,7 @@ const resolveSettings = async (): Promise<{
   metadataGoogleLanguage: string;
   metadataGoogleApiKey: string;
   metadataHardcoverApiKey: string;
-  metadataOpenrouterApiKey: string;
+  metadataOpenrouterApiKeyConfigured: boolean;
   metadataOpenrouterModel: string;
   metadataOpenrouterEnabled: boolean;
   koboDebugLogging: boolean;
@@ -97,13 +97,10 @@ const resolveSettings = async (): Promise<{
     "metadata_hardcover_api_key",
     config.hardcoverApiKey
   ),
-  metadataOpenrouterApiKey: await getSetting<string>(
-    "metadata_openrouter_api_key",
-    config.openrouterApiKey ?? ""
-  ),
+  metadataOpenrouterApiKeyConfigured: config.openrouterApiKey.trim().length > 0,
   metadataOpenrouterModel: await getSetting<string>(
     "metadata_openrouter_model",
-    ""
+    DEFAULT_OPENROUTER_MODEL
   ),
   metadataOpenrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false),
   koboDebugLogging: await getSetting<boolean>("kobo_debug_logging", false),
@@ -167,9 +164,6 @@ export const appSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       }
       if (body.metadataHardcoverApiKey !== undefined) {
         await upsert("metadata_hardcover_api_key", body.metadataHardcoverApiKey);
-      }
-      if (body.metadataOpenrouterApiKey !== undefined) {
-        await upsert("metadata_openrouter_api_key", body.metadataOpenrouterApiKey);
       }
       if (body.metadataOpenrouterModel !== undefined) {
         await upsert("metadata_openrouter_model", body.metadataOpenrouterModel);

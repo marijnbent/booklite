@@ -14,7 +14,8 @@ vi.mock("../src/config", () => ({
     amazonBooksCookie: "",
     googleBooksLanguage: "",
     googleBooksApiKey: "",
-    hardcoverApiKey: ""
+    hardcoverApiKey: "",
+    openrouterApiKey: "test-key"
   }
 }));
 
@@ -34,7 +35,6 @@ describe("metadata openrouter guardrails", () => {
 
   it("does not call OpenRouter when model is empty even if AI is enabled", async () => {
     settings.set("metadata_openrouter_enabled", true);
-    settings.set("metadata_openrouter_api_key", "test-key");
     settings.set("metadata_openrouter_model", "");
 
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {

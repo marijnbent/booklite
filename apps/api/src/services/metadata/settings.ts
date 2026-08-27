@@ -5,8 +5,11 @@ import {
   toMetadataProviderEnabled
 } from "../../utils/metadataProviders";
 import type { MetadataSettings } from "./types";
+import { resolveOpenRouterSettings } from "../aiSettings";
 
 export const resolveMetadataProviderSettings = async (): Promise<MetadataSettings> => {
+  const openrouter = await resolveOpenRouterSettings();
+
   return {
     providerEnabled: toMetadataProviderEnabled(
       await getSetting<unknown>("metadata_provider_enabled", defaultMetadataProviderEnabled),
@@ -27,11 +30,6 @@ export const resolveMetadataProviderSettings = async (): Promise<MetadataSetting
     hardcoverApiKey: (
       await getSetting<string>("metadata_hardcover_api_key", config.hardcoverApiKey)
     ).trim(),
-    openrouterApiKey: (
-      (await getSetting<string>("metadata_openrouter_api_key", config.openrouterApiKey ?? "")) ??
-      ""
-    ).trim(),
-    openrouterModel: ((await getSetting<string>("metadata_openrouter_model", "")) ?? "").trim(),
-    openrouterEnabled: await getSetting<boolean>("metadata_openrouter_enabled", false)
+    ...openrouter
   };
 };

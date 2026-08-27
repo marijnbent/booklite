@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import type { ReadStatus } from "@booklite/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
@@ -17,6 +16,7 @@ import {
 } from "../db/schema";
 import { nowIso } from "../utils/time";
 import crypto from "node:crypto";
+import { resolveContainedPath } from "../utils/containedPath";
 
 const encodeSyncToken = (snapshotId: string): string =>
   Buffer.from(JSON.stringify({ snapshotId }), "utf8").toString("base64");
@@ -284,10 +284,8 @@ const buildBookMetadata = (
 ): Record<string, unknown> => {
   let fileSize = book.fileSize ?? 0;
   if (fileSize <= 0 && typeof book.filePath === "string" && book.filePath.length > 0) {
-    const absolutePath = path.isAbsolute(book.filePath)
-      ? book.filePath
-      : path.join(config.booksDir, book.filePath);
     try {
+      const absolutePath = resolveContainedPath(config.booksDir, book.filePath);
       fileSize = fs.statSync(absolutePath).size;
     } catch {
       fileSize = 0;

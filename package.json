@@ -6,15 +6,15 @@
     "packages/*"
   ],
   "scripts": {
-    "clean": "npm run clean -ws --if-present",
+    "clean": "npm run clean --workspaces --if-present",
     "dev": "npm run dev -w @booklite/api",
     "dev:split": "concurrently -n api,web -c cyan,magenta \"npm:dev -w @booklite/api\" \"npm:dev -w @booklite/web\"",
     "build": "npm run build -w @booklite/shared && npm run build -w @booklite/api && npm run build -w @booklite/web",
     "db:generate": "npm run db:generate -w @booklite/api",
     "db:migrate": "npm run db:migrate -w @booklite/api",
     "db:studio": "npm run db:studio -w @booklite/api",
-    "test": "npm run test -ws --if-present",
-    "typecheck": "npm run typecheck -ws --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:dev": "docker compose -f compose.dev.yml up"
@@ -22,7 +22,10 @@
   "devDependencies": {
     "concurrently": "^9.1.2"
   },
+  "overrides": {
+    "@xmldom/xmldom": "0.9.12"
+  },
   "engines": {
-    "node": ">=22"
+    "node": ">=22 <26"
   }
 }

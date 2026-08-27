@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import sharp from "sharp";
 import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
 
 createTempEnv();
@@ -10,10 +11,11 @@ vi.mock("../src/services/metadata", () => ({
   fetchMetadataWithFallback: vi.fn(async () => ({ source: "NONE" }))
 }));
 
-const tinyPng = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1sAAAAASUVORK5CYII=",
-  "base64"
-);
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(async () => [{ address: "93.184.216.34", family: 4 }])
+}));
+
+let tinyPng: Buffer;
 
 let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
 let accessToken = "";
@@ -62,6 +64,11 @@ const patchCover = async (bookId: number, coverPath: string | null) =>
 
 describe("localized cover assets", () => {
   beforeAll(async () => {
+    tinyPng = await sharp({
+      create: { width: 1, height: 1, channels: 4, background: "white" }
+    })
+      .png()
+      .toBuffer();
     app = await setupTestApp();
     accessToken = (await setupOwnerAndLogin(app)).accessToken;
 
@@ -97,7 +104,7 @@ describe("localized cover assets", () => {
 
     const bookId = await createBook();
     const response = await patchCover(bookId, "https://covers.example/cover.png");
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode, response.body).toBe(200);
 
     const [stored] = await dbModule.db
       .select({
@@ -135,7 +142,7 @@ describe("localized cover assets", () => {
     });
     expect(servedCover.statusCode).toBe(200);
     expect(servedCover.headers["content-type"]).toContain("image/jpeg");
-    expect(servedCover.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(servedCover.headers["cache-control"]).toBe("private, no-store");
     expect(servedCover.body.length).toBeGreaterThan(0);
   });
 
@@ -164,6 +171,44 @@ describe("localized cover assets", () => {
 
     expect(stored.coverPath).toBeNull();
     expect(fs.existsSync(coverFile)).toBe(false);
+  });
+
+  it("removes a managed cover when its book is deleted", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(tinyPng, {
+        status: 200,
+        headers: { "content-type": "image/png" }
+      })
+    );
+
+    const bookId = await createBook();
+    expect((await patchCover(bookId, "https://covers.example/delete-me.png")).statusCode).toBe(200);
+    const coverFile = path.join(appDataDir, "covers", String(bookId), "cover.jpg");
+    expect(fs.existsSync(coverFile)).toBe(true);
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/books/${bookId}`,
+      headers: { authorization: `Bearer ${accessToken}` }
+    });
+
+    expect(deleted.statusCode).toBe(200);
+    expect(fs.existsSync(coverFile)).toBe(false);
+  });
+
+  it("rejects redirects to private addresses", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, {
+        status: 302,
+        headers: { location: "http://127.0.0.1/private-cover.png" }
+      })
+    );
+
+    const bookId = await createBook();
+    const response = await patchCover(bookId, "https://covers.example/redirect.png");
+
+    expect(response.statusCode).toBe(400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("localizes metadata refresh covers instead of storing raw remote URLs", async () => {

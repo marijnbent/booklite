@@ -125,7 +125,10 @@ Upload and metadata defaults:
 - `GOOGLE_BOOKS_LANGUAGE` optional, example `en`
 - `GOOGLE_BOOKS_API_KEY` optional
 - `HARDCOVER_API_KEY` optional
-- `OPENROUTER_API_KEY` optional
+- `OPENROUTER_API_KEY` optional, environment-only credential for metadata AI
+
+Metadata AI uses `openai/gpt-5.6-luna` for fresh installs. Owners can save a different
+OpenRouter model in app settings. Explicit saved model choices are not overwritten.
 
 Bootstrap:
 

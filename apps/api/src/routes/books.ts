@@ -30,6 +30,7 @@ import {
   getFavoritesCollectionId
 } from "../services/systemCollections";
 import { buildBookSearchQuery } from "../services/books";
+import { resolveContainedPath } from "../utils/containedPath";
 
 const patchBookSchema = z.object({
   title: z.string().min(1).optional(),
@@ -357,10 +358,7 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: "Cover not found" });
     }
 
-    reply.header(
-      "cache-control",
-      query.v ? "public, max-age=31536000, immutable" : "private, no-cache"
-    );
+    reply.header("cache-control", "private, no-store");
     reply.header("content-type", "image/jpeg");
     return reply.send(fs.createReadStream(resolved.absolutePath));
   });
@@ -526,6 +524,13 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(403).send({ error: "Forbidden" });
       }
 
+      let fullPath: string;
+      try {
+        fullPath = resolveContainedPath(config.booksDir, existing.file_path);
+      } catch {
+        return reply.code(500).send({ error: "Stored book path is invalid" });
+      }
+
       // Delete related rows first
       await db.delete(collectionBooks).where(eq(collectionBooks.bookId, params.id));
       await db.delete(bookProgress).where(eq(bookProgress.bookId, params.id));
@@ -533,11 +538,11 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Delete file from disk (best effort)
       try {
-        const fullPath = path.resolve(config.booksDir, existing.file_path);
         if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
       } catch {
         // ignore file deletion errors
       }
+      deleteManagedCoverIfPresent(existing.cover_path);
 
       return { ok: true };
     }
@@ -843,7 +848,12 @@ export const booksRoutes: FastifyPluginAsync = async (fastify) => {
       const row = rows[0];
       if (!row) return reply.code(404).send({ error: "Book not found" });
 
-      const absolutePath = path.join(config.booksDir, row.file_path);
+      let absolutePath: string;
+      try {
+        absolutePath = resolveContainedPath(config.booksDir, row.file_path);
+      } catch {
+        return reply.code(404).send({ error: "File not found" });
+      }
       if (!fs.existsSync(absolutePath)) {
         return reply.code(404).send({ error: "File not found" });
       }

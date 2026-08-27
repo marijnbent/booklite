@@ -637,6 +637,7 @@ describe("kobo contract", () => {
     });
 
     expect(activityResponse.statusCode).toBe(200);
+    expect(JSON.stringify(activityResponse.json())).not.toContain(koboToken);
     expect(activityResponse.json()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

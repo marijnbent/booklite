@@ -99,7 +99,9 @@ describe("app settings", () => {
       goodreads: true,
       douban: false
     });
-    expect(body.metadataOpenrouterModel).toBe("");
+    expect(body.metadataOpenrouterModel).toBe("openai/gpt-5.6-luna");
+    expect(body.metadataOpenrouterApiKeyConfigured).toBe(false);
+    expect(body).not.toHaveProperty("metadataOpenrouterApiKey");
     expect(body.koboDebugLogging).toBe(false);
     expect(body).not.toHaveProperty("metadataProviderPrimary");
     expect(body).not.toHaveProperty("metadataProviderSecondary");
@@ -107,6 +109,22 @@ describe("app settings", () => {
     expect(body).not.toHaveProperty("metadataFieldProviders");
     expect(body).not.toHaveProperty("metadataComicvineApiKey");
     expect(body).not.toHaveProperty("metadataAudibleDomain");
+  });
+
+  it("rejects legacy attempts to store an OpenRouter API key", async () => {
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/v1/app-settings",
+      headers: {
+        authorization: `Bearer ${ownerAccessToken}`,
+        "content-type": "application/json"
+      },
+      payload: {
+        metadataOpenrouterApiKey: "must-not-be-stored"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it("rejects removed provider values in PATCH", async () => {

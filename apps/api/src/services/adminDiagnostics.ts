@@ -11,6 +11,7 @@ import {
   type AdminActivityScope
 } from "./adminActivityLog";
 import { nowIso } from "../utils/time";
+import { DEFAULT_OPENROUTER_MODEL } from "./aiSettings";
 
 type DiagnosticsUserRow = {
   id: number;
@@ -68,10 +69,11 @@ const getDiagnosticsSettings = async () => ({
     "metadata_openrouter_enabled",
     false
   ),
-  metadataOpenrouterModel: await getSetting<string>("metadata_openrouter_model", ""),
-  metadataOpenrouterApiKeyConfigured: hasConfiguredValue(
-    await getSetting<string>("metadata_openrouter_api_key", config.openrouterApiKey ?? "")
+  metadataOpenrouterModel: await getSetting<string>(
+    "metadata_openrouter_model",
+    DEFAULT_OPENROUTER_MODEL
   ),
+  metadataOpenrouterApiKeyConfigured: hasConfiguredValue(config.openrouterApiKey),
   koboDebugLogging: await getSetting<boolean>("kobo_debug_logging", false),
   uploadLimitMb: await getSetting<number>("upload_limit_mb", config.uploadLimitMb),
   ebookDownloadUrlConfigured: hasConfiguredValue(

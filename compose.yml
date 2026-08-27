@@ -9,7 +9,8 @@ services:
       - APP_DATA_DIR=${APP_DATA_DIR:-/app/data}
       - BOOKS_DIR=${BOOKS_DIR:-/books}
       - BASE_URL=${BASE_URL:-http://localhost:6060}
-      - JWT_SECRET=${JWT_SECRET:-change-me-booklite}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       # Optional bootstrap owner (first run only)
       # - BOOTSTRAP_OWNER_EMAIL=owner@example.com
       # - BOOTSTRAP_OWNER_USERNAME=owner

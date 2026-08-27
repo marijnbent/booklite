@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
 import { createTempEnv, setupOwnerAndLogin, setupTestApp } from "./helpers";
+
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(async () => [{ address: "93.184.216.34", family: 4 }])
+}));
 
 const { fetchMetadataWithFallbackMock } = vi.hoisted(() => ({
   fetchMetadataWithFallbackMock: vi.fn()
@@ -11,10 +16,7 @@ vi.mock("../src/services/metadata", () => ({
 
 createTempEnv();
 
-const tinyPng = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1sAAAAASUVORK5CYII=",
-  "base64"
-);
+let tinyPng: Buffer;
 
 let app: Awaited<ReturnType<(typeof import("../src/app"))["buildApp"]>>;
 let accessToken = "";
@@ -26,6 +28,11 @@ vi.stubGlobal("fetch", fetchMock);
 
 describe("books metadata + kobo scope", () => {
   beforeAll(async () => {
+    tinyPng = await sharp({
+      create: { width: 1, height: 1, channels: 4, background: "white" }
+    })
+      .png()
+      .toBuffer();
     app = await setupTestApp();
     accessToken = (await setupOwnerAndLogin(app, "owner5@example.com", "owner5")).accessToken;
 

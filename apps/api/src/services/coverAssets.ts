@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import net from "node:net";
 import sharp from "sharp";
 import { config } from "../config";
+import { safeRemoteFetch } from "./safeRemoteFetch";
 
 const MANAGED_COVER_PREFIX = "managed://covers/";
 const MANAGED_COVER_PATTERN = /^managed:\/\/covers\/(\d+)\/cover\.jpg$/;
@@ -11,55 +11,10 @@ const MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024;
 const OUTPUT_QUALITY = 82;
 const OUTPUT_MAX_WIDTH = 1400;
 
-const LOCAL_HOSTNAMES = new Set([
-  "localhost",
-  "127.0.0.1",
-  "::1",
-  "0.0.0.0"
-]);
-
 const normalizeCandidate = (value: string | null | undefined): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
-};
-
-const isPrivateIpv4 = (value: string): boolean => {
-  const parts = value.split(".").map((part) => Number.parseInt(part, 10));
-  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part) || part < 0 || part > 255)) {
-    return false;
-  }
-
-  return (
-    parts[0] === 10 ||
-    parts[0] === 127 ||
-    parts[0] === 0 ||
-    (parts[0] === 169 && parts[1] === 254) ||
-    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-    (parts[0] === 192 && parts[1] === 168)
-  );
-};
-
-const isPrivateIpv6 = (value: string): boolean => {
-  const normalized = value.toLowerCase();
-  return (
-    normalized === "::1" ||
-    normalized.startsWith("fc") ||
-    normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:")
-  );
-};
-
-const isPrivateHost = (hostname: string): boolean => {
-  const normalized = hostname.trim().toLowerCase();
-  if (!normalized) return true;
-  if (LOCAL_HOSTNAMES.has(normalized)) return true;
-  if (normalized.endsWith(".localhost") || normalized.endsWith(".local")) return true;
-
-  const ipVersion = net.isIP(normalized);
-  if (ipVersion === 4) return isPrivateIpv4(normalized);
-  if (ipVersion === 6) return isPrivateIpv6(normalized);
-  return false;
 };
 
 const getManagedCoverAbsolutePath = (bookId: number): string =>
@@ -94,29 +49,6 @@ const readResponseBytes = async (response: Response): Promise<Buffer> => {
   }
 
   return Buffer.concat(chunks);
-};
-
-const validateRemoteUrl = (url: string): URL => {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("Cover URL is invalid");
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Cover URL must use http or https");
-  }
-
-  if (parsed.username || parsed.password) {
-    throw new Error("Cover URL must not include credentials");
-  }
-
-  if (isPrivateHost(parsed.hostname)) {
-    throw new Error("Cover URL points to a local or private address");
-  }
-
-  return parsed;
 };
 
 const normalizeToManagedJpeg = async (bytes: Buffer): Promise<Buffer> =>
@@ -232,12 +164,11 @@ export const localizeRemoteCoverForBook = async (
   bookId: number,
   remoteUrl: string
 ): Promise<string> => {
-  const validatedUrl = validateRemoteUrl(remoteUrl);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(validatedUrl, { signal: controller.signal });
+    const response = await safeRemoteFetch(remoteUrl, { signal: controller.signal });
     if (!response.ok) {
       throw new Error(`Cover host returned ${response.status}`);
     }

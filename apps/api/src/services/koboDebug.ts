@@ -8,6 +8,7 @@ type KoboDebugRequest = FastifyRequest & {
   koboDebugStartAt?: number;
   koboDebugActorUserId?: number | null;
   koboDebugAuth?: KoboDebugAuth;
+  koboDebugToken?: string | null;
 };
 
 type KoboDebugAuth = {
@@ -57,21 +58,33 @@ const maskSensitiveValue = (key: string, value: string): string => {
     lowered.includes("apikey") ||
     lowered.includes("api-key")
   ) {
-    if (value.length <= 8) return "***";
-    return `${value.slice(0, 4)}...${value.slice(-4)}`;
+    return "***";
   }
   return value;
 };
 
-const sanitizeHeaders = (headers: Record<string, unknown>): Record<string, unknown> => {
+const redactSecret = (value: string, secret: string | null | undefined): string => {
+  if (!secret) return value;
+  return value
+    .replaceAll(secret, "***")
+    .replaceAll(encodeURIComponent(secret), "***");
+};
+
+const sanitizeHeaders = (
+  headers: Record<string, unknown>,
+  token: string | null | undefined
+): Record<string, unknown> => {
   const entries = Object.entries(headers)
     .filter(([key]) => ALLOWED_HEADER_KEYS.has(key.toLowerCase()) || key.toLowerCase().startsWith("x-kobo-"))
     .map(([key, value]) => {
       if (Array.isArray(value)) {
-        return [key, value.map((item) => maskSensitiveValue(key, String(item)))];
+        return [
+          key,
+          value.map((item) => maskSensitiveValue(key, redactSecret(String(item), token)))
+        ];
       }
       if (typeof value === "string") {
-        return [key, maskSensitiveValue(key, value)];
+        return [key, maskSensitiveValue(key, redactSecret(value, token))];
       }
       return [key, value ?? null];
     });
@@ -79,23 +92,32 @@ const sanitizeHeaders = (headers: Record<string, unknown>): Record<string, unkno
   return Object.fromEntries(entries);
 };
 
-const summarizeValue = (value: unknown, depth = 0): unknown => {
+const summarizeValue = (
+  value: unknown,
+  depth = 0,
+  token?: string | null,
+  key?: string
+): unknown => {
   if (value === null || value === undefined) return null;
   if (depth >= 3) {
     if (Array.isArray(value)) return { type: "array", length: value.length };
     if (typeof value === "object") return { type: "object" };
-    return String(value);
+    const text = redactSecret(String(value), token);
+    return key ? maskSensitiveValue(key, text) : text;
   }
 
   if (typeof value === "string") {
-    return value.length > 1200 ? `${value.slice(0, 1200)}...` : value;
+    const redacted = key
+      ? maskSensitiveValue(key, redactSecret(value, token))
+      : redactSecret(value, token);
+    return redacted.length > 1200 ? `${redacted.slice(0, 1200)}...` : redacted;
   }
   if (typeof value === "number" || typeof value === "boolean") return value;
   if (Array.isArray(value)) {
     return {
       type: "array",
       length: value.length,
-      sample: value.slice(0, 3).map((item) => summarizeValue(item, depth + 1))
+      sample: value.slice(0, 3).map((item) => summarizeValue(item, depth + 1, token))
     };
   }
   if (value instanceof Uint8Array) {
@@ -103,7 +125,12 @@ const summarizeValue = (value: unknown, depth = 0): unknown => {
   }
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>).slice(0, 20);
-    return Object.fromEntries(entries.map(([key, nested]) => [key, summarizeValue(nested, depth + 1)]));
+    return Object.fromEntries(
+      entries.map(([nestedKey, nested]) => [
+        nestedKey,
+        summarizeValue(nested, depth + 1, token, nestedKey)
+      ])
+    );
   }
 
   return String(value);
@@ -111,26 +138,27 @@ const summarizeValue = (value: unknown, depth = 0): unknown => {
 
 const summarizePayload = (
   payload: unknown,
-  contentType: string | undefined
+  contentType: string | undefined,
+  token?: string | null
 ): unknown => {
   if (payload === null || payload === undefined) return null;
   if (typeof payload === "string") {
     const trimmed = payload.trim();
     if (contentType?.includes("application/json") && trimmed.length > 0) {
       try {
-        return summarizeValue(JSON.parse(trimmed));
+        return summarizeValue(JSON.parse(trimmed), 0, token);
       } catch {
-        return summarizeValue(trimmed);
+        return summarizeValue(trimmed, 0, token);
       }
     }
-    return summarizeValue(trimmed);
+    return summarizeValue(trimmed, 0, token);
   }
 
   if (typeof payload === "object" && payload !== null && "pipe" in (payload as object)) {
     return { type: "stream" };
   }
 
-  return summarizeValue(payload);
+  return summarizeValue(payload, 0, token);
 };
 
 export const isKoboDebugLoggingEnabled = async (): Promise<boolean> =>
@@ -143,6 +171,7 @@ export const prepareKoboDebugRequest = async (request: FastifyRequest): Promise<
 
   debugRequest.koboDebugStartAt = Date.now();
   const token = extractKoboToken(request);
+  debugRequest.koboDebugToken = token;
   if (!token) {
     debugRequest.koboDebugActorUserId = null;
     debugRequest.koboDebugAuth = {
@@ -174,6 +203,7 @@ export const prepareKoboDebugRequest = async (request: FastifyRequest): Promise<
 export const logKoboDebugRequest = async (request: FastifyRequest): Promise<void> => {
   const debugRequest = request as KoboDebugRequest;
   if (!debugRequest.koboDebugEnabled) return;
+  const token = debugRequest.koboDebugToken;
 
   await logAdminActivity({
     scope: "kobo",
@@ -183,12 +213,12 @@ export const logKoboDebugRequest = async (request: FastifyRequest): Promise<void
     actorUserId: debugRequest.koboDebugActorUserId ?? null,
     details: {
       method: request.method,
-      url: request.raw.url ?? request.url,
-      params: summarizeValue(request.params),
-      query: summarizeValue(request.query),
+      url: redactSecret(request.raw.url ?? request.url, token),
+      params: summarizeValue(request.params, 0, token),
+      query: summarizeValue(request.query, 0, token),
       auth: debugRequest.koboDebugAuth ?? null,
-      headers: sanitizeHeaders(request.headers as Record<string, unknown>),
-      body: summarizePayload(request.body, request.headers["content-type"])
+      headers: sanitizeHeaders(request.headers as Record<string, unknown>, token),
+      body: summarizePayload(request.body, request.headers["content-type"], token)
     }
   });
 };
@@ -200,6 +230,7 @@ export const logKoboDebugResponse = async (
 ): Promise<void> => {
   const debugRequest = request as KoboDebugRequest;
   if (!debugRequest.koboDebugEnabled) return;
+  const token = debugRequest.koboDebugToken;
 
   const rawHeaders = reply.getHeaders() as Record<string, unknown>;
   await logAdminActivity({
@@ -210,7 +241,7 @@ export const logKoboDebugResponse = async (
     actorUserId: debugRequest.koboDebugActorUserId ?? null,
     details: {
       method: request.method,
-      url: request.raw.url ?? request.url,
+      url: redactSecret(request.raw.url ?? request.url, token),
       statusCode: reply.statusCode,
       durationMs:
         typeof debugRequest.koboDebugStartAt === "number"
@@ -220,8 +251,14 @@ export const logKoboDebugResponse = async (
       ...(reply.statusCode === 401 && debugRequest.koboDebugAuth?.status !== "ok"
         ? { authFailureReason: debugRequest.koboDebugAuth?.status ?? "unknown" }
         : {}),
-      headers: sanitizeHeaders(rawHeaders),
-      body: summarizePayload(payload, typeof rawHeaders["content-type"] === "string" ? rawHeaders["content-type"] : undefined)
+      headers: sanitizeHeaders(rawHeaders, token),
+      body: summarizePayload(
+        payload,
+        typeof rawHeaders["content-type"] === "string"
+          ? rawHeaders["content-type"]
+          : undefined,
+        token
+      )
     }
   });
 };
@@ -245,7 +282,9 @@ export const logKoboDebugEvent = async (input: {
     message: input.message,
     actorUserId: input.actorUserId ?? request?.koboDebugActorUserId ?? null,
     bookId: input.bookId ?? null,
-    details: input.details
+    details: summarizeValue(input.details, 0, request?.koboDebugToken) as
+      | Record<string, unknown>
+      | undefined
   });
 };
 

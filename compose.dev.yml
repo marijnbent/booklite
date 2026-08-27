@@ -13,5 +13,9 @@ services:
       - "6060:6060"
     volumes:
       - ./:/workspace
+      - booklite_dev_node_modules:/workspace/node_modules
       - ./app-data:/app/data
       - ./books:/books
+
+volumes:
+  booklite_dev_node_modules:
