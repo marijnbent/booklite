@@ -12,8 +12,12 @@ import { fetchMetadataWithFallback, MetadataResult } from "../src/services/metad
 import { db } from "../src/db/client";
 import { appSettings } from "../src/db/schema";
 
-const API_KEY = process.env.OPENROUTER_API_KEY ?? "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";
-const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-3.1-flash-lite-preview";
+const API_KEY = process.env.OPENROUTER_API_KEY?.trim();
+const MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-5.6-luna";
+
+if (!API_KEY) {
+  throw new Error("OPENROUTER_API_KEY is required");
+}
 
 const FILENAMES = [
   // Anna's Archive format

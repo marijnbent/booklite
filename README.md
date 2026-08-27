@@ -126,7 +126,6 @@ Upload and metadata defaults:
 - `GOOGLE_BOOKS_API_KEY` optional
 - `HARDCOVER_API_KEY` optional
 - `OPENROUTER_API_KEY` optional
-- `OPENROUTER_MODEL` optional, default `google/gemini-3.1-flash-lite-preview`
 
 Bootstrap:
 

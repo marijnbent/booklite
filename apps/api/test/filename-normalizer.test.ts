@@ -10,8 +10,7 @@ vi.mock("../src/db/client", () => ({
 
 vi.mock("../src/config", () => ({
   config: {
-    openrouterApiKey: "",
-    openrouterModel: "google/gemini-2.0-flash-lite-001"
+    openrouterApiKey: ""
   }
 }));
 
@@ -38,7 +37,7 @@ describe("filename normalizer", () => {
   it("does not call LLM for high-confidence parses", async () => {
     settings.set("metadata_openrouter_enabled", true);
     settings.set("metadata_openrouter_api_key", "key");
-    settings.set("metadata_openrouter_model", "google/gemini-2.0-flash-lite-001");
+    settings.set("metadata_openrouter_model", "test/openrouter-model");
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const fileName = "Brandon Sanderson - Mistborn.epub";
@@ -52,7 +51,7 @@ describe("filename normalizer", () => {
   it("does not call LLM when parse is low-confidence but AI is disabled", async () => {
     settings.set("metadata_openrouter_enabled", false);
     settings.set("metadata_openrouter_api_key", "key");
-    settings.set("metadata_openrouter_model", "google/gemini-2.0-flash-lite-001");
+    settings.set("metadata_openrouter_model", "test/openrouter-model");
 
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const fileName = "libgen_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.epub";
@@ -66,7 +65,7 @@ describe("filename normalizer", () => {
   it("calls LLM for low-confidence parses and merges corrections", async () => {
     settings.set("metadata_openrouter_enabled", true);
     settings.set("metadata_openrouter_api_key", "key");
-    settings.set("metadata_openrouter_model", "google/gemini-2.0-flash-lite-001");
+    settings.set("metadata_openrouter_model", "test/openrouter-model");
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
@@ -96,7 +95,7 @@ describe("filename normalizer", () => {
   it("falls back to deterministic parse when LLM response is invalid", async () => {
     settings.set("metadata_openrouter_enabled", true);
     settings.set("metadata_openrouter_api_key", "key");
-    settings.set("metadata_openrouter_model", "google/gemini-2.0-flash-lite-001");
+    settings.set("metadata_openrouter_model", "test/openrouter-model");
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue(openRouterResponse("not-json"));
 
@@ -123,7 +122,7 @@ describe("filename normalizer", () => {
   it("keeps deterministic author and series when LLM returns only title", async () => {
     settings.set("metadata_openrouter_enabled", true);
     settings.set("metadata_openrouter_api_key", "key");
-    settings.set("metadata_openrouter_model", "google/gemini-2.0-flash-lite-001");
+    settings.set("metadata_openrouter_model", "test/openrouter-model");
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       openRouterResponse(
@@ -148,7 +147,7 @@ describe("filename normalizer", () => {
   it("includes language-preservation instructions in the LLM prompt", async () => {
     settings.set("metadata_openrouter_enabled", true);
     settings.set("metadata_openrouter_api_key", "key");
-    settings.set("metadata_openrouter_model", "google/gemini-2.0-flash-lite-001");
+    settings.set("metadata_openrouter_model", "test/openrouter-model");
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
       async (_input: RequestInfo | URL, init?: RequestInit) => {
