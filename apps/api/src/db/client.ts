@@ -34,6 +34,13 @@ export const seedDefaultAppSettings = (): void => {
   insertSetting.run("metadata_google_api_key", JSON.stringify(config.googleBooksApiKey));
   insertSetting.run("metadata_hardcover_api_key", JSON.stringify(config.hardcoverApiKey));
   insertSetting.run("metadata_openrouter_model", JSON.stringify(DEFAULT_OPENROUTER_MODEL));
+  sqlite
+    .prepare("UPDATE app_settings SET value_json = ? WHERE key = ? AND value_json = ?")
+    .run(
+      JSON.stringify(DEFAULT_OPENROUTER_MODEL),
+      "metadata_openrouter_model",
+      JSON.stringify("openai/gpt-5.6-luna")
+    );
   insertSetting.run("upload_limit_mb", JSON.stringify(config.uploadLimitMb));
 
   // OpenRouter credentials are environment-only. Remove values saved by older releases.

@@ -14,7 +14,7 @@ import path from "node:path";
 import type { MetadataResult } from "../src/services/metadata";
 
 const API_KEY = process.env.OPENROUTER_API_KEY?.trim();
-const MODEL = process.env.BOOKLITE_BENCHMARK_MODEL ?? "openai/gpt-5.6-luna";
+const MODEL = process.env.BOOKLITE_BENCHMARK_MODEL ?? "~openai/gpt-luna-latest";
 
 if (!API_KEY) {
   throw new Error("OPENROUTER_API_KEY is required");

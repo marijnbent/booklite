@@ -127,8 +127,9 @@ Upload and metadata defaults:
 - `HARDCOVER_API_KEY` optional
 - `OPENROUTER_API_KEY` optional, environment-only credential for metadata AI
 
-Metadata AI uses `openai/gpt-5.6-luna` for fresh installs. Owners can save a different
-OpenRouter model in app settings. Explicit saved model choices are not overwritten.
+Metadata AI uses `~openai/gpt-luna-latest`. Existing installs using the previous
+`openai/gpt-5.6-luna` default switch to this alias on startup. Owners can save a
+different OpenRouter model in app settings; other saved choices are preserved.
 
 Bootstrap:
 

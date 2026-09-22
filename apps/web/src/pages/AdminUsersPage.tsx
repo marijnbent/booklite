@@ -907,7 +907,7 @@ export const AdminUsersPage: React.FC = () => {
                       <Input
                         type="text"
                         defaultValue={settings.data.metadataOpenrouterModel}
-                        placeholder="openai/gpt-5.6-luna"
+                        placeholder="~openai/gpt-luna-latest"
                         onBlur={(e) =>
                           patchSettings.mutate({
                             metadataOpenrouterModel: e.target.value,

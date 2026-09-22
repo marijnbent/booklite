@@ -99,7 +99,7 @@ describe("app settings", () => {
       goodreads: true,
       douban: false
     });
-    expect(body.metadataOpenrouterModel).toBe("openai/gpt-5.6-luna");
+    expect(body.metadataOpenrouterModel).toBe("~openai/gpt-luna-latest");
     expect(body.metadataOpenrouterApiKeyConfigured).toBe(false);
     expect(body).not.toHaveProperty("metadataOpenrouterApiKey");
     expect(body.koboDebugLogging).toBe(false);
@@ -109,6 +109,29 @@ describe("app settings", () => {
     expect(body).not.toHaveProperty("metadataFieldProviders");
     expect(body).not.toHaveProperty("metadataComicvineApiKey");
     expect(body).not.toHaveProperty("metadataAudibleDomain");
+  });
+
+  it("moves the previous default model to the latest alias and preserves other choices", async () => {
+    const setModel = dbModule.sqlite.prepare(
+      "UPDATE app_settings SET value_json = ? WHERE key = 'metadata_openrouter_model'"
+    );
+    const getModel = dbModule.sqlite.prepare(
+      "SELECT value_json FROM app_settings WHERE key = 'metadata_openrouter_model'"
+    );
+
+    setModel.run(JSON.stringify("openai/gpt-5.6-luna"));
+    dbModule.seedDefaultAppSettings();
+    expect(JSON.parse((getModel.get() as { value_json: string }).value_json)).toBe(
+      "~openai/gpt-luna-latest"
+    );
+
+    setModel.run(JSON.stringify("custom/model"));
+    dbModule.seedDefaultAppSettings();
+    expect(JSON.parse((getModel.get() as { value_json: string }).value_json)).toBe(
+      "custom/model"
+    );
+
+    setModel.run(JSON.stringify("~openai/gpt-luna-latest"));
   });
 
   it("rejects legacy attempts to store an OpenRouter API key", async () => {
