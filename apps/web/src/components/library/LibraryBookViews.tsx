@@ -18,7 +18,6 @@ import {
   renderCollectionIcon,
   statusConfig,
 } from "@/components/library/libraryShared";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -74,15 +73,15 @@ export const SelectionToolbar: React.FC<{
   const allOwned = selectedBooks.length > 0 && selectedBooks.every((book) => !book.isShared);
 
   return (
-    <div className="fixed bottom-6 left-1/2 z-50 flex items-center gap-1 rounded-xl border border-border/60 bg-background/95 px-3 py-2 shadow-xl shadow-black/[0.08] backdrop-blur-md animate-slide-up">
+    <div className="selection-toolbar">
       <span className="whitespace-nowrap px-1 text-sm font-medium">{selectedCount} selected</span>
       <div className="mx-0.5 h-5 w-px bg-border/60" />
 
       {assignableCollections.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" title="Add to collection">
-              <FolderPlus className="size-4" />
+            <Button variant="ghost" size="icon" className="h-8 w-auto px-2" title="Add to collection">
+              <FolderPlus className="size-4" /><span className="hidden sm:inline">Collection</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-44">
@@ -104,8 +103,8 @@ export const SelectionToolbar: React.FC<{
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-8" title="Set status">
-            <BookOpen className="size-4" />
+          <Button variant="ghost" size="icon" className="h-8 w-auto px-2" title="Set status">
+            <BookOpen className="size-4" /><span className="hidden sm:inline">Status</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="center" className="w-44">
@@ -122,32 +121,32 @@ export const SelectionToolbar: React.FC<{
       </DropdownMenu>
 
       {allOwned && (
-        <Button variant="ghost" size="icon" className="size-8" title="Share selected" onClick={onShare}>
-          <Users className="size-4" />
+        <Button variant="ghost" size="icon" className="h-8 w-auto px-2" title="Share selected" onClick={onShare}>
+          <Users className="size-4" /><span className="hidden sm:inline">Share</span>
         </Button>
       )}
       {allOwned && (
-        <Button variant="ghost" size="icon" className="size-8" title="Refresh metadata" onClick={onRefreshMetadata}>
-          <RefreshCw className="size-4" />
+        <Button variant="ghost" size="icon" className="h-8 w-auto px-2" title="Refresh metadata" onClick={onRefreshMetadata}>
+          <RefreshCw className="size-4" /><span className="hidden sm:inline">Metadata</span>
         </Button>
       )}
-      <Button variant="ghost" size="icon" className="size-8" title="Download" onClick={onDownload}>
-        <Download className="size-4" />
+      <Button variant="ghost" size="icon" className="h-8 w-auto px-2" title="Download" onClick={onDownload}>
+        <Download className="size-4" /><span className="hidden sm:inline">Download</span>
       </Button>
       {allOwned && (
         <Button
           variant="ghost"
           size="icon"
-          className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          className="h-8 w-auto px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
           title="Delete"
           onClick={onDelete}
         >
-          <Trash2 className="size-4" />
+          <Trash2 className="size-4" /><span className="hidden sm:inline">Delete</span>
         </Button>
       )}
 
       <div className="mx-0.5 h-5 w-px bg-border/60" />
-      <Button variant="ghost" size="icon" className="size-7" onClick={onClear}>
+      <Button variant="ghost" size="icon" className="size-7 shrink-0" aria-label="Clear selection" onClick={onClear}>
         <X className="size-3.5" />
       </Button>
     </div>
@@ -172,58 +171,32 @@ export const GridCard: React.FC<{
         <div className="group cursor-pointer" onClick={(event) => menuProps.onBookClick(book.id, event)}>
           <div
             className={cn(
-              "relative aspect-[2/3] overflow-hidden rounded-lg bg-muted/20 shadow-sm transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg",
-              isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+              "shelf-cover relative aspect-[2/3] overflow-hidden bg-muted/20",
+              isSelected && "is-selected",
             )}
           >
             <BookCover book={book} className="h-full w-full" />
 
-            {shareBadge && <BookShareBadge book={book} className="absolute left-1.5 top-1.5 text-[9px]" />}
-
-            {selectionActive ? (
-              <button
-                className={cn(
-                  "absolute left-1.5 flex size-6 items-center justify-center rounded-full border-2 transition-all",
-                  shareBadge ? "top-8" : "top-1.5",
-                  isSelected ? "border-primary bg-primary" : "border-white/60 bg-black/25 backdrop-blur-sm",
-                )}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  menuProps.onToggleSelect(book.id);
-                }}
-              >
-                {isSelected && <Check className="size-3 text-primary-foreground" />}
-              </button>
-            ) : (
-              <button
-                className={cn(
-                  "absolute left-1.5 flex size-6 items-center justify-center rounded transition-all",
-                  shareBadge ? "top-8" : "top-1.5",
-                  book.isFavorite
-                    ? "bg-yellow-400/20 backdrop-blur-sm"
-                    : "bg-black/25 opacity-0 backdrop-blur-sm group-hover:opacity-100",
-                )}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void menuProps.onToggleFavorite(book.id, !book.isFavorite);
-                }}
-              >
-                <Star className={cn("size-3", book.isFavorite ? "fill-yellow-400 text-yellow-400" : "text-white/80")} />
-              </button>
-            )}
-
-            {book.koboSyncable === 1 && (
-              <span className="absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
-                <RefreshCw className="size-2" />
-                Kobo
-              </span>
-            )}
+            <div className="absolute bottom-2 left-1.5 flex flex-col items-start gap-1">
+              {book.koboSyncable === 1 && <span className="flex items-center gap-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] text-white"><RefreshCw className="size-2" />Kobo</span>}
+              {shareBadge && <BookShareBadge book={book} className="border-0 bg-black/70 text-white text-[9px]" />}
+            </div>
+            <button aria-label={`Select ${book.title}`} aria-pressed={isSelected}
+              className={cn("cover-select absolute left-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-black/60 text-white transition-opacity", !selectionActive && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
+              onClick={(event) => { event.stopPropagation(); menuProps.onToggleSelect(book.id); }}>
+              {isSelected && <Check className="size-3" />}
+            </button>
+            <button aria-label={book.isFavorite ? "Remove from favorites" : "Add to favorites"}
+              className={cn("absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-black/70 transition-opacity", !book.isFavorite && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100")}
+              onClick={(event) => { event.stopPropagation(); void menuProps.onToggleFavorite(book.id, !book.isFavorite); }}>
+              <Star className={cn("size-3", book.isFavorite ? "fill-cover-gold text-cover-gold" : "text-white")} />
+            </button>
 
             <div className="absolute bottom-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="flex size-6 items-center justify-center rounded bg-black/25 backdrop-blur-sm hover:bg-black/40"
+                    aria-label={`Menu for ${book.title}`} className="flex size-6 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm hover:bg-black/40"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <MoreHorizontal className="size-3 text-white/80" />
@@ -237,7 +210,7 @@ export const GridCard: React.FC<{
 
             {statusBucket === "READING" && percent > 0 && (
               <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/15">
-                <div className="h-full bg-status-processing/90" style={{ width: `${percent}%` }} />
+                <div className="h-full shelf-progress" style={{ width: `${percent}%` }} />
               </div>
             )}
           </div>
@@ -249,10 +222,7 @@ export const GridCard: React.FC<{
             <p className="truncate text-xs text-muted-foreground">{book.author ?? "Unknown author"}</p>
             {status !== "UNREAD" && (
               <div className="flex items-center gap-1 pt-0.5">
-                <Badge variant={config.variant} className="h-4 gap-0.5 px-1.5 py-0 text-[10px]">
-                  <config.icon className="size-2.5" />
-                  {config.label}
-                </Badge>
+                <span className="shelf-status" data-status={statusBucket}>{config.label}</span>
                 {statusBucket === "READING" && percent > 0 && (
                   <span className="text-[10px] tabular-nums text-muted-foreground/50">{percent}%</span>
                 )}
@@ -292,8 +262,9 @@ export const ListRow: React.FC<{
           onClick={(event) => menuProps.onBookClick(book.id, event)}
         >
           <div className="flex items-center gap-3 px-2.5 py-2">
-            {selectionActive && (
+            {(
               <button
+                aria-label={`Select ${book.title}`} aria-pressed={isSelected}
                 className={cn(
                   "flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
                   isSelected ? "border-primary bg-primary" : "border-muted-foreground/30 bg-transparent",
@@ -312,7 +283,7 @@ export const ListRow: React.FC<{
 
             <div className="min-w-0 flex-1">
               <h3 className="truncate text-sm font-medium transition-colors group-hover:text-primary">{book.title}</h3>
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground/60">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="truncate">{book.author ?? "Unknown author"}</span>
                 {book.series && <span className="truncate text-muted-foreground/35">&middot; {book.series}</span>}
                 {shareBadge && <BookShareBadge book={book} className="h-4 px-1.5" />}
@@ -320,7 +291,7 @@ export const ListRow: React.FC<{
               {statusBucket === "READING" && percent > 0 && (
                 <div className="mt-1 flex items-center gap-2">
                   <div className="h-1 max-w-20 flex-1 overflow-hidden rounded-full bg-muted/60">
-                    <div className="h-full rounded-full bg-status-processing" style={{ width: `${percent}%` }} />
+                    <div className="h-full rounded-full shelf-progress" style={{ width: `${percent}%` }} />
                   </div>
                   <span className="text-[10px] tabular-nums text-muted-foreground/50">{percent}%</span>
                 </div>
@@ -336,7 +307,7 @@ export const ListRow: React.FC<{
                     void menuProps.onToggleFavorite(book.id, !book.isFavorite);
                   }}
                 >
-                  <Star className={cn("size-3.5", book.isFavorite ? "fill-yellow-400 text-yellow-500" : "text-muted-foreground/25")} />
+                  <Star className={cn("size-3.5", book.isFavorite ? "fill-gold text-gold" : "text-muted-foreground/25")} />
                 </button>
               )}
               {book.koboSyncable === 1 && (
@@ -345,18 +316,15 @@ export const ListRow: React.FC<{
                   Kobo
                 </span>
               )}
-              <span className="w-14 text-right text-[11px] tabular-nums text-muted-foreground/40">{formatSize(book.fileSize)}</span>
-              <Badge variant={config.variant} className="h-4 gap-0.5 px-1.5 text-[10px]">
-                <config.icon className="size-2.5" />
-                {config.label}
-              </Badge>
+              <span className="w-28 text-right text-[11px] tabular-nums text-muted-foreground">{book.fileExt.toUpperCase()} · {formatSize(book.fileSize)}</span>
+              <span className="shelf-status w-28" data-status={statusBucket}>{config.label}</span>
             </div>
 
             <div className="opacity-0 transition-opacity group-hover:opacity-100">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="flex size-6 items-center justify-center rounded hover:bg-muted/60"
+                    aria-label={`Menu for ${book.title}`} className="flex size-6 items-center justify-center rounded-full hover:bg-muted/60"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <MoreHorizontal className="size-3.5 text-muted-foreground/50" />

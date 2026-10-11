@@ -1,3 +1,5 @@
+import type { AccentColor } from "@booklite/shared";
+import { applyAccent } from "./accent";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -14,6 +16,7 @@ import {
 type Role = "OWNER" | "MEMBER";
 
 export interface Me {
+  accentColor: AccentColor | null;
   id: number;
   email: string | null;
   username: string;
@@ -35,6 +38,7 @@ interface AuthContextValue {
   } | null;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  setAccent: (value: AccentColor) => Promise<void>;
   refreshMe: () => Promise<Me | null>;
   beginImpersonation: (userId: number) => Promise<void>;
   endImpersonation: () => Promise<void>;
@@ -72,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshMe = async () => {
     try {
       const user = await apiFetch<Me>("/api/v1/me");
+      applyAccent(user.accentColor);
       setMe(user);
       return user;
     } catch {
@@ -85,6 +90,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setImpersonation(toPublicImpersonation(loadImpersonationState()));
     refreshMe().finally(() => setLoading(false));
   }, []);
+
+  const setAccent = async (value: AccentColor) => {
+    if (!me) return;
+    const previous = me;
+    applyAccent(value);
+    setMe({ ...me, accentColor: value });
+    try {
+      await apiFetch("/api/v1/me", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accentColor: value }),
+      });
+    } catch (error) {
+      setMe(previous);
+      applyAccent(previous.accentColor);
+      throw error;
+    }
+  };
 
   const login = async (usernameOrEmail: string, password: string) => {
     const tokens = await apiFetch<AuthTokens>("/api/v1/auth/login", {
@@ -166,6 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       logout,
       refreshMe,
+      setAccent,
       beginImpersonation,
       endImpersonation,
     }),

@@ -22,8 +22,6 @@ import {
   createUploadBatches,
   toErrorMessage,
   sortDrafts,
-  draftBorderColor,
-  jobBorderColor,
   DEPLOYMENT_SAFE_UPLOAD_BATCH_BYTES,
   DEPLOYMENT_SAFE_UPLOAD_BATCH_FILES,
 } from "@/components/uploads/uploadHelpers";
@@ -352,6 +350,8 @@ export const UploadsPage: React.FC = () => {
             )
             .map((result) => ({
               id: result.jobId,
+              draftId: result.id,
+              fileName: result.fileName,
               title: result.title,
               status: result.status
             }));
@@ -427,6 +427,7 @@ export const UploadsPage: React.FC = () => {
 
   // #1: Completion state
   const allJobsDone = jobs.length > 0 && jobs.every((j) => j.status === "COMPLETED" || j.status === "FAILED") && drafts.length === 0 && !uploadingAny;
+  const importTotal = jobs.length + uploadingIds.filter((id) => !jobs.some((job) => job.draftId === id)).length;
   const completedCount = jobs.filter((j) => j.status === "COMPLETED").length;
   const failedCount = jobs.filter((j) => j.status === "FAILED").length;
 
@@ -468,60 +469,14 @@ export const UploadsPage: React.FC = () => {
         </p>
       </div>
 
-      {/* #4: Drop zone — compact when files exist, tall when empty */}
-      {!hasAnyContent ? (
-        /* Tall drop zone */
-        <div
-          {...dropZoneHandlers}
-          className={cn(
-            "flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-14 transition-all duration-200 cursor-pointer",
-            dragOver
-              ? "border-primary bg-primary/5 scale-[1.01]"
-              : "border-border/70 hover:border-primary/40 hover:bg-accent/30"
-          )}
-        >
-          <div className={cn(
-            "flex size-14 items-center justify-center rounded-2xl transition-all duration-200",
-            dragOver ? "bg-primary/12 ring-2 ring-primary/20" : "bg-muted/60"
-          )}>
-            <FileUp className={cn(
-              "size-7 transition-colors duration-200",
-              dragOver ? "text-primary" : "text-muted-foreground/50"
-            )} />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-semibold">{dragOver ? "Drop to add books" : "Drop EPUB, KEPUB, or PDF files here"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              or click to browse &mdash; metadata is looked up automatically
-            </p>
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".epub,.kepub,.pdf"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files) addFilesToDrafts(e.target.files);
-              if (fileInputRef.current) fileInputRef.current.value = "";
-            }}
-          />
-        </div>
-      ) : (
-        /* #9: Hidden file input + FAB when files exist */
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".epub,.kepub,.pdf"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files) addFilesToDrafts(e.target.files);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-          }}
-        />
-      )}
+      <button type="button" {...dropZoneHandlers} className={cn("flex w-full items-center gap-3 rounded-2xl border border-dashed px-4 py-4 text-left text-sm text-muted-foreground", dragOver && "bg-secondary")}>
+        <FileUp className="size-5" />
+        <span>Drop files here, or <span className="font-medium text-foreground">browse</span></span>
+      </button>
+      <input ref={fileInputRef} type="file" accept=".epub,.kepub,.pdf" multiple className="hidden" onChange={(event) => {
+        if (event.target.files) addFilesToDrafts(event.target.files);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }} />
 
       {/* Status banner — importing or done */}
       {(uploadingAny || hasActiveJobs || allJobsDone) && (
@@ -547,6 +502,7 @@ export const UploadsPage: React.FC = () => {
                 : "Importing books — please stay on this page until complete."}
             </span>
           </div>
+          {!allJobsDone && <span className="shrink-0 text-xs text-muted-foreground">{completedCount} / {importTotal} imported</span>}
           {allJobsDone && (
             <div className="flex items-center gap-2 shrink-0">
               {!failedCount && (
@@ -627,7 +583,7 @@ export const UploadsPage: React.FC = () => {
                   ) : (
                     <Upload className="size-4" />
                   )}
-                  Add {selectedCount > 0 ? `${selectedCount} to library` : "to library"}
+                  Import {selectedCount} {selectedCount === 1 ? "book" : "books"}
                 </Button>
               </div>
             )}
@@ -647,8 +603,7 @@ export const UploadsPage: React.FC = () => {
                 <div
                   key={draft.id}
                   className={cn(
-                    "group flex items-center gap-3 rounded-r-lg border border-l-4 px-3 py-2 transition-all duration-300",
-                    draftBorderColor(draft, isUploading),
+                    "group flex items-center gap-3 rounded-xl px-3 py-2 transition-all duration-300",
                     draft.selected
                       ? "border-primary/20 bg-primary/[0.02]"
                       : "border-border/60",
@@ -661,7 +616,7 @@ export const UploadsPage: React.FC = () => {
                     type="button"
                     onClick={() => updateDraft(draft.id, { selected: !draft.selected })}
                     className={cn(
-                      "flex size-4.5 shrink-0 items-center justify-center rounded border transition-colors duration-150",
+                      "flex size-4.5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150",
                       draft.selected
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border hover:border-muted-foreground/50"
@@ -674,7 +629,7 @@ export const UploadsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingDraftId(draft.id)}
-                    className="relative shrink-0 overflow-hidden rounded border border-border/40 bg-muted/30 transition-colors hover:border-primary/40 group/cover"
+                    className="relative shrink-0 overflow-hidden rounded-[7px] border border-border/40 bg-muted/30 transition-colors hover:border-primary/40 group/cover"
                     style={{ width: 32, height: 48 }}
                   >
                     {draft.coverPath ? (
@@ -701,21 +656,23 @@ export const UploadsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingDraftId(draft.id)}
-                    className="min-w-0 flex-1 flex items-baseline gap-2 text-left overflow-hidden"
+                    className="min-w-0 flex-1 flex flex-col gap-0.5 text-left overflow-hidden"
                   >
                     <span className={cn("truncate text-sm font-medium", !draft.title && "text-muted-foreground/40")}>
                       {draft.title || "Untitled"}
                     </span>
                     {draft.author && (
                       <>
-                        <span className="shrink-0 text-muted-foreground/30">—</span>
+
                         <span className="truncate text-sm text-muted-foreground">{draft.author}</span>
                       </>
                     )}
                   </button>
 
+                  <span className="hidden max-w-48 truncate font-mono text-xs text-muted-foreground sm:block">{draft.file.name}</span>
+
                   {/* Metadata status */}
-                  <div className="shrink-0 w-28 text-right">
+                  <div className="shrink-0 w-16 sm:w-28 text-right">
                     {isLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground inline-block" />}
                     {isEnriched && (
                       <button
@@ -767,7 +724,7 @@ export const UploadsPage: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7 shrink-0 text-muted-foreground/0 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    className="size-7 shrink-0 text-muted-foreground hover:text-destructive transition-opacity duration-150"
                     onClick={() => removeDraft(draft.id)}
                     disabled={isUploading}
                   >
@@ -777,6 +734,7 @@ export const UploadsPage: React.FC = () => {
               );
             })}
 
+            {jobs.length > 0 && <p className="px-3 pt-4 text-xs text-muted-foreground">Importing</p>}
             {/* Job rows (inline in same list) */}
             {jobs.map((job) => {
               const display = statusDisplay[job.status];
@@ -784,8 +742,7 @@ export const UploadsPage: React.FC = () => {
                 <div
                   key={job.id}
                   className={cn(
-                    "flex items-center gap-3 rounded-r-lg border border-l-4 px-3 py-2 transition-all duration-500",
-                    jobBorderColor(job.status),
+                    "flex items-center gap-3 rounded-xl px-3 py-2 transition-all duration-500",
                     "border-border/40",
                     enteringJobIds.has(job.id) && "[animation:fade-up_0.35s_cubic-bezier(0.16,1,0.3,1)]",
                   )}
@@ -803,6 +760,7 @@ export const UploadsPage: React.FC = () => {
                     {job.title}
                   </p>
 
+                  {job.fileName && <span className="hidden max-w-48 truncate font-mono text-xs text-muted-foreground sm:block">{job.fileName}</span>}
                   {/* Error text shown as tooltip on status badge area */}
                   {job.error && (
                     <span
@@ -831,18 +789,6 @@ export const UploadsPage: React.FC = () => {
             </p>
           )}
         </div>
-      )}
-
-      {/* #9: FAB — fixed bottom-right when files exist */}
-      {hasAnyContent && (
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-primary pl-4 pr-5 py-3 text-sm font-medium text-primary-foreground shadow-lg hover:bg-primary/90 hover:shadow-xl transition-all duration-200"
-        >
-          <Plus className="size-4" />
-          Add files
-        </button>
       )}
 
       <UploadEditDraftDialog

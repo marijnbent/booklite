@@ -239,7 +239,7 @@ export const BookMenuItems: React.FC<{
         onSelect={runMenuAction(() => onToggleFavorite(book.id, !book.isFavorite))}
         className="gap-2 text-xs"
       >
-        <Star className={cn("size-3.5", book.isFavorite && "fill-yellow-400 text-yellow-500")} />
+        <Star className={cn("size-3.5", book.isFavorite && "fill-gold text-gold")} />
         {book.isFavorite ? "Unfavorite" : "Favorite"}
       </Item>
 

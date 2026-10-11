@@ -27,7 +27,7 @@ export const SetupPage: React.FC = () => {
 
   if (statusLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex auth-page min-h-screen items-center justify-center bg-transparent">
         <Loader2 className="size-5 text-muted-foreground animate-spin" />
       </div>
     );
@@ -52,13 +52,7 @@ export const SetupPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      {/* Subtle decorative gradient */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-32 size-[600px] rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute -bottom-40 -left-32 size-[500px] rounded-full bg-primary/4 blur-3xl" />
-      </div>
-
+    <div className="flex auth-page min-h-screen items-center justify-center bg-transparent px-4">
       <div className="relative w-full max-w-sm animate-fade-up">
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/12 ring-2 ring-primary/20 shadow-sm">

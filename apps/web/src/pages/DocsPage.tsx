@@ -30,7 +30,7 @@ const TroubleshootItem: React.FC<{
       type="button"
       onClick={() => setOpen((o) => !o)}
       className={[
-        "group w-full rounded-md border text-left transition-colors duration-150",
+        "group w-full rounded-2xl border text-left transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         open
           ? "border-border bg-muted/20"
@@ -139,7 +139,7 @@ export const DocsPage: React.FC = () => {
         Everything you need to know about BookLite.
       </p>
 
-      <nav className="mb-12 rounded-md border border-border bg-muted/20 p-4">
+      <nav className="mb-12 rounded-2xl border border-border bg-muted/20 p-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           On this page
         </p>
@@ -239,7 +239,7 @@ export const DocsPage: React.FC = () => {
               the selected collections and Favorites if requested.
             </Step>
           </ol>
-          <div className="mt-5 rounded-md border border-border bg-muted/15 p-4">
+          <div className="mt-5 rounded-2xl border border-border bg-muted/15 p-4">
             <div className="mb-2.5 flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -331,7 +331,7 @@ export const DocsPage: React.FC = () => {
             Member permissions, owner-only controls, and how impersonation works.
           </p>
           <div className="mb-5 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-md border border-border p-4">
+            <div className="rounded-2xl border border-border p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Badge variant="secondary" className="text-[11px] font-semibold">
                   Member
@@ -343,7 +343,7 @@ export const DocsPage: React.FC = () => {
                 <BulletItem>Hide shared books from your own library when you no longer want them.</BulletItem>
               </ul>
             </div>
-            <div className="rounded-md border border-border p-4">
+            <div className="rounded-2xl border border-border p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Badge variant="default" className="text-[11px] font-semibold">
                   Owner
@@ -358,7 +358,7 @@ export const DocsPage: React.FC = () => {
               </ul>
             </div>
           </div>
-          <div className="mb-4 flex items-start gap-2.5 rounded-md border border-border bg-muted/15 p-4">
+          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-border bg-muted/15 p-4">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             <p className="text-sm text-foreground/80">
               Disabled users cannot log in, and only active member accounts can be impersonated.
@@ -418,7 +418,7 @@ export const DocsPage: React.FC = () => {
               </ol>
             </div>
           </div>
-          <div className="rounded-md border border-border bg-muted/15 p-4">
+          <div className="rounded-2xl border border-border bg-muted/15 p-4">
             <div className="mb-2.5 flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

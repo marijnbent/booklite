@@ -8,12 +8,13 @@ import {
   text,
   uniqueIndex
 } from "drizzle-orm/sqlite-core";
-import { READ_STATUSES } from "@booklite/shared";
+import { ACCENT_COLORS, READ_STATUSES } from "@booklite/shared";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   email: text("email").unique(),
   username: text("username").notNull().unique(),
+  accentColor: text("accent_color", { enum: ACCENT_COLORS }),
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: ["OWNER", "MEMBER"] }).notNull().default("MEMBER"),
   createdAt: text("created_at").notNull(),

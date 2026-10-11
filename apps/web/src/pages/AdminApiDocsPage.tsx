@@ -177,14 +177,14 @@ export const AdminApiDocsPage: React.FC = () => {
           </div>
 
           {tokenMutation.isError && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
               Could not generate token. Try again.
             </div>
           )}
 
           {/* Token output — only shown after generation */}
           {generated && (
-            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+            <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
               {/* Raw token */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -225,7 +225,7 @@ export const AdminApiDocsPage: React.FC = () => {
                     {linkCopyStatus ?? "Copy URL"}
                   </button>
                 </div>
-                <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
+                <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
                   <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
                     {llmDocsUrl}

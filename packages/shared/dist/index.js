@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sourceLabel = exports.READ_STATUSES = void 0;
+exports.sourceLabel = exports.READ_STATUSES = exports.ACCENT_COLORS = void 0;
+exports.ACCENT_COLORS = ["orange", "rose", "violet", "blue", "teal", "green", "none"];
 exports.READ_STATUSES = [
     "UNSET",
     "UNREAD",

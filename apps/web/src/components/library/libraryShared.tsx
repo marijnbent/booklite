@@ -108,7 +108,7 @@ export const statusConfig: Record<
   WONT_READ: { label: "Won't read", icon: X, variant: "outline" },
 };
 
-export const detailStatusOptions = manualStatusOptions.map((status) => ({
+export const detailStatusOptions = (Object.keys(statusConfig) as DisplayStatus[]).map((status) => ({
   value: status,
   label: statusConfig[status].label,
   icon: statusConfig[status].icon,
@@ -317,7 +317,7 @@ export function renderCollectionIcon(
 }
 
 export const BookCover: React.FC<{
-  book: Pick<BookItem, "id" | "title" | "coverPath">;
+  book: Pick<BookItem, "id" | "title" | "coverPath"> & { author?: string | null };
   className?: string;
   showTitle?: boolean;
 }> = ({ book, className, showTitle = true }) => {
@@ -343,17 +343,17 @@ export const BookCover: React.FC<{
 
   return (
     <div
-      className={cn("flex flex-col items-center justify-center gap-2 p-4", className)}
+      className={cn("flex flex-col justify-between gap-3 p-4", className)}
       style={{
         background: `linear-gradient(145deg, oklch(0.38 0.09 ${hue}) 0%, oklch(0.20 0.06 ${hue + 40}) 100%)`,
       }}
     >
-      <Book className="size-8 text-white/15" />
       {showTitle && (
-        <span className="text-[10px] font-medium text-white/35 text-center leading-tight line-clamp-3 max-w-[80%]">
+        <span className="text-lg font-semibold text-white/90 leading-tight line-clamp-5">
           {book.title}
         </span>
       )}
+      {showTitle && <span className="text-xs text-white/70">{book.author ?? "Unknown author"}</span>}
     </div>
   );
 };

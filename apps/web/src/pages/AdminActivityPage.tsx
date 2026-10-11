@@ -237,7 +237,7 @@ const LogEntryRow: React.FC<{ entry: AdminActivityItem; index: number }> = ({
       {/* Collapsible details panel */}
       {hasDetails && expanded && (
         <div className="border-t border-border bg-zinc-950/[0.03] px-4 pb-3 pt-2 dark:bg-zinc-50/[0.03]">
-          <pre className="overflow-x-auto rounded-md bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-100">
+          <pre className="overflow-x-auto rounded-2xl bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-100">
             {formatActivityDetails(entry.details)}
           </pre>
         </div>
@@ -352,7 +352,7 @@ export const AdminActivityPage: React.FC = () => {
       </div>
 
       {/* Log stream card */}
-      <Card className="rounded-lg border-border overflow-hidden">
+      <Card className="rounded-2xl border-border overflow-hidden">
         {/* Toolbar */}
         <CardHeader className="border-b border-border bg-muted/20 px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -372,7 +372,7 @@ export const AdminActivityPage: React.FC = () => {
             {/* Right: filters + actions — visually separated */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Filter group */}
-              <div className="flex items-center gap-1.5 rounded-md border border-border bg-background p-0.5">
+              <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-background p-0.5">
                 <Select
                   value={activityScope}
                   onValueChange={(value) =>

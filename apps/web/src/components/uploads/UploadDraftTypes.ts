@@ -1,6 +1,8 @@
 import type { MetadataCoverOption, MetadataSource } from "@/lib/metadata";
 
 export interface UploadJob {
+  draftId?: string;
+  fileName?: string;
   id: string;
   title: string;
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";

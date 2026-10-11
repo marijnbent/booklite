@@ -44,10 +44,10 @@ import {
   detailStatusOptions,
   formatSize,
   getStatusFilterBucket,
+  getDisplayStatus,
   isVirtualCollection,
   renderCollectionIcon,
   sortBooks,
-  statusConfig,
   statusFilterLabels,
   statusFilterOptions,
   updateBookInData,
@@ -95,6 +95,7 @@ import {
   Grid3X3,
   List,
   Loader2,
+  MoreHorizontal,
   Pencil,
   Plus,
   RotateCcw,
@@ -671,15 +672,13 @@ export const LibraryPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Library</h1>
+      <div className="library-heading flex flex-wrap items-center gap-3">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">{activeCollection?.name ?? "Library"}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {activeCollection
-              ? `${activeCollection.icon ? activeCollection.icon + " " : ""}${activeCollection.name} \u00b7 ${statusCounts.ALL} books`
-              : `${statusCounts.ALL} books${statusCounts.READING > 0 ? ` \u00b7 ${statusCounts.READING} reading` : ""}`}
+            {statusCounts.ALL}{!activeCollection && booksQuery.hasNextPage ? "+" : ""} books{!activeCollection && statusCounts.READING > 0 ? ` · ${statusCounts.READING} reading` : ""}
           </p>
         </div>
         {activeCollection && !activeCollectionIsVirtual && (
@@ -693,118 +692,98 @@ export const LibraryPage: React.FC = () => {
             Add books
           </Button>
         )}
-      </div>
+        <div className="library-tools ml-auto flex items-center gap-2">
+          <div className="relative min-w-0 flex-1 sm:w-48">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />
+            <Input
+              placeholder="Search..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="h-9 rounded-full border-0 bg-secondary pl-9 pr-8 text-sm placeholder:text-muted-foreground/60"
+            />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 transition-colors hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />
-          <Input
-            placeholder="Search..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="h-9 rounded-lg border-border/70 bg-background pl-9 pr-8 text-sm placeholder:text-muted-foreground/60"
-          />
-          {searchInput && (
-            <button
-              onClick={() => setSearchInput("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 transition-colors hover:text-foreground"
+          <div className="hidden items-center gap-1.5 sm:flex">
+            <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+              <SelectTrigger className="h-9 w-auto rounded-full border-0 bg-secondary px-3 text-sm" aria-label={`Sort by: ${SORT_LABELS[sort]}`}>
+                <div className="flex items-center gap-2 text-left">
+                  <ArrowDownAZ className="size-3.5 shrink-0 text-muted-foreground/60" />
+                  <span className="font-medium text-foreground">{SORT_LABELS[sort]}</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created">{SORT_LABELS.created}</SelectItem>
+                <SelectItem value="updated">{SORT_LABELS.updated}</SelectItem>
+                <SelectItem value="title">{SORT_LABELS.title}</SelectItem>
+                <SelectItem value="author">{SORT_LABELS.author}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="h-5 w-px bg-border/60" />
+
+            <ToggleGroup
+              type="single"
+              value={view}
+              onValueChange={(v) => { if (v) setView(v as ViewMode); }}
+              className="h-9 rounded-full bg-secondary p-0.5"
             >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+              <ToggleGroupItem value="grid" aria-label="Grid" className="size-8 rounded-full text-muted-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <Grid3X3 className="size-3.5" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label="List" className="size-8 rounded-full text-muted-foreground data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                <List className="size-3.5" />
+              </ToggleGroupItem>
+            </ToggleGroup>
 
-        <div className="flex items-center gap-1.5">
-          <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-            <SelectTrigger className="h-9 w-auto rounded-lg border-border/70 bg-background px-3 text-sm" aria-label={`Sort by: ${SORT_LABELS[sort]}`}>
-              <div className="flex items-center gap-2 text-left">
-                <ArrowDownAZ className="size-3.5 shrink-0 text-muted-foreground/60" />
-                <span className="font-medium text-foreground">{SORT_LABELS[sort]}</span>
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created">{SORT_LABELS.created}</SelectItem>
-              <SelectItem value="updated">{SORT_LABELS.updated}</SelectItem>
-              <SelectItem value="title">{SORT_LABELS.title}</SelectItem>
-              <SelectItem value="author">{SORT_LABELS.author}</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <div className="h-5 w-px bg-border/60" />
-
-          <ToggleGroup
-            type="single"
-            value={view}
-            onValueChange={(v) => { if (v) setView(v as ViewMode); }}
-            className="h-9 rounded-lg border border-border/70 bg-background p-0.5"
-          >
-            <ToggleGroupItem value="grid" aria-label="Grid" className="size-8 rounded-md text-muted-foreground data-[state=on]:bg-accent data-[state=on]:text-foreground">
-              <Grid3X3 className="size-3.5" />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="list" aria-label="List" className="size-8 rounded-md text-muted-foreground data-[state=on]:bg-accent data-[state=on]:text-foreground">
-              <List className="size-3.5" />
-            </ToggleGroupItem>
-          </ToggleGroup>
-
-          <Button
-            variant={selectionActive ? "secondary" : "ghost"}
-            size="sm"
-            className="h-9 gap-1.5 rounded-lg px-2.5 text-sm"
-            onClick={() => {
-              if (selectionActive) {
-                clearSelection();
-              } else {
-                setSelectionMode(true);
-              }
-            }}
-          >
-            <CheckSquare className="size-3.5" />
-            Select
-          </Button>
-        </div>
-      </div>
-
-      {/* Status filters */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-px">
-        {statusFilterOptions.map((status) => {
-          const active = statusFilter === status;
-          const count = statusCounts[status];
-          const config = status === "ALL" ? null : statusConfig[status];
-          return (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
-                active
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
+            <Button
+              variant={selectionActive ? "secondary" : "ghost"}
+              size="sm"
+              className="h-9 gap-1.5 rounded-full px-2.5 text-sm"
+              onClick={() => {
+                if (selectionActive) {
+                  clearSelection();
+                } else {
+                  setSelectionMode(true);
+                }
+              }}
             >
-              {config && <config.icon className="size-3.5" />}
-              {statusFilterLabels[status]}
-              <span className={cn(
-                "text-[11px] tabular-nums font-normal",
-                active ? "text-primary/70" : "text-muted-foreground/60",
-              )}>{count}</span>
-            </button>
-          );
-        })}
+              <CheckSquare className="size-3.5" />
+              Select
+            </Button>
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button variant="secondary" size="icon" className="sm:hidden" aria-label="Library options"><MoreHorizontal /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {Object.entries(SORT_LABELS).map(([value, label]) => <DropdownMenuItem key={value} onSelect={() => setSort(value as SortOption)}>{sort === value && <Check className="size-3" />}{label}</DropdownMenuItem>)}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setView("grid")}><Grid3X3 />Grid</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setView("list")}><List />List</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => selectionActive ? clearSelection() : setSelectionMode(true)}><CheckSquare />Select</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Collection filters */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-px">
+      <div className="collection-tabs">
         <button
           onClick={() => setSelectedCollectionId(null)}
           className={cn(
             "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
             selectedCollectionId === null
-              ? "bg-primary/10 text-primary"
+              ? "active"
               : "text-muted-foreground hover:bg-accent hover:text-foreground",
           )}
         >
-          All
+          All <span className="ml-1 text-[11px] text-muted-foreground">{booksQuery.data?.pages.flat().length ?? 0}{booksQuery.hasNextPage ? "+" : ""}</span>
         </button>
         {orderedCollections.map((col) =>
           isVirtualCollection(col) ? (
@@ -814,7 +793,7 @@ export const LibraryPage: React.FC = () => {
               className={cn(
                 "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
                 selectedCollectionId === col.id
-                  ? "bg-primary/10 text-primary"
+                  ? "active"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
@@ -833,7 +812,7 @@ export const LibraryPage: React.FC = () => {
                   className={cn(
                     "shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors duration-150",
                     selectedCollectionId === col.id
-                      ? "bg-primary/10 text-primary"
+                      ? "active"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
@@ -885,6 +864,33 @@ export const LibraryPage: React.FC = () => {
           <Plus className="size-3.5" />
           {collections.filter((collection) => !isVirtualCollection(collection)).length === 0 && <span>New collection</span>}
         </button>
+      </div>
+
+      {/* Status filters */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-px">
+        {statusFilterOptions.map((status) => {
+          const active = statusFilter === status;
+          const count = statusCounts[status];
+          return (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={cn(
+                "status-chip flex shrink-0 items-center gap-1.5 whitespace-nowrap transition-colors",
+                active
+                  ? "active"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+
+              {statusFilterLabels[status]}
+              <span className={cn(
+                "text-[11px] tabular-nums font-normal",
+                active ? "opacity-60" : "text-muted-foreground/60",
+              )}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Content */}
@@ -1074,7 +1080,7 @@ export const LibraryPage: React.FC = () => {
         }}
         setBookCoverPending={setBookCover.isPending}
         statusOptions={detailStatusOptions}
-        statusValue={panelBook ? getStatusFilterBucket(panelBook.progress?.status) : "UNREAD"}
+        statusValue={panelBook ? getDisplayStatus(panelBook.progress?.status) : "UNREAD"}
         onStatusChange={(status) => {
           if (panelBook) void changeStatus(panelBook.id, status);
         }}

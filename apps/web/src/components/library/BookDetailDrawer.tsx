@@ -1,3 +1,4 @@
+import { toRenderableCoverSrc } from "@/lib/covers";
 import React from "react";
 import {
   dropdownMenuComponents,
@@ -154,9 +155,9 @@ export const BookDetailDrawer: React.FC<{
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent
       className={cn(
-        "fixed inset-y-0 right-0 left-auto h-full w-full max-w-[440px]",
-        "translate-x-0 translate-y-0 rounded-none",
-        "border-l border-border bg-background overflow-hidden p-0 gap-0",
+        "shelf-detail outline-none fixed top-3 bottom-3 right-3 left-auto h-[calc(100dvh-24px)] w-[calc(100vw-24px)] max-w-[392px]",
+        "translate-x-0 translate-y-0 rounded-[20px]",
+        "border border-border bg-card overflow-hidden p-0 gap-0",
         "data-[state=open]:animate-slide-in-right data-[state=open]:duration-200",
         "[&>button:last-child]:hidden",
       )}
@@ -173,8 +174,9 @@ export const BookDetailDrawer: React.FC<{
       )}
 
       {panelBook && (
-        <div className="flex h-full min-h-0 flex-col">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="relative flex h-full min-h-0 flex-col">
+          {toRenderableCoverSrc(panelBook.coverPath) && <div className="detail-ambient"><img src={toRenderableCoverSrc(panelBook.coverPath)!} alt="" /></div>}
+          <div className="relative flex items-center justify-between px-4 py-3">
             <DialogClose asChild>
               <Button variant="ghost" size="icon" className="size-8 shrink-0" title="Close details">
                 <X className="size-4" />
@@ -186,11 +188,11 @@ export const BookDetailDrawer: React.FC<{
                 onClick={onToggleFavorite}
                 title={panelBook.isFavorite ? "Remove from favorites" : "Add to favorites"}
               >
-                <Star className={cn("size-5", panelBook.isFavorite ? "fill-yellow-400 text-yellow-500" : "")} />
+                <Star className={cn("size-5", panelBook.isFavorite ? "fill-gold text-gold" : "")} />
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                  <button aria-label="Book actions" className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                     <MoreHorizontal className="size-5" />
                   </button>
                 </DropdownMenuTrigger>
@@ -246,13 +248,7 @@ export const BookDetailDrawer: React.FC<{
             </div>
           )}
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="flex justify-center border-b border-border bg-gradient-to-b from-secondary/30 to-secondary/10 px-5 py-8">
-              <div className="aspect-[2/3] w-36 overflow-hidden rounded-lg shadow-md shadow-black/10">
-                <BookCover book={panelBook} className="h-full w-full" showTitle={false} />
-              </div>
-            </div>
-
+          <div className="relative min-h-0 flex-1 overflow-y-auto">
             {coverOptionsRequested && (
               <div className="animate-fade-in border-b border-border px-5 py-4">
                 <div className="mb-2 flex items-center justify-between">
@@ -286,13 +282,15 @@ export const BookDetailDrawer: React.FC<{
             )}
 
             <div className="space-y-4 px-5 py-5">
-              <div className="space-y-1 text-center">
-                <h2 className="text-base font-semibold leading-snug">{panelBook.title}</h2>
+              <div className="flex items-end gap-4">
+                <div className="aspect-[2/3] w-[104px] shrink-0 overflow-hidden rounded-[7px] shadow-md"><BookCover book={panelBook} className="h-full w-full" /></div>
+                <div className="min-w-0 space-y-1">
+                <h2 className="text-2xl font-semibold leading-tight tracking-tight">{panelBook.title}</h2>
                 {panelBook.author && (
                   <p className="text-sm text-muted-foreground">{panelBook.author}</p>
                 )}
                 {panelBook.isShared && panelBook.sharedByUsername && (
-                  <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                  <p className="flex items-center justify-start gap-1.5 text-xs text-muted-foreground">
                     <Users className="size-3" />
                     Shared by {panelBook.sharedByUsername}
                   </p>
@@ -300,44 +298,23 @@ export const BookDetailDrawer: React.FC<{
                 {panelBook.series && (
                   <p className="text-xs text-muted-foreground/70">{panelBook.series}</p>
                 )}
-                <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs text-muted-foreground/70">
-                  <span className="rounded-md bg-secondary px-2 py-1 font-medium uppercase text-secondary-foreground">
+                <div className="flex flex-wrap items-center justify-start gap-2 pt-1 text-xs text-muted-foreground/70">
+                  <span className="rounded-full bg-secondary px-2 py-1 font-medium uppercase text-secondary-foreground">
                     {panelBook.fileExt.toUpperCase()}
                   </span>
-                  <span className="tabular-nums">{fileSizeLabel}</span>
+                  <span className="rounded-full bg-secondary px-2 py-1 tabular-nums">{fileSizeLabel}</span>
+                  {(panelBook.shareCount ?? 0) > 0 && <span className="rounded-full bg-secondary px-2 py-1">Shared with {panelBook.shareCount}</span>}
                   {panelBook.koboSyncable === 1 && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 font-medium text-secondary-foreground">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 font-medium text-secondary-foreground">
                       <RefreshCw className="size-3" />
                       Kobo
                     </span>
                   )}
                 </div>
+                </div>
               </div>
 
               <div className="space-y-3">
-                <ToggleGroup
-                  type="single"
-                  value={statusValue}
-                  onValueChange={(value) => {
-                    if (value) onStatusChange(value);
-                  }}
-                  className="grid grid-cols-2 gap-2"
-                >
-                  {statusOptions.map((option) => {
-                    const Icon = option.icon;
-                    return (
-                      <ToggleGroupItem
-                        key={option.value}
-                        value={option.value}
-                        className="flex h-9 items-center justify-center gap-1 rounded-md border border-border bg-secondary text-[11px] data-[state=on]:border-foreground/15 data-[state=on]:bg-background"
-                      >
-                        <Icon className="size-3" />
-                        {option.label}
-                      </ToggleGroupItem>
-                    );
-                  })}
-                </ToggleGroup>
-
                 <div
                   className={cn(
                     "grid gap-2",
@@ -350,16 +327,10 @@ export const BookDetailDrawer: React.FC<{
                         : "grid-cols-2",
                   )}
                 >
+                  <Button className="h-9 justify-center gap-1" onClick={onDownload}><Download className="size-3.5" />Download</Button>
                   {isBrowserReadableBookExt(panelBook.fileExt) && (
-                    <Button variant="outline" className="h-9 justify-center gap-2" onClick={onRead}>
-                      <BookOpen className="size-3.5" />
-                      Read
-                    </Button>
+                    <Button variant="secondary" className="h-9 justify-center gap-1" onClick={onRead}><BookOpen className="size-3.5" />Read</Button>
                   )}
-                  <Button variant="outline" className="h-9 justify-center gap-2" onClick={onDownload}>
-                    <Download className="size-3.5" />
-                    Download
-                  </Button>
                   {!panelBook.isShared && (
                     <ShareBookDropdown
                       bookId={panelBook.id}
@@ -369,17 +340,46 @@ export const BookDetailDrawer: React.FC<{
                 </div>
               </div>
 
+              <div><p className="mb-2 text-xs text-muted-foreground">Status</p>
+                <ToggleGroup
+                  type="single"
+                  value={statusValue}
+                  onValueChange={(value) => {
+                    if (value) onStatusChange(value);
+                  }}
+                  className="flex flex-wrap justify-start gap-1.5 rounded-none bg-transparent p-0"
+                >
+                  {statusOptions.map((option) => {
+                    const Icon = option.icon;
+                    return (
+                      <ToggleGroupItem
+                        key={option.value}
+                        value={option.value}
+                        className="flex h-7 items-center justify-center gap-1 rounded-full border border-border bg-transparent px-2.5 text-[11px] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                      >
+                        <Icon className="size-3" />
+                        {option.label}
+                      </ToggleGroupItem>
+                    );
+                  })}
+                </ToggleGroup>
+              </div>
+
               {(panelBook.progress?.status === "READING" || (panelBook.progress?.progressPercent ?? 0) > 0) && (
-                <div className="flex items-center gap-2">
+                <div>
+                  <p className="mb-2 text-xs text-muted-foreground">Progress</p>
+                  <div className="flex items-center gap-2">
                   <Progress value={panelBook.progress?.progressPercent ?? 0} className="h-1 flex-1" />
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                     {panelBook.progress?.progressPercent ?? 0}%
                   </span>
+                  </div>
                 </div>
               )}
 
               {panelBook.description && !editMode && (
                 <div>
+                  <p className="mb-2 text-xs text-muted-foreground">About</p>
                   <p className={cn("text-[13px] leading-relaxed text-muted-foreground", !descriptionExpanded && "line-clamp-4")}>
                     {panelBook.description}
                   </p>
@@ -388,7 +388,7 @@ export const BookDetailDrawer: React.FC<{
                       onClick={() => setDescriptionExpanded((current) => !current)}
                       className="mt-1 text-xs text-muted-foreground/60 hover:text-muted-foreground"
                     >
-                      {descriptionExpanded ? "Show less" : "Show more"}
+                      {descriptionExpanded ? "Less" : "More"}
                     </button>
                   )}
                 </div>
@@ -401,12 +401,13 @@ export const BookDetailDrawer: React.FC<{
               )}
               {bookCollections.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
+                  <p className="mb-1 w-full text-xs text-muted-foreground">Collections</p>
                   {bookCollections.map((collection) => (
                     <button
                       key={collection.id}
                       onClick={() => onToggleCollectionAssigned(collection.id, !collection.assigned)}
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                        "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium transition-colors",
                         collection.assigned
                           ? "bg-primary/10 text-primary"
                           : "bg-secondary text-muted-foreground hover:text-foreground",

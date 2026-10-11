@@ -51,7 +51,7 @@ export const setupRoutes: FastifyPluginAsync = async (fastify) => {
           createdAt: timestamp,
           disabledAt: null
         })
-        .returning({ id: users.id, email: users.email, username: users.username, role: users.role });
+        .returning({ id: users.id, email: users.email, username: users.username, role: users.role, accentColor: users.accentColor });
     } catch (error) {
       const columns = getSqliteUniqueConstraintColumns(error);
       if (columns.includes("users.username")) {

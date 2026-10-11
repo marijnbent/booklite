@@ -1,7 +1,10 @@
+export declare const ACCENT_COLORS: readonly ["orange", "rose", "violet", "blue", "teal", "green", "none"];
+export type AccentColor = (typeof ACCENT_COLORS)[number];
 export type Role = "OWNER" | "MEMBER";
 export declare const READ_STATUSES: readonly ["UNSET", "UNREAD", "READING", "RE_READING", "READ", "PARTIALLY_READ", "PAUSED", "ABANDONED", "WONT_READ"];
 export type ReadStatus = (typeof READ_STATUSES)[number];
 export interface ApiUser {
+    accentColor: AccentColor | null;
     id: number;
     email: string | null;
     username: string;

@@ -1,3 +1,4 @@
+import { ACCENT_COLORS } from "@booklite/shared";
 import { FastifyPluginAsync } from "fastify";
 import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
@@ -34,6 +35,10 @@ const createUserSchema = z.object({
   password: z.string().min(6),
   role: z.enum(["OWNER", "MEMBER"]).default("MEMBER")
 });
+
+const accentPreferenceSchema = z.object({
+  accentColor: z.enum(ACCENT_COLORS).nullable()
+}).strict();
 
 const patchUserSchema = z.object({
   email: updatableEmailSchema,
@@ -79,6 +84,16 @@ const countOtherEnabledOwners = async (excludedUserId: number): Promise<number> 
 };
 
 export const usersRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.patch("/api/v1/me", { preHandler: requireAuth }, async (request, reply) => {
+    const { userId } = getAuth(request);
+    const result = accentPreferenceSchema.safeParse(request.body);
+    if (!result.success) return reply.code(400).send({ error: "Invalid accent colour preference" });
+    const body = result.data;
+    const [updated] = await db.update(users).set(body).where(eq(users.id, userId))
+      .returning({ accentColor: users.accentColor });
+    return updated;
+  });
+
   fastify.get("/api/v1/users", { preHandler: requireOwner }, async () =>
     db
       .select({
@@ -86,6 +101,7 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
         email: users.email,
         username: users.username,
         role: users.role,
+        accentColor: users.accentColor,
         createdAt: users.createdAt,
         disabledAt: users.disabledAt
       })
@@ -136,6 +152,7 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
           email: users.email,
           username: users.username,
           role: users.role,
+          accentColor: users.accentColor,
           createdAt: users.createdAt,
           disabledAt: users.disabledAt
         });
@@ -170,6 +187,7 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
           email: users.email,
           username: users.username,
           role: users.role,
+          accentColor: users.accentColor,
           createdAt: users.createdAt,
           disabledAt: users.disabledAt
         })
@@ -231,6 +249,7 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
             email: users.email,
             username: users.username,
             role: users.role,
+            accentColor: users.accentColor,
             createdAt: users.createdAt,
             disabledAt: users.disabledAt
           });
@@ -306,7 +325,8 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
           email: users.email,
           username: users.username,
           role: users.role,
-          disabledAt: users.disabledAt
+          disabledAt: users.disabledAt,
+          accentColor: users.accentColor
         })
         .from(users)
         .where(eq(users.id, params.id))
@@ -350,7 +370,8 @@ export const usersRoutes: FastifyPluginAsync = async (fastify) => {
           id: target.id,
           email: target.email,
           username: target.username,
-          role: target.role
+          role: target.role,
+          accentColor: target.accentColor
         }
       };
     }

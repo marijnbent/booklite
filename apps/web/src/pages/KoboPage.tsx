@@ -133,7 +133,7 @@ export const KoboPage: React.FC = () => {
           </div>
 
           {/* Toggle rows */}
-          <div className="border border-border/50 rounded-md divide-y divide-border/50">
+          <div className="border border-border/50 rounded-2xl divide-y divide-border/50">
             <div className="flex items-center justify-between gap-4 px-4 py-3.5">
               <div>
                 <Label htmlFor="sync-enabled" className="text-sm font-medium cursor-pointer">Enable sync</Label>
@@ -185,13 +185,13 @@ export const KoboPage: React.FC = () => {
             </div>
 
             {model.syncCollectionIds.length === 0 && (
-              <div className="rounded-md border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+              <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
                 <AlertTriangle className="size-3.5 mt-0.5 shrink-0" />
                 <span>No collections selected. Kobo sync will not send any books.</span>
               </div>
             )}
 
-            <div className="border border-border/50 rounded-md divide-y divide-border/50">
+            <div className="border border-border/50 rounded-2xl divide-y divide-border/50">
               <div className="max-h-52 overflow-y-auto">
                 {collectionItems.map((collection) => {
                   const checked = model.syncCollectionIds.includes(collection.id);
@@ -282,7 +282,7 @@ export const KoboPage: React.FC = () => {
 
           <div className="space-y-2">
             <Label className="text-xs font-medium text-muted-foreground">API endpoint</Label>
-            <div className="rounded-md border border-border/50 bg-muted/30 px-3.5 py-3">
+            <div className="rounded-2xl border border-border/50 bg-muted/30 px-3.5 py-3">
               <code className="font-mono text-xs leading-relaxed text-foreground/80 break-all select-all">
                 {koboConfigEndpoint}
               </code>

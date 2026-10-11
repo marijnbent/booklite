@@ -137,6 +137,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         email: users.email,
         username: users.username,
         role: users.role,
+        accentColor: users.accentColor,
         createdAt: users.createdAt,
         disabledAt: users.disabledAt
       })

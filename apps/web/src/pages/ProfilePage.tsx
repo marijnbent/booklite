@@ -1,3 +1,4 @@
+import { AccentPicker } from "@/components/AccentPicker";
 import React from "react";
 import { useAuth } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -70,6 +71,7 @@ export const ProfilePage: React.FC = () => {
               ))}
             </dl>
           </div>
+          <AccentPicker />
         </CardContent>
       </Card>
     </div>

@@ -13,6 +13,9 @@
             ? "dark"
             : "light";
         document.documentElement.classList.add(theme);
+        var accent = localStorage.getItem("booklite-accent");
+        if (["orange", "rose", "violet", "blue", "teal", "green", "none"].includes(accent))
+          document.documentElement.dataset.accent = accent;
       })();
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />

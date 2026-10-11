@@ -322,7 +322,7 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             USERS SECTION
             ================================================================ */}
-        <Card className="rounded-lg border-border overflow-hidden">
+        <Card className="rounded-2xl border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -359,7 +359,7 @@ export const AdminUsersPage: React.FC = () => {
           <CardContent className="space-y-5 px-6 pb-6">
             {/* Create user form (collapsible) */}
             {showCreateForm && (
-              <div className="rounded-md border border-border bg-muted/30 p-5">
+              <div className="rounded-2xl border border-border bg-muted/30 p-5">
                 <p className="text-sm font-semibold mb-4">New User</p>
                 <form
                   onSubmit={(e) => {
@@ -480,7 +480,7 @@ export const AdminUsersPage: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="rounded-md border border-border overflow-hidden">
+              <div className="rounded-2xl border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -627,7 +627,7 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             METADATA PROVIDERS SECTION
             ================================================================ */}
-        <Card className="rounded-lg border-border overflow-hidden">
+        <Card className="rounded-2xl border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
             <div className="flex items-center gap-2.5">
               <h2 className="text-lg font-semibold tracking-tight">Metadata Providers</h2>
@@ -704,7 +704,7 @@ export const AdminUsersPage: React.FC = () => {
                         {hasSettings && enabled && expandedProviders.has(key) && (
                           <div className="pb-4 pl-7">
                             {key === "amazon" && (
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-md border border-border bg-muted/20 p-4">
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-2xl border border-border bg-muted/20 p-4">
                                 <div className="space-y-1.5">
                                   <Label className="text-xs text-muted-foreground">Region</Label>
                                   <Select
@@ -758,7 +758,7 @@ export const AdminUsersPage: React.FC = () => {
                             )}
 
                             {key === "google" && (
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-md border border-border bg-muted/20 p-4">
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-2xl border border-border bg-muted/20 p-4">
                                 <div className="space-y-1.5">
                                   <div className="flex items-center gap-1.5">
                                     <Label className="text-xs text-muted-foreground">Preferred Language</Label>
@@ -805,7 +805,7 @@ export const AdminUsersPage: React.FC = () => {
                             )}
 
                             {key === "hardcover" && (
-                              <div className="max-w-sm rounded-md border border-border bg-muted/20 p-4">
+                              <div className="max-w-sm rounded-2xl border border-border bg-muted/20 p-4">
                                 <div className="space-y-1.5">
                                   <div className="flex items-center gap-1.5">
                                     <Label className="text-xs text-muted-foreground">API Token</Label>
@@ -843,7 +843,7 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             AI METADATA RESOLVER
             ================================================================ */}
-        <Card className="rounded-lg border-border overflow-hidden">
+        <Card className="rounded-2xl border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
             <div className="flex items-center gap-2.5">
               <h2 className="text-lg font-semibold tracking-tight">AI Metadata Resolver</h2>
@@ -890,10 +890,10 @@ export const AdminUsersPage: React.FC = () => {
 
                 {/* Settings (only when enabled) */}
                 {settings.data.metadataOpenrouterEnabled && (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-md border border-border bg-muted/20 p-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-2xl border border-border bg-muted/20 p-4">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">API Key</Label>
-                      <div className="flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm">
+                      <div className="flex h-9 items-center rounded-2xl border border-input bg-background px-3 text-sm">
                         {settings.data.metadataOpenrouterApiKeyConfigured
                           ? "Configured through OPENROUTER_API_KEY"
                           : "Set OPENROUTER_API_KEY on the server"}
@@ -928,7 +928,7 @@ export const AdminUsersPage: React.FC = () => {
         {/* ================================================================
             STORAGE & LIMITS
             ================================================================ */}
-        <Card className="rounded-lg border-border overflow-hidden">
+        <Card className="rounded-2xl border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
             <h2 className="text-lg font-semibold tracking-tight">Storage</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -977,7 +977,7 @@ export const AdminUsersPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="rounded-lg border-border overflow-hidden">
+        <Card className="rounded-2xl border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
             <div className="flex items-center gap-2.5">
               <Link2 className="size-4 text-muted-foreground" />
@@ -994,7 +994,7 @@ export const AdminUsersPage: React.FC = () => {
                 <Loader2 className="size-5 text-muted-foreground animate-spin" />
               </div>
             ) : settings.data ? (
-              <div className="max-w-2xl rounded-md border border-border bg-muted/20 p-4">
+              <div className="max-w-2xl rounded-2xl border border-border bg-muted/20 p-4">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5">
                     <Label className="text-xs text-muted-foreground">Ebook Download URL</Label>
@@ -1021,7 +1021,7 @@ export const AdminUsersPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="rounded-lg border-border overflow-hidden">
+        <Card className="rounded-2xl border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
             <div className="flex items-center gap-2.5">
               <TerminalSquare className="size-4 text-muted-foreground" />
@@ -1050,7 +1050,7 @@ export const AdminUsersPage: React.FC = () => {
               settings.data && (
                 <div
                   className={[
-                    "rounded-md border p-4 transition-colors duration-300",
+                    "rounded-2xl border p-4 transition-colors duration-300",
                     settings.data.koboDebugLogging
                       ? "border-amber-300/50 bg-amber-500/[0.06] dark:border-amber-500/30 dark:bg-amber-500/[0.08]"
                       : "border-border bg-muted/20",

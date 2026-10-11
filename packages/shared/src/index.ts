@@ -1,3 +1,6 @@
+export const ACCENT_COLORS = ["orange", "rose", "violet", "blue", "teal", "green", "none"] as const;
+export type AccentColor = (typeof ACCENT_COLORS)[number];
+
 export type Role = "OWNER" | "MEMBER";
 
 export const READ_STATUSES = [
@@ -15,6 +18,7 @@ export const READ_STATUSES = [
 export type ReadStatus = (typeof READ_STATUSES)[number];
 
 export interface ApiUser {
+  accentColor: AccentColor | null;
   id: number;
   email: string | null;
   username: string;

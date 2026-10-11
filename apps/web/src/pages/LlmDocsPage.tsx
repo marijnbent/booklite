@@ -37,6 +37,24 @@ const METHOD_COLORS: Record<string, string> = {
 
 const SECTIONS: Section[] = [
   {
+    title: "Profile",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/v1/me",
+        description: "Get the current user: id, email, username, role, createdAt, disabledAt, and accentColor (null means orange).",
+        curl: (base, token) => `curl -s "${base}/api/v1/me" -H "Authorization: Bearer ${token}"`,
+      },
+      {
+        method: "PATCH",
+        path: "/api/v1/me",
+        description: "Update your own accent colour. Available to every authenticated user.",
+        body: '{ "accentColor": "orange" | "rose" | "violet" | "blue" | "teal" | "green" | "none" | null }',
+        curl: (base, token) => `curl -s -X PATCH "${base}/api/v1/me" -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"accentColor":"violet"}'`,
+      },
+    ],
+  },
+  {
     title: "Books",
     endpoints: [
       {
@@ -227,7 +245,7 @@ const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label })
 };
 
 const CodeBlock: React.FC<{ code: string }> = ({ code }) => (
-  <div className="group relative mt-2 rounded-md border border-border/60 bg-muted/30">
+  <div className="group relative mt-2 rounded-2xl border border-border/60 bg-muted/30">
     <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
       <CopyButton text={code} />
     </div>
@@ -291,7 +309,7 @@ export const LlmDocsPage: React.FC = () => {
       <header className="border-b border-border/60 bg-card">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded-md bg-primary/10">
+            <div className="flex size-7 items-center justify-center rounded-2xl bg-primary/10">
               <BookOpen className="size-4 text-primary" />
             </div>
             <div>
@@ -319,7 +337,7 @@ export const LlmDocsPage: React.FC = () => {
       {/* Main */}
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-8">
         {/* Auth box */}
-        <div className="rounded-lg border border-border/60 bg-card p-5 space-y-4">
+        <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
           <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Authentication
           </h2>
@@ -328,7 +346,7 @@ export const LlmDocsPage: React.FC = () => {
             {/* Base URL */}
             <div className="space-y-1">
               <div className="text-xs font-medium text-muted-foreground">Base URL</div>
-              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-muted/30 px-3 py-2">
                 <code className="flex-1 truncate font-mono text-xs text-foreground">{base}</code>
                 <CopyButton text={base} />
               </div>
@@ -338,14 +356,14 @@ export const LlmDocsPage: React.FC = () => {
             <div className="space-y-1">
               <div className="text-xs font-medium text-muted-foreground">Bearer token</div>
               {token ? (
-                <div className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-muted/30 px-3 py-2">
                   <code className="flex-1 truncate font-mono text-xs text-foreground">
                     {token.slice(0, 24)}…
                   </code>
                   <CopyButton text={token} />
                 </div>
               ) : (
-                <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950/40">
+                <div className="flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950/40">
                   <span className="flex-1 text-xs text-amber-700 dark:text-amber-400">
                     No token — add ?token=YOUR_TOKEN to the URL
                   </span>
@@ -357,7 +375,7 @@ export const LlmDocsPage: React.FC = () => {
           {/* Authorization header */}
           <div className="space-y-1">
             <div className="text-xs font-medium text-muted-foreground">Authorization header</div>
-            <div className="group relative rounded-md border border-border/60 bg-muted/30">
+            <div className="group relative rounded-2xl border border-border/60 bg-muted/30">
               <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100">
                 <CopyButton
                   text={`Authorization: Bearer ${token || "YOUR_TOKEN_HERE"}`}
@@ -381,7 +399,7 @@ export const LlmDocsPage: React.FC = () => {
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {section.title}
             </h2>
-            <div className="rounded-lg border border-border/60 bg-card px-5">
+            <div className="rounded-2xl border border-border/60 bg-card px-5">
               {section.endpoints.map((ep) => (
                 <EndpointRow
                   key={`${ep.method}-${ep.path}`}
@@ -395,7 +413,7 @@ export const LlmDocsPage: React.FC = () => {
         ))}
 
         {/* Notes */}
-        <div className="rounded-lg border border-border/60 bg-card p-5">
+        <div className="rounded-2xl border border-border/60 bg-card p-5">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Notes
           </h2>
