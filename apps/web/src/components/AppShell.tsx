@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { AccentPicker } from "@/components/AccentPicker";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { User, Shield, Key, LogOut, Sun, Moon, CircleHelp, Download, TerminalSquare } from "lucide-react";
+import { User, Shield, Key, LogOut, Sun, Moon, CircleHelp, ExternalLink, TerminalSquare } from "lucide-react";
 
 const navItems = [
   { to: "/library", label: "Library" },
@@ -56,6 +56,11 @@ export const AppShell: React.FC = () => {
               {item.label}
             </NavLink>
           ))}
+          {ebookDownloadUrl && (
+            <a href={ebookDownloadUrl} target="_blank" rel="noreferrer" className="dock-link gap-1.5">
+              Download<ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+            </a>
+          )}
           <span className="mx-1 h-5 w-px bg-border" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -64,7 +69,6 @@ export const AppShell: React.FC = () => {
             <DropdownMenuContent side="top" align="end" sideOffset={12} className="w-60">
               <p className="px-2 py-2 text-xs text-muted-foreground">{me?.username} · {me?.role.toLowerCase()}</p>
               <DropdownMenuItem asChild><NavLink to="/profile"><User className="size-4" />Profile</NavLink></DropdownMenuItem>
-              {ebookDownloadUrl && <DropdownMenuItem asChild><a href={ebookDownloadUrl} target="_blank" rel="noreferrer"><Download className="size-4" />Ebooks</a></DropdownMenuItem>}
               <DropdownMenuItem asChild className="sm:hidden"><NavLink to="/docs"><CircleHelp className="size-4" />Docs</NavLink></DropdownMenuItem>
               {!isImpersonating && me?.role === "OWNER" && <>
                 <DropdownMenuSeparator />
