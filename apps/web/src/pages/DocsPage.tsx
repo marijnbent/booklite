@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   BookOpen,
   ChevronDown,
-  ChevronRight,
   Info,
   Lock,
   Share2,
@@ -76,10 +75,10 @@ const Step: React.FC<{
 );
 
 const OwnerNote: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="mt-4 border-l-2 border-primary/40 py-3 pl-4">
+  <div className="mt-4 border-l-2 border-[var(--ac)] py-3 pl-4">
     <div className="mb-1 flex items-center gap-1.5">
-      <Shield className="h-3.5 w-3.5 text-primary" />
-      <span className="text-xs font-semibold uppercase tracking-wide text-primary/80">
+      <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Owner note
       </span>
     </div>
@@ -133,24 +132,18 @@ export const DocsPage: React.FC = () => {
   }, [location.hash]);
 
   return (
-    <div className="max-w-3xl">
-      <h1 className="text-2xl font-bold tracking-tight">Docs</h1>
-      <p className="mb-10 mt-1 text-sm text-muted-foreground">
-        Everything you need to know about BookLite.
-      </p>
+    <div className="mx-auto max-w-3xl">
+      <h1>Docs</h1>
 
-      <nav className="mb-12 rounded-2xl border border-border bg-muted/20 p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          On this page
-        </p>
-        <ul className="space-y-1.5">
+      <nav aria-label="On this page" className="mb-10 mt-4">
+        <ul className="flex flex-wrap gap-1.5">
           {NAV_ITEMS.map((item) => (
             <li key={item.id}>
               <a
                 href={`#${item.id}`}
-                className="group flex items-center gap-2 text-sm text-foreground/80 transition-colors duration-150 hover:text-primary"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[13px] text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground"
               >
-                <ChevronRight className="h-3 w-3 text-muted-foreground/40 transition-colors duration-150 group-hover:text-primary" />
+                <item.icon className="size-3.5" />
                 {item.label}
               </a>
             </li>
@@ -174,7 +167,7 @@ export const DocsPage: React.FC = () => {
               href="https://github.com/booklore-app/booklore"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-primary hover:underline underline-offset-2"
+              className="docs-link"
             >
               BookLore
             </a>
@@ -218,7 +211,7 @@ export const DocsPage: React.FC = () => {
           </p>
           <ol className="space-y-2.5">
             <Step number={1}>
-              Go to <Link to="/uploads" className="font-medium text-primary hover:underline underline-offset-2">Upload</Link>{" "}
+              Go to <Link to="/uploads" className="docs-link">Upload</Link>{" "}
               and drag in one or more files, or click to browse.
             </Step>
             <Step number={2}>
@@ -365,8 +358,8 @@ export const DocsPage: React.FC = () => {
             </p>
           </div>
           <OwnerNote>
-            Impersonation switches this browser into the member session and keeps your owner session
-            parked behind a restore overlay so you can come back when you are done.
+            Impersonation switches this browser into the member session. Use Return to admin in the
+            banner at the top of the page to switch back to your owner session.
           </OwnerNote>
         </section>
 
@@ -383,10 +376,10 @@ export const DocsPage: React.FC = () => {
               <ol className="space-y-2.5">
                 <Step number={1}>
                   Go to{" "}
-                  <Link to="/kobo" className="font-medium text-primary hover:underline underline-offset-2">
+                  <Link to="/kobo" className="docs-link">
                     Kobo
                   </Link>{" "}
-                  in the left sidebar.
+                  in the main menu.
                 </Step>
                 <Step number={2}>Enable sync.</Step>
                 <Step number={3}>Choose to sync all books, or select specific collections.</Step>
@@ -481,8 +474,6 @@ export const DocsPage: React.FC = () => {
           </div>
         </section>
       </div>
-
-      <div className="h-20" />
     </div>
   );
 };

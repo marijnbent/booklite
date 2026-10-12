@@ -9,8 +9,8 @@ export function AccentPicker({ menu = false }: { menu?: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   return (
-    <div className="space-y-2 px-2 py-2">
-      <p className="text-xs text-muted-foreground">Accent colour</p>
+    <div className={menu ? "space-y-2 px-2 py-2" : "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border/50 pt-3"}>
+      <p className={menu ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>Accent colour</p>
       <div className="flex gap-2" role="group" aria-label="Accent colour">
         {(Object.keys(accentPresets) as AccentColor[]).map((key) => {
           const swatch = (
@@ -28,7 +28,7 @@ export function AccentPicker({ menu = false }: { menu?: boolean }) {
           return menu ? <DropdownMenuItem key={key} asChild disabled={pending} onSelect={(event) => event.preventDefault()}>{swatch}</DropdownMenuItem> : swatch;
         })}
       </div>
-      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="w-full text-xs text-destructive">{error}</p>}
     </div>
   );
 }

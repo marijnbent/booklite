@@ -331,7 +331,7 @@ export const ShareSelectedBooksDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg rounded-xl">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Share {bookIds.length} {bookIds.length === 1 ? "book" : "books"}</DialogTitle>
           <DialogDescription>Choose who should get this selection in their library.</DialogDescription>

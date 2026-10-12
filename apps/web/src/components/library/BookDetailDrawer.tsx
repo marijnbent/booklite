@@ -151,13 +151,20 @@ export const BookDetailDrawer: React.FC<{
   onSaveMetadata,
   saveMetadataPending,
   BookCover,
-}) => (
+}) => {
+  const editorRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (editMode) editorRef.current?.scrollIntoView({ block: "start" });
+  }, [editMode]);
+
+  return (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent
       className={cn(
         "shelf-detail outline-none fixed top-3 bottom-3 right-3 left-auto h-[calc(100dvh-24px)] w-[calc(100vw-24px)] max-w-[392px]",
         "translate-x-0 translate-y-0 rounded-[20px]",
-        "border border-border bg-card overflow-hidden p-0 gap-0",
+        "border border-border bg-card overflow-hidden p-0 sm:p-0 gap-0",
         "data-[state=open]:animate-slide-in-right data-[state=open]:duration-200",
         "[&>button:last-child]:hidden",
       )}
@@ -184,8 +191,9 @@ export const BookDetailDrawer: React.FC<{
             </DialogClose>
             <div className="flex items-center gap-1">
               <button
-                className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 onClick={onToggleFavorite}
+                aria-label={panelBook.isFavorite ? "Remove from favorites" : "Add to favorites"}
                 title={panelBook.isFavorite ? "Remove from favorites" : "Add to favorites"}
               >
                 <Star className={cn("size-5", panelBook.isFavorite ? "fill-gold text-gold" : "")} />
@@ -257,7 +265,7 @@ export const BookDetailDrawer: React.FC<{
                     {coverOptionsLoading ? "Searching for covers..." : "Change cover"}
                     {(setBookCoverPending || coverOptionsLoading) && <Loader2 className="size-3 animate-spin" />}
                   </span>
-                  <button onClick={onToggleCoverOptions} className="text-muted-foreground/50 hover:text-foreground">
+                  <button aria-label="Close cover options" onClick={onToggleCoverOptions} className="text-muted-foreground/50 hover:text-foreground">
                     <X className="size-3.5" />
                   </button>
                 </div>
@@ -278,6 +286,45 @@ export const BookDetailDrawer: React.FC<{
                     </div>
                   }
                 />
+              </div>
+            )}
+
+            {editMode && (
+              <div ref={editorRef} className="animate-fade-in space-y-2 border-b border-border px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Pencil className="size-3" />
+                    Edit metadata
+                  </span>
+                  <button aria-label="Close editor" onClick={() => setEditMode(false)} className="text-muted-foreground/50 hover:text-foreground">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] text-muted-foreground">Title</Label>
+                  <Input className="h-8" value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} />
+                </div>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] text-muted-foreground">Author</Label>
+                  <Input className="h-8" value={draft.author} onChange={(event) => setDraft((current) => ({ ...current, author: event.target.value }))} />
+                </div>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] text-muted-foreground">Series</Label>
+                  <Input className="h-8" value={draft.series} onChange={(event) => setDraft((current) => ({ ...current, series: event.target.value }))} />
+                </div>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] text-muted-foreground">Description</Label>
+                  <Textarea
+                    rows={4}
+                    value={draft.description}
+                    onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                    className="resize-none"
+                  />
+                </div>
+                <Button size="sm" onClick={onSaveMetadata} disabled={saveMetadataPending} className="mt-1 h-8 gap-1.5">
+                  {saveMetadataPending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                  Save changes
+                </Button>
               </div>
             )}
 
@@ -420,50 +467,11 @@ export const BookDetailDrawer: React.FC<{
                 </div>
               )}
 
-              {editMode && (
-                <div className="animate-fade-in">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <Pencil className="size-3" />
-                      Edit metadata
-                    </span>
-                    <button onClick={() => setEditMode(false)} className="text-muted-foreground/50 hover:text-foreground">
-                      <X className="size-3.5" />
-                    </button>
-                  </div>
-                  <div className="space-y-2 rounded-md border border-border/40 bg-card p-3">
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px] text-muted-foreground">Title</Label>
-                      <Input className="h-8" value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px] text-muted-foreground">Author</Label>
-                      <Input className="h-8" value={draft.author} onChange={(event) => setDraft((current) => ({ ...current, author: event.target.value }))} />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px] text-muted-foreground">Series</Label>
-                      <Input className="h-8" value={draft.series} onChange={(event) => setDraft((current) => ({ ...current, series: event.target.value }))} />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[11px] text-muted-foreground">Description</Label>
-                      <Textarea
-                        rows={2}
-                        value={draft.description}
-                        onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
-                        className="resize-none"
-                      />
-                    </div>
-                    <Button size="sm" onClick={onSaveMetadata} disabled={saveMetadataPending} className="h-8 gap-1.5">
-                      {saveMetadataPending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                      Save changes
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       )}
     </DialogContent>
   </Dialog>
-);
+  );
+};

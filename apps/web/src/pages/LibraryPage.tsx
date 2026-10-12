@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Link } from "react-router-dom";
 import {
   useInfiniteQuery,
   useMutation,
@@ -629,7 +630,7 @@ export const LibraryPage: React.FC = () => {
       ? uncollectedBooksQuery.isError
       : collectionBooksQuery.isError
     : booksQuery.isError;
-  const isEmpty = !isLoading && allBooks.length === 0;
+  const isEmpty = !isLoading && !isError && allBooks.length === 0;
   const hasResults = !isLoading && filteredAndSorted.length > 0;
   const noFilterResults = !isLoading && allBooks.length > 0 && filteredAndSorted.length === 0;
   const panelBook = selectedBook.data;
@@ -703,6 +704,7 @@ export const LibraryPage: React.FC = () => {
             />
             {searchInput && (
               <button
+                aria-label="Clear search"
                 onClick={() => setSearchInput("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 transition-colors hover:text-foreground"
               >
@@ -943,9 +945,14 @@ export const LibraryPage: React.FC = () => {
                   ? "Books appear here as soon as someone shares them with you."
                   : selectedCollectionId === UNCOLLECTED_COLLECTION_ID
                   ? "Books disappear from this shelf as soon as they are added to a collection."
-                  : "Add books using the button above or right-click a book."
+                  : "Add books here, or use a book's menu in the library."
                 : "Upload some books to get started."}
           </p>
+          {selectedCollectionId === null && !debouncedQuery && (
+            <Button asChild size="sm" className="mt-4">
+              <Link to="/uploads">Upload books</Link>
+            </Button>
+          )}
           {selectedCollectionId !== null && !debouncedQuery && !activeCollectionIsVirtual && (
             <Button
               variant="outline"
@@ -968,7 +975,7 @@ export const LibraryPage: React.FC = () => {
               : `No books marked "${statusFilterLabels[statusFilter].toLowerCase()}"`}
             {debouncedQuery && ` matching "${debouncedQuery}"`}.
           </p>
-          <button onClick={() => setStatusFilter("ALL")} className="mt-2 text-sm text-primary hover:underline">
+          <button onClick={() => setStatusFilter("ALL")} className="docs-link mt-2 text-sm">
             Show all
           </button>
         </div>

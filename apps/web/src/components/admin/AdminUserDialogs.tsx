@@ -244,8 +244,8 @@ export const ImpersonationDialog: React.FC<{
       <DialogHeader>
         <DialogTitle>Impersonate {impersonationTarget?.username}</DialogTitle>
         <DialogDescription>
-          BookLite will switch this browser into that member account and keep your admin
-          session parked behind a restore overlay so you can come back when you are done.
+          BookLite will switch this browser into that member account. Use Return to admin in
+          the banner at the top of the page to switch back.
         </DialogDescription>
       </DialogHeader>
       {impersonationTarget && (

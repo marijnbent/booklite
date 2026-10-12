@@ -192,7 +192,7 @@ export const GridCard: React.FC<{
               <Star className={cn("size-3", book.isFavorite ? "fill-cover-gold text-cover-gold" : "text-white")} />
             </button>
 
-            <div className="absolute bottom-1.5 right-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="absolute bottom-1.5 right-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -301,7 +301,8 @@ export const ListRow: React.FC<{
             <div className="hidden items-center gap-2 sm:flex">
               {!selectionActive && (
                 <button
-                  className="rounded p-1 hover:bg-muted/50"
+                  aria-label={book.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                  className="rounded-full p-1 hover:bg-muted/50"
                   onClick={(event) => {
                     event.stopPropagation();
                     void menuProps.onToggleFavorite(book.id, !book.isFavorite);
@@ -320,7 +321,7 @@ export const ListRow: React.FC<{
               <span className="shelf-status w-28" data-status={statusBucket}>{config.label}</span>
             </div>
 
-            <div className="opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button

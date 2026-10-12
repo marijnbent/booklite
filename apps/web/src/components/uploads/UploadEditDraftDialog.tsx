@@ -30,7 +30,7 @@ export const UploadEditDraftDialog: React.FC<{
     {editingDraft && (
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Edit Book Details</DialogTitle>
+          <DialogTitle>Edit book details</DialogTitle>
           <DialogDescription className="truncate">
             {editingDraft.file.name}
           </DialogDescription>
