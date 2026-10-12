@@ -113,10 +113,7 @@ export const AdminApiDocsPage: React.FC = () => {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       {/* Page heading */}
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <Shield className="size-4 text-muted-foreground" />
-          <h1 className="text-2xl font-bold tracking-tight">Admin API</h1>
-        </div>
+        <h1>Admin API</h1>
         <p className="text-sm text-muted-foreground">
           Generate long-lived tokens for scripts and LLM agents.
         </p>

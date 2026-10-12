@@ -38,9 +38,9 @@ export const AppShell: React.FC = () => {
   return (
     <div className={cn("min-h-screen", !isReaderRoute && "app-shell shelf-glow")}>
       {!isReaderRoute && isImpersonating && impersonation && (
-        <div className="mx-auto flex max-w-2xl items-center gap-3 rounded-2xl border bg-card px-4 py-3">
+        <div className="impersonation-bar">
           <Shield className="size-4 shrink-0" />
-          <span className="flex-1 text-sm">Viewing BookLite as {impersonation.targetUsername}</span>
+          <span className="min-w-0 flex-1 truncate">Viewing as {impersonation.targetUsername}</span>
           <Button size="sm" onClick={async () => {
             const restorePath = impersonation.restorePath ?? "/admin-users";
             await endImpersonation();

@@ -56,7 +56,17 @@ import {
   TerminalSquare,
   Pencil,
   Trash2,
+  MoreHorizontal,
+  Ban,
+  UserCheck,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ---------------------------------------------------------------------------
 // Types & constants (unchanged)
@@ -308,16 +318,8 @@ export const AdminUsersPage: React.FC = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-10">
-        {/* ================================================================
-            PAGE HEADER
-            ================================================================ */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Administration</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Manage users, metadata providers, and system configuration.
-          </p>
-        </div>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <h1>Administration</h1>
 
         {/* ================================================================
             USERS SECTION
@@ -346,21 +348,18 @@ export const AdminUsersPage: React.FC = () => {
                 ) : (
                   <>
                     <UserPlus className="size-4" />
-                    Create User
+                    Create user
                   </>
                 )}
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Manage who has access to your BookLite instance.
-            </p>
           </CardHeader>
 
           <CardContent className="space-y-5 px-6 pb-6">
             {/* Create user form (collapsible) */}
             {showCreateForm && (
               <div className="rounded-2xl border border-border bg-muted/30 p-5">
-                <p className="text-sm font-semibold mb-4">New User</p>
+                <p className="text-sm font-semibold mb-4">New user</p>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -454,7 +453,7 @@ export const AdminUsersPage: React.FC = () => {
                       ) : (
                         <>
                           <UserPlus className="size-4" />
-                          Create User
+                          Create user
                         </>
                       )}
                     </Button>
@@ -481,20 +480,17 @@ export const AdminUsersPage: React.FC = () => {
               </div>
             ) : (
               <div className="rounded-2xl border border-border overflow-hidden">
-                <Table>
+                <Table className="table-fixed">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
-                      <TableHead className="text-xs font-medium text-muted-foreground">
+                      <TableHead className="px-2 text-xs font-medium text-muted-foreground sm:px-3">
                         User
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">
+                      <TableHead className="w-24 px-1 text-xs font-medium text-muted-foreground sm:w-32 sm:px-3">
                         Role
                       </TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">
-                        Status
-                      </TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground text-right">
-                        Actions
+                      <TableHead className="w-10 px-1 sm:w-14 sm:px-3">
+                        <span className="sr-only">Actions</span>
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -504,27 +500,34 @@ export const AdminUsersPage: React.FC = () => {
                         key={user.id}
                         className="hover:bg-muted/20"
                       >
-                        <TableCell>
+                        <TableCell className="px-2 sm:px-3">
                           <div className="flex items-center gap-3">
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold uppercase text-muted-foreground">
+                            <div className="hidden size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold uppercase text-muted-foreground sm:flex">
                               {user.username.slice(0, 2)}
                             </div>
-                            <div>
-                              <p className="font-medium text-sm">{user.username}</p>
-                              <p className="text-xs text-muted-foreground">{getEmailLabel(user.email)}</p>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+                                <span className="truncate" title={user.username}>{user.username}</span>
+                                {user.disabledAt && (
+                                  <Badge variant="destructive" className="text-[11px]">
+                                    Disabled
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="truncate text-xs text-muted-foreground">{getEmailLabel(user.email)}</p>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="px-1 sm:px-3">
                           <Select
                             value={user.role}
                             onValueChange={(v) =>
                               updateUserAccess.mutate({ id: user.id, payload: { role: v } })
                             }
                           >
-                            <SelectTrigger className="h-7 w-[6.5rem] text-xs">
+                            <SelectTrigger className="h-7 w-full px-2 text-xs">
                               <div className="flex items-center gap-1.5">
-                                <Shield className="size-3 text-muted-foreground" />
+                                <Shield className="hidden size-3 text-muted-foreground sm:block" />
                                 <SelectValue />
                               </div>
                             </SelectTrigger>
@@ -534,64 +537,54 @@ export const AdminUsersPage: React.FC = () => {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>
-                          {user.disabledAt ? (
-                            <Badge variant="destructive" className="text-[11px]">
-                              Disabled
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[11px] bg-status-completed/10 text-status-completed">
-                              Active
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => openEditDialog(user)}
-                            >
-                              <Pencil className="size-3.5" />
-                              Edit
-                            </Button>
-                            {canImpersonateUser(user) && (
+                        <TableCell className="px-1 text-right sm:px-3">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                               <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => setImpersonationTarget(user)}
+                                variant="ghost"
+                                size="icon"
+                                className="size-8"
+                                aria-label={`Actions for ${user.username}`}
                               >
-                                <LogIn className="size-3.5" />
-                                Impersonate
+                                <MoreHorizontal className="size-4" />
                               </Button>
-                            )}
-                            <Button
-                              variant={user.disabledAt ? "outline" : "secondary"}
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() =>
-                                updateUserAccess.mutate({
-                                  id: user.id,
-                                  payload: { disabled: !user.disabledAt },
-                                })
-                              }
-                            >
-                              {user.disabledAt ? "Enable" : "Disable"}
-                            </Button>
-                            {canDeleteUser(user) && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => setDeleteTarget(user)}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => openEditDialog(user)}>
+                                <Pencil className="size-3.5" />
+                                Edit
+                              </DropdownMenuItem>
+                              {canImpersonateUser(user) && (
+                                <DropdownMenuItem onSelect={() => setImpersonationTarget(user)}>
+                                  <LogIn className="size-3.5" />
+                                  Impersonate
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  updateUserAccess.mutate({
+                                    id: user.id,
+                                    payload: { disabled: !user.disabledAt },
+                                  })
+                                }
                               >
-                                <Trash2 className="size-3.5" />
-                                Delete
-                              </Button>
-                            )}
-                          </div>
+                                {user.disabledAt ? <UserCheck className="size-3.5" /> : <Ban className="size-3.5" />}
+                                {user.disabledAt ? "Enable" : "Disable"}
+                              </DropdownMenuItem>
+                              {canDeleteUser(user) && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onSelect={() => setDeleteTarget(user)}
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -931,9 +924,6 @@ export const AdminUsersPage: React.FC = () => {
         <Card className="rounded-2xl border-border overflow-hidden">
           <CardHeader className="pb-4 pt-5 px-6">
             <h2 className="text-lg font-semibold tracking-tight">Storage</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Configure upload limits and storage behavior.
-            </p>
           </CardHeader>
 
           <CardContent className="px-6 pb-6">
@@ -981,10 +971,10 @@ export const AdminUsersPage: React.FC = () => {
           <CardHeader className="pb-4 pt-5 px-6">
             <div className="flex items-center gap-2.5">
               <Link2 className="size-4 text-muted-foreground" />
-              <h2 className="text-lg font-semibold tracking-tight">External Links</h2>
+              <h2 className="text-lg font-semibold tracking-tight">External links</h2>
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Configure optional links that appear in the app menu.
+              Optional links shown in the main menu.
             </p>
           </CardHeader>
 
@@ -994,7 +984,7 @@ export const AdminUsersPage: React.FC = () => {
                 <Loader2 className="size-5 text-muted-foreground animate-spin" />
               </div>
             ) : settings.data ? (
-              <div className="max-w-2xl rounded-2xl border border-border bg-muted/20 p-4">
+              <div className="max-w-2xl">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5">
                     <Label className="text-xs text-muted-foreground">Ebook Download URL</Label>

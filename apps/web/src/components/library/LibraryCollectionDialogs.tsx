@@ -89,7 +89,7 @@ export const CreateCollectionDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md rounded-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create collection</DialogTitle>
           <DialogDescription>Group related books together.</DialogDescription>
@@ -152,7 +152,7 @@ export const EditCollectionDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md rounded-lg">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Edit collection</DialogTitle>
           <DialogDescription>Update the name or icon.</DialogDescription>
@@ -228,7 +228,7 @@ export const AddBooksDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col rounded-lg">
+      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {renderCollectionIcon(collection, { svgClassName: "size-4", textClassName: "text-lg leading-none" })}
@@ -248,7 +248,7 @@ export const AddBooksDialog: React.FC<{
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto -mx-6 px-6 min-h-0 max-h-[400px]">
+        <div className="flex-1 overflow-y-auto -mx-5 px-5 sm:-mx-6 sm:px-6 min-h-0 max-h-[400px]">
           {booksQuery.isLoading && (
             <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin mr-2" />

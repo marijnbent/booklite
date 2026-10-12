@@ -500,7 +500,7 @@ export const ReaderPage: React.FC = () => {
   if (bookQuery.isLoading) {
     return (
       <div className="flex h-dvh items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-primary" />
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -541,7 +541,10 @@ export const ReaderPage: React.FC = () => {
         settings.theme === "night" ? "bg-white/10" : "bg-black/5"
       )}>
         <div
-          className="h-full bg-primary transition-[width] duration-300 ease-out"
+          className={cn(
+            "h-full transition-[width] duration-300 ease-out",
+            settings.theme === "night" ? "bg-white/60" : "bg-black/45"
+          )}
           style={{ width: `${progressPercent}%` }}
         />
       </div>
@@ -763,7 +766,9 @@ export const ReaderPage: React.FC = () => {
                         className={cn(
                           "rounded-lg px-0 py-1.5 text-xs tabular-nums transition-colors",
                           settings.fontSize === option
-                            ? "bg-primary text-primary-foreground"
+                            ? settings.theme === "night"
+                              ? "bg-white/85 text-[#171923]"
+                              : "bg-black/75 text-white"
                             : settings.theme === "night"
                               ? "bg-white/5 text-white/65 hover:bg-white/10"
                               : "bg-black/5 text-black/55 hover:bg-black/10"
@@ -807,7 +812,9 @@ export const ReaderPage: React.FC = () => {
                           t === "sepia" && "bg-[#f3e6cd]",
                           t === "night" && "bg-[#171923]",
                         settings.theme === t
-                            ? "border-primary scale-110"
+                            ? settings.theme === "night"
+                              ? "border-white/85 scale-110"
+                              : "border-black/75 scale-110"
                             : settings.theme === "night"
                               ? "border-white/20"
                               : "border-black/10"

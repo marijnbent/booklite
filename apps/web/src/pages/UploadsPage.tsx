@@ -449,7 +449,7 @@ export const UploadsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6" {...(hasAnyContent ? pageDragHandlers : {})}>
+    <div className="mx-auto max-w-4xl space-y-5" {...(hasAnyContent ? pageDragHandlers : {})}>
       {/* #9: Full-page drag overlay when files already exist */}
       {dragOver && hasAnyContent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -462,16 +462,19 @@ export const UploadsPage: React.FC = () => {
       )}
 
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Upload</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Add books to your library from EPUB, KEPUB, or PDF files.
-        </p>
-      </div>
+      <h1>Upload</h1>
 
-      <button type="button" {...dropZoneHandlers} className={cn("flex w-full items-center gap-3 rounded-2xl border border-dashed px-4 py-4 text-left text-sm text-muted-foreground", dragOver && "bg-secondary")}>
-        <FileUp className="size-5" />
-        <span>Drop files here, or <span className="font-medium text-foreground">browse</span></span>
+      <button
+        type="button"
+        {...dropZoneHandlers}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-2xl border border-dashed border-foreground/20 px-4 text-sm text-muted-foreground transition-colors hover:bg-secondary/60",
+          hasAnyContent ? "py-4 text-left" : "flex-col justify-center py-16 text-center",
+          dragOver && "bg-secondary",
+        )}
+      >
+        <FileUp className={hasAnyContent ? "size-5" : "size-7"} />
+        <span>Drop EPUB, KEPUB or PDF files here, or <span className="font-medium text-foreground">browse</span></span>
       </button>
       <input ref={fileInputRef} type="file" accept=".epub,.kepub,.pdf" multiple className="hidden" onChange={(event) => {
         if (event.target.files) addFilesToDrafts(event.target.files);
@@ -481,7 +484,7 @@ export const UploadsPage: React.FC = () => {
       {/* Status banner — importing or done */}
       {(uploadingAny || hasActiveJobs || allJobsDone) && (
         <div className={cn(
-          "flex items-center justify-between gap-4 rounded-lg border px-4 py-3 transition-colors duration-500",
+          "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border px-4 py-3 transition-colors duration-500",
           allJobsDone && failedCount > 0
             ? "border-destructive/20 bg-destructive/[0.04]"
             : allJobsDone
@@ -506,12 +509,12 @@ export const UploadsPage: React.FC = () => {
           {allJobsDone && (
             <div className="flex items-center gap-2 shrink-0">
               {!failedCount && (
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => addFilesToDrafts([])}>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
                   Add more books
                 </Button>
               )}
               <Button size="sm" className="gap-1" onClick={() => navigate("/")}>
-                View Library
+                View library
                 <ChevronRight className="size-3.5" />
               </Button>
             </div>
@@ -523,7 +526,7 @@ export const UploadsPage: React.FC = () => {
       {hasAnyContent && (
         <div className="space-y-4">
           {/* Toolbar */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               {/* #3: Summary chip */}
               {drafts.length > 0 && (
@@ -615,6 +618,8 @@ export const UploadsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => updateDraft(draft.id, { selected: !draft.selected })}
+                    aria-label={`Select ${draft.title || draft.file.name}`}
+                    aria-pressed={draft.selected}
                     className={cn(
                       "flex size-4.5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150",
                       draft.selected
@@ -629,6 +634,7 @@ export const UploadsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingDraftId(draft.id)}
+                    aria-label="Change cover"
                     className="relative shrink-0 overflow-hidden rounded-[7px] border border-border/40 bg-muted/30 transition-colors hover:border-primary/40 group/cover"
                     style={{ width: 32, height: 48 }}
                   >
@@ -705,6 +711,7 @@ export const UploadsPage: React.FC = () => {
                       onClick={() => void uploadDraft(draft)}
                       disabled={isUploading}
                       title={draft.error}
+                      aria-label={`Retry upload: ${draft.error}`}
                     >
                       <RotateCw className="size-3.5" />
                     </Button>
@@ -714,8 +721,9 @@ export const UploadsPage: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7 shrink-0 text-muted-foreground/40 hover:text-foreground"
+                    className="hidden size-7 shrink-0 text-muted-foreground hover:text-foreground sm:inline-flex"
                     onClick={() => setEditingDraftId(draft.id)}
+                    aria-label="Edit details"
                   >
                     <Pencil className="size-3.5" />
                   </Button>
@@ -727,6 +735,7 @@ export const UploadsPage: React.FC = () => {
                     className="size-7 shrink-0 text-muted-foreground hover:text-destructive transition-opacity duration-150"
                     onClick={() => removeDraft(draft.id)}
                     disabled={isUploading}
+                    aria-label="Remove from upload"
                   >
                     <Trash2 className="size-3.5" />
                   </Button>
@@ -749,16 +758,17 @@ export const UploadsPage: React.FC = () => {
                 >
                   {/* Book icon placeholder (no cover for jobs) */}
                   <div
-                    className="shrink-0 flex items-center justify-center rounded border border-border/30 bg-muted/20 text-muted-foreground/25"
+                    className="shrink-0 flex items-center justify-center rounded-[7px] border border-border/30 bg-muted/20 text-muted-foreground/25"
                     style={{ width: 32, height: 48 }}
                   >
                     <BookOpen className="size-3.5" />
                   </div>
 
                   {/* Title */}
-                  <p className="flex-1 min-w-0 text-sm font-medium truncate text-muted-foreground/80">
-                    {job.title}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-muted-foreground">{job.title}</p>
+                    {job.error && <p className="truncate text-[11px] text-destructive sm:hidden">{job.error}</p>}
+                  </div>
 
                   {job.fileName && <span className="hidden max-w-48 truncate font-mono text-xs text-muted-foreground sm:block">{job.fileName}</span>}
                   {/* Error text shown as tooltip on status badge area */}
@@ -785,7 +795,7 @@ export const UploadsPage: React.FC = () => {
           {drafts.length > 0 && (
             <p className="flex items-center gap-1.5 pt-1 text-[11px] text-muted-foreground/70">
               <Pencil className="size-3 shrink-0" />
-              Click a row to edit details, change the cover, or pick a different metadata match.
+              Select a title to edit details or change the cover.
             </p>
           )}
         </div>

@@ -24,49 +24,42 @@ export const ProfilePage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Your account information
-        </p>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <h1>Profile</h1>
 
       {/* Profile card */}
-      <Card className="shadow-sm">
+      <Card>
         <CardContent className="pt-5">
           {/* User identity row */}
           <div className="flex items-center gap-4">
-            <Avatar className="size-16 ring-2 ring-primary/15 ring-offset-2">
-              <AvatarFallback className="text-lg font-bold bg-primary/12 text-primary">
+            <Avatar className="size-14">
+              <AvatarFallback
+                className="text-lg font-semibold"
+                style={{ background: "linear-gradient(135deg, var(--ac), var(--ac2))", color: "var(--act)" }}
+              >
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-xl font-semibold tracking-tight">{me.username}</h2>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <h2 className="truncate text-xl font-semibold tracking-tight">{me.username}</h2>
                 <Badge variant={me.role === "OWNER" ? "default" : "secondary"}>
                   {me.role}
                 </Badge>
               </div>
-              {me.email && (
-                <p className="text-sm text-muted-foreground mt-0.5">{me.email}</p>
-              )}
             </div>
           </div>
 
           {/* Info rows */}
-          <div className="mt-6 border-t border-border/50">
+          <div className="mt-5 border-t border-border/50">
             <dl className="divide-y divide-border/50">
               {[
-                { label: "Username", value: me.username },
                 { label: "Email", value: me.email ?? "Not set" },
-                { label: "Role", value: me.role },
                 { label: "Member since", value: createdDate },
               ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between py-3">
-                  <dt className="text-sm text-muted-foreground">{item.label}</dt>
-                  <dd className="text-sm font-medium">{item.value}</dd>
+                <div key={item.label} className="flex items-center justify-between gap-4 py-3">
+                  <dt className="shrink-0 text-sm text-muted-foreground">{item.label}</dt>
+                  <dd className="min-w-0 truncate text-sm font-medium">{item.value}</dd>
                 </div>
               ))}
             </dl>

@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  TerminalSquare,
   RefreshCw,
   Trash2,
   Copy,
@@ -302,13 +301,12 @@ export const AdminActivityPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-5">
       {/* Page header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2.5">
-            <TerminalSquare className="size-5 text-muted-foreground" />
-            <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
+            <h1>Activity</h1>
             {settings.data?.koboDebugLogging ? (
               <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                 Kobo debug on
@@ -317,9 +315,6 @@ export const AdminActivityPage: React.FC = () => {
               <Badge variant="secondary">Kobo debug off</Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">
-            Owner-visible operational logs for metadata, uploads, and Kobo device flows.
-          </p>
 
           {/* Stat pills — only shown when there is data */}
           {activity.data && activity.data.length > 0 && (

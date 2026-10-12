@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Copy,
   RefreshCw,
@@ -90,7 +89,7 @@ export const KoboPage: React.FC = () => {
   if (settings.isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 text-primary animate-spin" />
+        <Loader2 className="size-6 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -98,8 +97,9 @@ export const KoboPage: React.FC = () => {
   const model = settings.data;
   if (!model) {
     return (
-      <div className="flex flex-col items-center py-20">
+      <div className="flex flex-col items-center gap-3 py-20">
         <p className="text-sm text-muted-foreground">Could not load Kobo settings.</p>
+        <Button variant="outline" size="sm" onClick={() => void settings.refetch()}>Retry</Button>
       </div>
     );
   }
@@ -113,27 +113,15 @@ export const KoboPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-8 max-w-2xl">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Kobo</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Configure your Kobo e-reader sync settings
-        </p>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-8">
+      <h1>Kobo</h1>
 
       {/* Sync settings */}
-      <Card>
-        <CardContent className="pt-5 space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Sync Settings</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Control how books are synced to your Kobo device
-            </p>
-          </div>
+      <section className="space-y-5">
+          <h2 className="text-lg font-semibold tracking-tight">Sync</h2>
 
           {/* Toggle rows */}
-          <div className="border border-border/50 rounded-2xl divide-y divide-border/50">
+          <div className="rounded-2xl border border-border bg-card divide-y divide-border/50">
             <div className="flex items-center justify-between gap-4 px-4 py-3.5">
               <div>
                 <Label htmlFor="sync-enabled" className="text-sm font-medium cursor-pointer">Enable sync</Label>
@@ -191,8 +179,8 @@ export const KoboPage: React.FC = () => {
               </div>
             )}
 
-            <div className="border border-border/50 rounded-2xl divide-y divide-border/50">
-              <div className="max-h-52 overflow-y-auto">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              <div className="max-h-64 overflow-y-auto">
                 {collectionItems.map((collection) => {
                   const checked = model.syncCollectionIds.includes(collection.id);
                   const hasSyncableCount = typeof collection.kobo_syncable_count === "number";
@@ -233,7 +221,7 @@ export const KoboPage: React.FC = () => {
           )}
 
           {/* Threshold settings */}
-          <div className="border-t border-border/50 pt-6">
+          <div>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="reading-threshold" className="text-sm font-medium">Mark reading at (%)</Label>
@@ -267,22 +255,19 @@ export const KoboPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </section>
 
       {/* Endpoint */}
-      <Card>
-        <CardContent className="pt-5 space-y-6">
+      <section className="space-y-4 border-t border-border pt-8">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Kobo API Endpoint</h2>
+            <h2 className="text-lg font-semibold tracking-tight">API endpoint</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Copy this line into your Kobo configuration file
+              Copy this line into your Kobo configuration file.
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-medium text-muted-foreground">API endpoint</Label>
-            <div className="rounded-2xl border border-border/50 bg-muted/30 px-3.5 py-3">
+            <div className="rounded-2xl border border-border bg-card px-3.5 py-3">
               <code className="font-mono text-xs leading-relaxed text-foreground/80 break-all select-all">
                 {koboConfigEndpoint}
               </code>
@@ -328,8 +313,7 @@ export const KoboPage: React.FC = () => {
               Regenerate endpoint
             </Button>
           </div>
-        </CardContent>
-      </Card>
+      </section>
     </div>
   );
 };
