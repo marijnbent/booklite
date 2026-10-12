@@ -73,9 +73,12 @@ export const SelectionToolbar: React.FC<{
   const allOwned = selectedBooks.length > 0 && selectedBooks.every((book) => !book.isShared);
 
   return (
-    <div className="selection-toolbar">
-      <span className="whitespace-nowrap px-1 text-sm font-medium">{selectedCount} selected</span>
-      <div className="mx-0.5 h-5 w-px bg-border/60" />
+    <div className="selection-toolbar animate-fade-in">
+      <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label="Clear selection" onClick={onClear}>
+        <X className="size-4" />
+      </Button>
+      <span className="whitespace-nowrap px-1 text-sm font-medium">{selectedCount}<span className="max-[379px]:sr-only"> selected</span></span>
+      <div className="ml-auto flex items-center gap-0.5">
 
       {assignableCollections.length > 0 && (
         <DropdownMenu>
@@ -144,11 +147,7 @@ export const SelectionToolbar: React.FC<{
           <Trash2 className="size-4" /><span className="hidden sm:inline">Delete</span>
         </Button>
       )}
-
-      <div className="mx-0.5 h-5 w-px bg-border/60" />
-      <Button variant="ghost" size="icon" className="size-7 shrink-0" aria-label="Clear selection" onClick={onClear}>
-        <X className="size-3.5" />
-      </Button>
+      </div>
     </div>
   );
 };
