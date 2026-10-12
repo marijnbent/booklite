@@ -196,10 +196,8 @@ body {
 .dock-link:not(.hidden) { display: flex; }
 .dock-link.active, .dock-link:hover { background: var(--color-secondary); color: var(--color-foreground); }
 .dock-avatar { flex-shrink: 0; width: 34px; height: 34px; border-radius: 99px; background: linear-gradient(135deg,var(--ac),var(--ac2)); color: var(--act); font-size: 11px; font-weight: 600; }
-.shelf-mark { display: flex; gap: 3px; align-items: flex-end; padding: 0 13px; }
-.shelf-mark i { width: 3px; height: 16px; border-radius: 1px; background: color-mix(in oklab,var(--ac) 86%,#000); }
-.shelf-mark i:nth-child(2) { height: 12px; }
-.shelf-mark i:nth-child(3) { height: 15px; transform: rotate(12deg); }
+.booklite-logo { display: inline-block; background: color-mix(in oklab,var(--ac) 86%,#000); mask: url('/logo.svg') center / contain no-repeat; }
+.dock-brand { display: flex; align-items: center; padding: 0 13px; }
 .accent-swatch[aria-pressed="true"] { outline: 1.5px solid var(--color-foreground); outline-offset: 3px; }
 .shelf-progress { background: linear-gradient(90deg,var(--ac),var(--ac2)); }
 .status-chip { border: 1px solid var(--color-border); border-radius: 99px; font-size: 12px; padding: 4px 10px; }
@@ -226,7 +224,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--ac); outline-of
 }
 @media (max-width: 639px) {
   .shelf-content { padding: 22px 16px 108px; }
-  .shelf-dock .shelf-mark { display: none; }
+  .dock-brand { display: none; }
   .impersonation-bar { margin: 12px 16px 0; }
   .dock-link { padding: 0 12px; }
   .selection-toolbar { overflow-x: auto; justify-content: flex-start; width: max-content; }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { BookLiteLogo } from "@/components/BookLiteLogo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
@@ -55,7 +56,7 @@ export const SetupPage: React.FC = () => {
     <div className="flex auth-page min-h-screen items-center justify-center bg-transparent px-4">
       <div className="relative w-full max-w-sm animate-fade-up">
         <div className="mb-8 flex flex-col items-center gap-4">
-          <div className="shelf-mark scale-[1.75]"><i /><i /><i /></div>
+          <BookLiteLogo className="size-8" decorative />
           <span className="text-2xl font-semibold tracking-tight">BookLite</span>
         </div>
 

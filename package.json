@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "generate:icons": "node scripts/generate-icons.mjs",
     "clean": "npm run clean --workspaces --if-present",
     "dev": "npm run dev -w @booklite/api",
     "dev:split": "concurrently -n api,web -c cyan,magenta \"npm:dev -w @booklite/api\" \"npm:dev -w @booklite/web\"",

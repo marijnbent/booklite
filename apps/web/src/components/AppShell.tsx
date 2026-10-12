@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { AccentPicker } from "@/components/AccentPicker";
+import { BookLiteLogo } from "@/components/BookLiteLogo";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { User, Shield, Key, LogOut, Sun, Moon, CircleHelp, ExternalLink, TerminalSquare } from "lucide-react";
 
@@ -52,7 +53,7 @@ export const AppShell: React.FC = () => {
       {!isReaderRoute && (
         <nav className={cn("shelf-dock", showAdminNavigation && "has-admin")} aria-label="Main navigation">
           <div className="dock-primary">
-            <NavLink to="/library" aria-label="BookLite" className="shelf-mark"><i /><i /><i /></NavLink>
+            <NavLink to="/library" aria-label="BookLite" className="dock-brand"><BookLiteLogo decorative /></NavLink>
             {navItems.map((item) => (
               <NavLink key={item.to} to={item.to} className={({ isActive }) => cn("dock-link", isActive && "active", item.label === "Docs" && "hidden sm:flex")}>
                 {item.label}

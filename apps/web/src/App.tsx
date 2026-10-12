@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Book } from "lucide-react";
+import { BookLiteLogo } from "@/components/BookLiteLogo";
 
 const AppShell = lazy(async () => {
   const module = await import("@/components/AppShell");
@@ -71,9 +71,7 @@ const ReaderPage = lazy(async () => {
 const RouteLoadingScreen: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center bg-background">
     <div className="flex flex-col items-center gap-4 animate-fade-up">
-      <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10">
-        <Book className="size-6 animate-pulse-soft text-primary" />
-      </div>
+      <BookLiteLogo className="size-8" />
       <p className="text-sm text-muted-foreground">Loading page...</p>
     </div>
   </div>
