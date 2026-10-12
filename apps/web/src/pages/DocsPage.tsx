@@ -223,7 +223,7 @@ export const DocsPage: React.FC = () => {
               choose a suggested cover, mark it as a favorite, and assign collections.
             </Step>
             <Step number={4}>
-              Click <span className="font-medium text-foreground">Add selected</span>. Files are
+              Click <span className="font-medium text-foreground">Import</span>. Files are
               uploaded in batches and queued as background import jobs.
             </Step>
             <Step number={5}>
