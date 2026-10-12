@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Check, Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
+import { BookLiteLogo } from "@/components/BookLiteLogo";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -309,9 +310,7 @@ export const LlmDocsPage: React.FC = () => {
       <header className="border-b border-border/60 bg-card">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded-2xl bg-primary/10">
-              <BookOpen className="size-4 text-primary" />
-            </div>
+            <BookLiteLogo className="size-7" decorative />
             <div>
               <div className="text-sm font-semibold leading-tight">BookLite</div>
               <div className="text-xs text-muted-foreground leading-tight">API Reference</div>

@@ -1,4 +1,4 @@
-# BookLite
+# <img src="apps/web/public/logo.svg" width="28" height="28" alt="" /> BookLite
 
 <img width="1936" height="1352" alt="image" src="https://github.com/user-attachments/assets/bf36eaee-3880-42d8-a54c-906536dc590d" />
 
@@ -163,6 +163,8 @@ npm run dev:split
 ```
 
 ## Build and Test
+
+The shared logo is `apps/web/public/logo.svg`. After changing it, run `npm run generate:icons` to refresh the browser, app, and repository icons.
 
 ```bash
 npm run build
