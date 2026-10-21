@@ -1,6 +1,6 @@
 services:
   booklite-dev:
-    image: node:22-alpine
+    image: node:22.23.4-alpine
     working_dir: /workspace
     command: sh -c "npm install && npm run dev -w @booklite/api"
     environment:
