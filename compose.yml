@@ -18,7 +18,7 @@ services:
       # Optional Google fallback key
       # - GOOGLE_BOOKS_API_KEY=
     ports:
-      - "${PORT:-6060}:${PORT:-6060}"
+      - "${PUBLISH_ADDRESS:-127.0.0.1}:${PORT:-6060}:${PORT:-6060}"
     volumes:
       - ${APP_DATA_BIND:-./app-data}:${APP_DATA_DIR:-/app/data}
       - ${BOOKS_BIND:-./books}:${BOOKS_DIR:-/books}

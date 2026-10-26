@@ -112,6 +112,7 @@ Storage and frontend:
 
 - `APP_DATA_DIR` default `/app/data`
 - `BOOKS_DIR` default `/books`
+- `PUBLISH_ADDRESS` default `127.0.0.1` when using `compose.yml`: the host address the port is published on. Set it to `0.0.0.0` only when the app must be reachable from other machines without a reverse proxy.
 - `APP_DATA_BIND` default `./app-data` when using `compose.yml`
 - `BOOKS_BIND` default `./books` when using `compose.yml`
 - `WEB_DIST_DIR` optional override for built frontend assets
