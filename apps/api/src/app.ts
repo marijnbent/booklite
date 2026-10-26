@@ -1,5 +1,4 @@
 import Fastify from "fastify";
-import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import sensible from "@fastify/sensible";
@@ -37,10 +36,6 @@ export const buildApp = () => {
   });
 
   app.register(sensible);
-  app.register(cors, {
-    origin: true,
-    credentials: true
-  });
   app.register(rateLimit, {
     max: 200,
     timeWindow: "1 minute"
