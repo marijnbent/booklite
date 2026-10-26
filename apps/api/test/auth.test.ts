@@ -52,6 +52,46 @@ describe("auth", () => {
     expect(me.json().email).toBe("owner@example.com");
   });
 
+  it("keeps authenticated API access without granting cross-origin browser access", async () => {
+    for (const origin of [undefined, "https://boeken.bentjes.nl", "https://audit.invalid", "null"]) {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/v1/me",
+        headers: {
+          authorization: `Bearer ${ownerAccessToken}`,
+          ...(origin ? { origin } : {})
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().username).toBe("owner");
+      expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+      expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+    }
+
+    const preflight = await app.inject({
+      method: "OPTIONS",
+      url: "/api/v1/me",
+      headers: {
+        origin: "https://audit.invalid",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "authorization"
+      }
+    });
+
+    expect(preflight.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(preflight.headers["access-control-allow-credentials"]).toBeUndefined();
+
+    const unauthenticated = await app.inject({
+      method: "GET",
+      url: "/api/v1/me",
+      headers: { origin: "https://audit.invalid" }
+    });
+
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(unauthenticated.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
   it("refresh rotates tokens", async () => {
     const login = await app.inject({
       method: "POST",
