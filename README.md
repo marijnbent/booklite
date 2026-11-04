@@ -1,82 +1,80 @@
 # <img src="apps/web/public/logo.svg" width="28" height="28" alt="" /> BookLite
 
-<img width="1936" height="1352" alt="image" src="https://github.com/user-attachments/assets/bf36eaee-3880-42d8-a54c-906536dc590d" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.webp" />
+  <img src="docs/screenshot-light.webp" alt="BookLite library with a grid of book covers, collections and reading status filters" />
+</picture>
 
-BookLite is a self-hosted digital book library for people who want a clean personal or family bookshelf without the heavier feature surface of larger library servers. You can upload books, organize them, enrich metadata from multiple providers, read in the browser, share books between users, and sync selected books to Kobo.
+BookLite is a self-hosted ebook library for a personal or family bookshelf. Upload books, enrich their metadata from several providers, read in the browser, share books between users and sync selected books to Kobo.
 
-It is inspired by [BookLore](https://github.com/booklore-app/booklore), but deliberately keeps a tighter scope: no OPDS feeds, no KOReader sync, no comics or audiobooks, and no BookDrop-style ingestion pipeline.
+It is inspired by [BookLore](https://github.com/booklore-app/booklore), but keeps a tighter scope: no OPDS feeds, no KOReader sync, no comics or audiobooks and no BookDrop-style ingestion pipeline.
 
 ## Features
 
 ### Library and reading
 
-- Upload `EPUB`, `KEPUB`, and `PDF` from the web UI
-- Built-in browser reader for `EPUB` and `KEPUB`
+- Upload `EPUB`, `KEPUB` and `PDF`
+- Grid and list views with sorting, full-text search (SQLite FTS5) and reading status filters
+- Custom collections plus built-in `Favorites`, `Shared with me` and `Uncollected`
+- Browser reader for `EPUB` and `KEPUB` with paper, sepia and night themes, font choice and font size
 - Reading status and progress tracking
-- Full-text library search powered by SQLite FTS5
-- Custom collections plus built-in `Favorites`, `Shared with me`, and `Uncollected`
-- Per-book metadata editing, cover changes, downloads, and deletion
+- Per-book metadata editing, cover changes, downloads and deletion
+- Light and dark mode, with a personal accent color per user
 
-### Upload and import flow
+### Uploads
 
 - Drag-and-drop multi-file uploads
-- Background import jobs with live queue/progress states
-- Automatic filename parsing before import
-- Optional OpenRouter-assisted filename cleanup for messy filenames
-- Automatic metadata preview while reviewing uploads
-- Manual edits to title, author, and description are preserved during enrichment
-- Assign collections and favorites before import completes
+- Background import jobs with live progress
+- Filename parsing before import, with optional OpenRouter-assisted cleanup for messy filenames
+- Metadata preview while reviewing uploads; manual edits to title, author and description are kept
+- Assign collections and favorites before the import finishes
 
-### Metadata pipeline
+### Metadata
 
-- Metadata from 7 providers: Open Library, Google Books, Amazon, bol.com, Hardcover, Goodreads, and Douban
-- Owners can enable or disable providers per instance
-- Results are merged field-by-field instead of trusting a single source
-- Covers are ranked separately from text metadata
-- Optional OpenRouter resolver can normalize provider results, reject wrong matches, and fill missing series data
-- Cover suggestions can be reviewed and changed later from the library detail drawer
+- 7 providers: Open Library, Google Books, Amazon, bol.com, Hardcover, Goodreads and Douban
+- Owners enable or disable providers per instance
+- Results are merged field by field instead of trusting a single source
+- Covers are ranked separately and can be changed later from the book drawer
+- Optional OpenRouter resolver normalizes results, rejects wrong matches and fills in missing series data
 
-### Multi-user and admin
+### Users and administration
 
-- Simple `OWNER` and `MEMBER` roles
+- `OWNER` and `MEMBER` roles
 - Share books directly between users
-- Owner-only user management, provider settings, upload limits, and diagnostics
-- Admin impersonation for member support and debugging
-- Activity log for auth, upload, metadata, and Kobo events
-- LLM-ready API docs with expiring admin-generated tokens
+- Owner-only user management, provider settings, upload limits and diagnostics
+- Impersonate members for support and debugging
+- Activity log for auth, upload, metadata and Kobo events
+- LLM-ready API docs with expiring, admin-generated tokens
+- Optional external ebook download link in the header
 
 ### Kobo sync
 
 - Built-in Kobo-compatible API endpoint
 - Sync all books or only selected collections
-- Reading progress sync with latest timestamp wins
-- Only `EPUB` and `KEPUB` are synced to Kobo
-- New accounts have Kobo sync enabled with a `Favorites` collection preselected
+- Reading progress sync, latest timestamp wins
+- Only `EPUB` and `KEPUB` sync; `PDF` stays library-only
+- New accounts start with Kobo sync on and `Favorites` selected
 
-## Stack
-
-- Backend: Fastify + TypeScript + Drizzle + SQLite (WAL)
-- Frontend: React + Vite + TanStack Query + dnd-kit
-- Runtime: single Docker container
-
-## Quick Start
+## Quick start
 
 ### Docker Compose
 
 ```bash
 cp .env.example .env
-# then edit .env and set JWT_SECRET
+# set JWT_SECRET in .env
 docker compose up -d --build
 ```
 
 Open [http://localhost:6060](http://localhost:6060).
+
+The port is published on `127.0.0.1` by default. Put a reverse proxy in front of it, or set `PUBLISH_ADDRESS=0.0.0.0` to reach it from other machines.
 
 ### Prebuilt image
 
 ```bash
 docker run -d \
   --name booklite \
-  -p 6060:6060 \
+  -p 127.0.0.1:6060:6060 \
   -e JWT_SECRET=replace-with-a-long-random-secret \
   -e BASE_URL=http://localhost:6060 \
   -v "$(pwd)/app-data:/app/data" \
@@ -84,63 +82,69 @@ docker run -d \
   ghcr.io/marijnbent/booklite:latest
 ```
 
-Pending Drizzle migrations are applied automatically when the API starts, including on Docker deploys.
+Database migrations run automatically on startup.
 
-On first run either:
+### First run
 
-1. Open `/setup` in the UI and create the first owner account.
-2. Or set bootstrap env vars before startup:
+Open `/setup` and create the owner account, or set these before the first start:
 
 - `BOOTSTRAP_OWNER_EMAIL`
 - `BOOTSTRAP_OWNER_USERNAME`
 - `BOOTSTRAP_OWNER_PASSWORD`
 
-## Environment
+## Configuration
 
-See [`.env.example`](.env.example) for the common starting point.
+[`.env.example`](.env.example) is the starting point. Most provider toggles and AI settings can also be changed later under `Admin`.
 
-Core settings:
+Core:
 
-- `PORT` default `6060`
-- `HOST` default `0.0.0.0`
-- `BASE_URL` default `http://localhost:6060`
-- `JWT_SECRET` required, must not be left empty or set to the example/default value
-- `ACCESS_TOKEN_TTL_SECONDS` default `3600`
-- `REFRESH_TOKEN_TTL_SECONDS` default `7776000`
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `JWT_SECRET` | | Required. Must not be empty or the example value. |
+| `PORT` | `6060` | |
+| `HOST` | `0.0.0.0` | |
+| `BASE_URL` | `http://localhost:6060` | Public URL, used for Kobo endpoints |
+| `ACCESS_TOKEN_TTL_SECONDS` | `3600` | |
+| `REFRESH_TOKEN_TTL_SECONDS` | `7776000` | |
+| `UPLOAD_LIMIT_MB` | `100` | |
 
 Storage and frontend:
 
-- `APP_DATA_DIR` default `/app/data`
-- `BOOKS_DIR` default `/books`
-- `PUBLISH_ADDRESS` default `127.0.0.1` when using `compose.yml`: the host address the port is published on. Set it to `0.0.0.0` only when the app must be reachable from other machines without a reverse proxy.
-- `APP_DATA_BIND` default `./app-data` when using `compose.yml`
-- `BOOKS_BIND` default `./books` when using `compose.yml`
-- `WEB_DIST_DIR` optional override for built frontend assets
-- `BOOKLITE_FRONTEND_MODE` one of `auto`, `vite`, `static`, `off`
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `APP_DATA_DIR` | `/app/data` | Database, covers and temp files |
+| `BOOKS_DIR` | `/books` | Book files |
+| `PUBLISH_ADDRESS` | `127.0.0.1` | `compose.yml` only. Host address the port is published on. |
+| `APP_DATA_BIND` | `./app-data` | `compose.yml` only |
+| `BOOKS_BIND` | `./books` | `compose.yml` only |
+| `WEB_DIST_DIR` | | Override for built frontend assets |
+| `BOOKLITE_FRONTEND_MODE` | `auto` | `auto`, `vite`, `static` or `off` |
 
-Upload and metadata defaults:
+Metadata (all optional):
 
-- `UPLOAD_LIMIT_MB` default `100`
-- `AMAZON_BOOKS_DOMAIN` optional, default `com`
-- `AMAZON_BOOKS_COOKIE` optional
-- `GOOGLE_BOOKS_LANGUAGE` optional, example `en`
-- `GOOGLE_BOOKS_API_KEY` optional
-- `HARDCOVER_API_KEY` optional
-- `OPENROUTER_API_KEY` optional, environment-only credential for metadata AI
+| Variable | Notes |
+| --- | --- |
+| `AMAZON_BOOKS_DOMAIN` | Default `com` |
+| `AMAZON_BOOKS_COOKIE` | |
+| `GOOGLE_BOOKS_LANGUAGE` | For example `en` |
+| `GOOGLE_BOOKS_API_KEY` | |
+| `HARDCOVER_API_KEY` | |
+| `OPENROUTER_API_KEY` | Enables metadata AI. Read from the environment only, never stored. |
 
-Metadata AI uses `~openai/gpt-luna-latest`. Existing installs using the previous
-`openai/gpt-5.6-luna` default switch to this alias on startup. Owners can save a
-different OpenRouter model in app settings; other saved choices are preserved.
+Metadata AI uses `~openai/gpt-luna-latest` by default. Owners can pick a different OpenRouter model in `Admin`. Installs still on the old `openai/gpt-5.6-luna` default move to the new alias on startup; other saved choices are kept.
 
-Bootstrap:
+## Kobo setup
 
-- `BOOTSTRAP_OWNER_EMAIL`
-- `BOOTSTRAP_OWNER_USERNAME`
-- `BOOTSTRAP_OWNER_PASSWORD`
+1. Open the `Kobo` page in BookLite and pick which collections to sync.
+2. Connect the Kobo by USB and open `.kobo/Kobo/Kobo eReader.conf`.
+3. Replace the `api_endpoint=` line with the full line from the `Kobo` page.
+4. Eject and sync on the Kobo.
 
-Most metadata provider toggles and AI settings can also be changed later from `Administration`.
+Regenerating the Kobo token invalidates the previous endpoint.
 
 ## Development
+
+Requires Node.js 22 or 24.
 
 ```bash
 npm install
@@ -148,24 +152,16 @@ npm run db:migrate
 npm run dev
 ```
 
-- App: `http://localhost:6060`
-- Run `npm run db:migrate` again after pulling new schema or migration changes.
+The app runs at `http://localhost:6060`, with the API and Vite served from one process. Run `npm run db:migrate` again after pulling schema changes.
 
-Docker dev mode:
-
-```bash
-npm run docker:dev
-```
-
-Optional split dev mode:
+Other modes:
 
 ```bash
-npm run dev:split
+npm run dev:split    # API and Vite as separate processes
+npm run docker:dev   # dev setup in Docker
 ```
 
-## Build and Test
-
-The shared logo is `apps/web/public/logo.svg`. After changing it, run `npm run generate:icons` to refresh the browser, app, and repository icons.
+Checks:
 
 ```bash
 npm run build
@@ -173,24 +169,19 @@ npm run typecheck
 npm test
 ```
 
-Database helpers:
+Database helpers: `npm run db:generate`, `npm run db:migrate`, `npm run db:studio`.
 
-```bash
-npm run db:generate
-npm run db:migrate
-npm run db:studio
-```
+The shared logo is `apps/web/public/logo.svg`. After changing it, run `npm run generate:icons` to refresh the browser, app and repository icons.
 
-## Repository Layout
+### Stack
 
-- `apps/api` Fastify API
-- `apps/web` React app
-- `packages/shared` shared TypeScript contracts
+- Backend: Fastify, TypeScript, Drizzle and SQLite (WAL)
+- Frontend: React, Vite, TanStack Query and dnd-kit
+- Runtime: a single Docker container
 
-## Kobo Notes
+### Layout
 
-- Copy the full `api_endpoint=https://your-booklite-host/api/kobo/...` line from the Kobo page into `Kobo eReader.conf`
-- Only `EPUB` and `KEPUB` sync to Kobo
-- `PDF` stays library-only
-- Progress sync uses latest timestamp wins
-- Regenerating the Kobo token invalidates the previous endpoint
+- `apps/api`: Fastify API
+- `apps/web`: React app
+- `packages/shared`: shared TypeScript contracts
+- `docs`: README screenshots
