@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { count } from "drizzle-orm";
 import { z } from "zod";
+import { config } from "../config";
 import { db } from "../db/client";
 import { users } from "../db/schema";
 import { hashPassword } from "../auth/password";
@@ -26,7 +27,8 @@ export const setupRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/api/v1/setup/status", async () => {
     const [{ total }] = await db.select({ total: count() }).from(users);
     return {
-      completed: total > 0
+      completed: total > 0,
+      sso: config.oidc !== null
     };
   });
 

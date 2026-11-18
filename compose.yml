@@ -11,6 +11,9 @@ services:
       - BASE_URL=${BASE_URL:-http://localhost:6060}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OIDC_ISSUER=${OIDC_ISSUER:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
       # Optional bootstrap owner (first run only)
       # - BOOTSTRAP_OWNER_EMAIL=owner@example.com
       # - BOOTSTRAP_OWNER_USERNAME=owner
