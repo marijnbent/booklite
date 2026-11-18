@@ -42,7 +42,8 @@ export const requireAuth = async (
       .select({
         id: users.id,
         role: users.role,
-        username: users.username
+        username: users.username,
+        signedOutAt: users.signedOutAt
       })
       .from(users)
       .where(and(eq(users.id, payload.userId), isNull(users.disabledAt)))
@@ -50,6 +51,12 @@ export const requireAuth = async (
 
     if (!currentUser) {
       void reply.code(401).send({ error: "User is disabled or missing" });
+      return;
+    }
+
+    const signedOutAt = currentUser.signedOutAt ? Math.floor(Date.parse(currentUser.signedOutAt) / 1000) : 0;
+    if (!payload.jti && (payload.iat ?? 0) < signedOutAt) {
+      void reply.code(401).send({ error: "Signed out" });
       return;
     }
 

@@ -37,7 +37,7 @@ interface AuthContextValue {
     restorePath: string;
   } | null;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
-  completeSso: (refreshToken: string) => Promise<void>;
+  completeSso: (refreshToken: string, idToken: string | null) => Promise<void>;
   logout: () => Promise<void>;
   setAccent: (value: AccentColor) => Promise<void>;
   refreshMe: () => Promise<Me | null>;
@@ -46,6 +46,7 @@ interface AuthContextValue {
 }
 
 export const SIGNED_OUT_KEY = "booklite_signed_out";
+const ID_TOKEN_KEY = "booklite_id_token";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -131,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await startSession(tokens);
   };
 
-  const completeSso = async (refreshToken: string) => {
+  const completeSso = async (refreshToken: string, idToken: string | null) => {
     const tokens = await apiFetch<AuthTokens>("/api/v1/auth/refresh", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -139,6 +140,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     await startSession(tokens);
+    if (idToken) localStorage.setItem(ID_TOKEN_KEY, idToken);
+  };
+
+  const providerLogoutUrl = async (): Promise<string | null> => {
+    const idToken = localStorage.getItem(ID_TOKEN_KEY);
+    if (!idToken) return null;
+    localStorage.removeItem(ID_TOKEN_KEY);
+    try {
+      const response = await fetch("/api/v1/auth/oidc/end-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      return response.ok ? ((await response.json()) as { url: string | null }).url : null;
+    } catch {
+      return null;
+    }
   };
 
   const logout = async () => {
@@ -146,8 +164,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (tokens?.refreshToken) {
       await revokeRefreshToken(tokens.refreshToken).catch(() => undefined);
     }
+    const providerUrl = await providerLogoutUrl();
     setTokens(null);
     setImpersonationState(null);
+    if (providerUrl) {
+      window.location.assign(providerUrl);
+      return new Promise<void>(() => undefined);
+    }
     setImpersonation(null);
     setMe(null);
     sessionStorage.setItem(SIGNED_OUT_KEY, "1");

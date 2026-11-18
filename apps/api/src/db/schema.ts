@@ -18,7 +18,9 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: ["OWNER", "MEMBER"] }).notNull().default("MEMBER"),
   createdAt: text("created_at").notNull(),
-  disabledAt: text("disabled_at")
+  disabledAt: text("disabled_at"),
+  oidcSubject: text("oidc_subject"),
+  signedOutAt: text("signed_out_at")
 });
 
 export const refreshTokens = sqliteTable("refresh_tokens", {
