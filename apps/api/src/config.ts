@@ -24,6 +24,19 @@ const resolveJwtSecret = (): string => {
   return jwtSecret;
 };
 
+const resolveOidc = (): { issuer: string; clientId: string; clientSecret: string } | null => {
+  const issuer = process.env.OIDC_ISSUER?.trim().replace(/\/$/, "");
+  const clientId = process.env.OIDC_CLIENT_ID?.trim();
+  const clientSecret = process.env.OIDC_CLIENT_SECRET?.trim();
+
+  if (!issuer && !clientId && !clientSecret) return null;
+  if (!issuer || !clientId || !clientSecret) {
+    throw new Error("OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set together");
+  }
+
+  return { issuer, clientId, clientSecret };
+};
+
 export const config = {
   port: toInt(process.env.PORT, 6060),
   host: process.env.HOST ?? "0.0.0.0",
@@ -33,6 +46,7 @@ export const config = {
   webDistDir: process.env.WEB_DIST_DIR ?? path.join(process.cwd(), "apps/web/dist"),
   frontendMode: process.env.BOOKLITE_FRONTEND_MODE ?? "auto",
   jwtSecret: resolveJwtSecret(),
+  oidc: resolveOidc(),
   accessTokenTtlSeconds: toInt(process.env.ACCESS_TOKEN_TTL_SECONDS, 3600),
   refreshTokenTtlSeconds: toInt(process.env.REFRESH_TOKEN_TTL_SECONDS, 7776000),
   uploadLimitMb: toInt(process.env.UPLOAD_LIMIT_MB, 100),

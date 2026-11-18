@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/lib/auth";
+import { SIGNED_OUT_KEY, useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { BookLiteLogo } from "@/components/BookLiteLogo";
@@ -8,25 +8,55 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
+const SSO_START_URL = "/api/v1/auth/oidc/start";
+const SSO_HASH_PREFIX = "#sso=";
+const SSO_ERROR = "Single sign-on failed. Try again or sign in with your password.";
+
 export const LoginPage: React.FC = () => {
-  const { login } = useAuth();
+  const { login, completeSso } = useAuth();
   const navigate = useNavigate();
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true);
+  const [sso, setSso] = useState(false);
+  const started = useRef(false);
 
   useEffect(() => {
-    apiFetch<{ completed: boolean }>("/api/v1/setup/status")
+    if (started.current) return;
+    started.current = true;
+
+    const { hash, search } = window.location;
+    if (hash.startsWith(SSO_HASH_PREFIX)) {
+      window.history.replaceState(null, "", "/login");
+      completeSso(hash.slice(SSO_HASH_PREFIX.length))
+        .then(() => navigate("/library", { replace: true }))
+        .catch(() => {
+          setSso(true);
+          setError(SSO_ERROR);
+          setStatusLoading(false);
+        });
+      return;
+    }
+
+    const params = new URLSearchParams(search);
+    const stayHere = params.has("local") || params.has("error") || sessionStorage.getItem(SIGNED_OUT_KEY) !== null;
+    if (params.has("error")) setError(SSO_ERROR);
+
+    apiFetch<{ completed: boolean; sso: boolean }>("/api/v1/setup/status")
       .then((result) => {
         if (!result.completed) {
           navigate("/setup", { replace: true });
+        } else if (result.sso && !stayHere) {
+          window.location.replace(SSO_START_URL);
+          return;
         }
+        setSso(result.sso);
+        setStatusLoading(false);
       })
-      .catch(() => undefined)
-      .finally(() => setStatusLoading(false));
-  }, [navigate]);
+      .catch(() => setStatusLoading(false));
+  }, [navigate, completeSso]);
 
   if (statusLoading) {
     return (
@@ -109,6 +139,12 @@ export const LoginPage: React.FC = () => {
                   "Sign in"
                 )}
               </Button>
+
+              {sso && (
+                <Button asChild variant="outline" className="w-full">
+                  <a href={SSO_START_URL}>Use single sign-on</a>
+                </Button>
+              )}
             </form>
           </div>
         </div>

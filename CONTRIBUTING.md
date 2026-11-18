@@ -29,7 +29,7 @@ npm run build
 ## Scope Guidelines
 
 - Keep BookLite v1 minimal and Kobo-first.
-- Avoid re-introducing removed legacy features (browser readers, OPDS, OIDC, complex permission matrix, large settings surfaces).
+- Avoid re-introducing removed legacy features (browser readers, OPDS, complex permission matrix, large settings surfaces).
 - Prefer small, focused changes with clear behavior.
 
 ## Pull Requests

@@ -6,6 +6,7 @@ import { config } from "./config";
 import { healthRoutes } from "./routes/health";
 import { setupRoutes } from "./routes/setup";
 import { authRoutes } from "./routes/auth";
+import { oidcRoutes } from "./routes/oidc";
 import { usersRoutes } from "./routes/users";
 import { uploadRoutes } from "./routes/uploads";
 import { importJobRoutes } from "./routes/importJobs";
@@ -50,6 +51,7 @@ export const buildApp = () => {
   app.register(healthRoutes);
   app.register(setupRoutes);
   app.register(authRoutes);
+  app.register(oidcRoutes);
   app.register(usersRoutes);
   app.register(appSettingsRoutes);
   app.register(adminActivityRoutes);

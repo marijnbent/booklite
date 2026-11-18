@@ -131,6 +131,16 @@ Metadata (all optional):
 | `HARDCOVER_API_KEY` | |
 | `OPENROUTER_API_KEY` | Enables metadata AI. Read from the environment only, never stored. |
 
+Single sign-on (optional, set all three or none):
+
+| Variable | Notes |
+| --- | --- |
+| `OIDC_ISSUER` | Issuer URL of an OpenID Connect provider |
+| `OIDC_CLIENT_ID` | |
+| `OIDC_CLIENT_SECRET` | Sent to the token endpoint as `client_secret_post` |
+
+Register `<BASE_URL>/api/v1/auth/oidc/callback` as the redirect URI. The login page then sends people to the provider. Accounts are matched on a verified email address, and an unknown address gets a new member account. Password login stays available at `/login?local`.
+
 Metadata AI uses `~openai/gpt-luna-latest` by default. Owners can pick a different OpenRouter model in `Admin`. Installs still on the old `openai/gpt-5.6-luna` default move to the new alias on startup; other saved choices are kept.
 
 ## Kobo setup

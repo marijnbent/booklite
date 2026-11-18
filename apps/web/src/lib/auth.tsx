@@ -37,12 +37,15 @@ interface AuthContextValue {
     restorePath: string;
   } | null;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
+  completeSso: (refreshToken: string) => Promise<void>;
   logout: () => Promise<void>;
   setAccent: (value: AccentColor) => Promise<void>;
   refreshMe: () => Promise<Me | null>;
   beginImpersonation: (userId: number) => Promise<void>;
   endImpersonation: () => Promise<void>;
 }
+
+export const SIGNED_OUT_KEY = "booklite_signed_out";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -109,6 +112,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const startSession = async (tokens: AuthTokens) => {
+    setImpersonationState(null);
+    setImpersonation(null);
+    setTokens(tokens);
+    sessionStorage.removeItem(SIGNED_OUT_KEY);
+    queryClient.clear();
+    await refreshMe();
+  };
+
   const login = async (usernameOrEmail: string, password: string) => {
     const tokens = await apiFetch<AuthTokens>("/api/v1/auth/login", {
       method: "POST",
@@ -116,11 +128,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       body: JSON.stringify({ usernameOrEmail, password })
     });
 
-    setImpersonationState(null);
-    setImpersonation(null);
-    setTokens(tokens);
-    queryClient.clear();
-    await refreshMe();
+    await startSession(tokens);
+  };
+
+  const completeSso = async (refreshToken: string) => {
+    const tokens = await apiFetch<AuthTokens>("/api/v1/auth/refresh", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken })
+    });
+
+    await startSession(tokens);
   };
 
   const logout = async () => {
@@ -132,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setImpersonationState(null);
     setImpersonation(null);
     setMe(null);
+    sessionStorage.setItem(SIGNED_OUT_KEY, "1");
     queryClient.clear();
   };
 
@@ -187,6 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isImpersonating: impersonation !== null,
       impersonation,
       login,
+      completeSso,
       logout,
       refreshMe,
       setAccent,
