@@ -141,6 +141,8 @@ Single sign-on (optional, set all three or none):
 
 Register `<BASE_URL>/api/v1/auth/oidc/callback` as the redirect URI. The login page then sends people to the provider. Accounts are matched on a verified email address, and an unknown address gets a new member account. Password login stays available at `/login?local`.
 
+Logging out also ends the session at the provider, through its `end_session_endpoint`; register `<BASE_URL>/` as the post-logout redirect URI. To end the BookLite session when the provider session ends elsewhere, register `<BASE_URL>/api/v1/auth/oidc/backchannel-logout` as the OIDC back-channel logout URI.
+
 Metadata AI uses `~openai/gpt-luna-latest` by default. Owners can pick a different OpenRouter model in `Admin`. Installs still on the old `openai/gpt-5.6-luna` default move to the new alias on startup; other saved choices are kept.
 
 ## Kobo setup

@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
 const SSO_START_URL = "/api/v1/auth/oidc/start";
-const SSO_HASH_PREFIX = "#sso=";
 const SSO_ERROR = "Single sign-on failed. Try again or sign in with your password.";
 
 export const LoginPage: React.FC = () => {
@@ -28,9 +27,11 @@ export const LoginPage: React.FC = () => {
     started.current = true;
 
     const { hash, search } = window.location;
-    if (hash.startsWith(SSO_HASH_PREFIX)) {
+    const session = new URLSearchParams(hash.slice(1));
+    const refreshToken = session.get("sso");
+    if (refreshToken) {
       window.history.replaceState(null, "", "/login");
-      completeSso(hash.slice(SSO_HASH_PREFIX.length))
+      completeSso(refreshToken, session.get("id_token"))
         .then(() => navigate("/library", { replace: true }))
         .catch(() => {
           setSso(true);

@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 import { FastifyPluginAsync, FastifyReply } from "fastify";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { config } from "../config";
 import { db } from "../db/client";
-import { users } from "../db/schema";
+import { refreshTokens, users } from "../db/schema";
 import { hashPassword } from "../auth/password";
 import { issueTokens } from "../auth/tokens";
 import { ensureKoboSettingsRow } from "../services/koboSettings";
@@ -16,16 +17,20 @@ import { nowIso } from "../utils/time";
 const COOKIE_NAME = "booklite_oidc";
 const OIDC_PATH = "/api/v1/auth/oidc";
 const FAILURE_REDIRECT = "/login?error=sso";
+const LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout";
 
 const discoverySchema = z.object({
   authorization_endpoint: z.string().url(),
   token_endpoint: z.string().url(),
-  userinfo_endpoint: z.string().url()
+  userinfo_endpoint: z.string().url(),
+  end_session_endpoint: z.string().url().optional(),
+  jwks_uri: z.string().url().optional()
 });
 
-const tokenSchema = z.object({ access_token: z.string().min(1) });
+const tokenSchema = z.object({ access_token: z.string().min(1), id_token: z.string().min(1).optional() });
 
 const userInfoSchema = z.object({
+  sub: z.string().min(1),
   email: z.string().email(),
   email_verified: z.literal(true),
   name: z.string().optional()
@@ -34,6 +39,16 @@ const userInfoSchema = z.object({
 const callbackSchema = z.object({
   code: z.string().min(1),
   state: z.string().min(1)
+});
+
+const endSessionSchema = z.object({ idToken: z.string().min(1).optional() });
+
+const jwksSchema = z.object({ keys: z.array(z.object({ kid: z.string().optional() }).passthrough()) });
+
+const logoutTokenSchema = z.object({
+  sub: z.string().min(1),
+  events: z.object({ [LOGOUT_EVENT]: z.object({}).passthrough() }).passthrough(),
+  nonce: z.undefined()
 });
 
 type Discovery = z.infer<typeof discoverySchema>;
@@ -90,7 +105,8 @@ export const oidcRoutes: FastifyPluginAsync = async (fastify) => {
   const oidc = config.oidc;
   if (!oidc) return;
 
-  const redirectUri = `${config.baseUrl.replace(/\/$/, "")}${OIDC_PATH}/callback`;
+  const baseUrl = config.baseUrl.replace(/\/$/, "");
+  const redirectUri = `${baseUrl}${OIDC_PATH}/callback`;
   let discovery: Promise<Discovery> | null = null;
 
   const discover = (): Promise<Discovery> => {
@@ -134,7 +150,7 @@ export const oidcRoutes: FastifyPluginAsync = async (fastify) => {
 
     try {
       const { token_endpoint, userinfo_endpoint } = await discover();
-      const { access_token } = tokenSchema.parse(
+      const { access_token, id_token } = tokenSchema.parse(
         await fetchJson(token_endpoint, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -161,6 +177,7 @@ export const oidcRoutes: FastifyPluginAsync = async (fastify) => {
       if (existing?.disabledAt) return reply.redirect(FAILURE_REDIRECT);
 
       const userId = existing?.id ?? (await createMember(email, profile.name));
+      await db.update(users).set({ oidcSubject: profile.sub }).where(eq(users.id, userId));
       const [user] = await db
         .select({ id: users.id, username: users.username, role: users.role })
         .from(users)
@@ -168,10 +185,70 @@ export const oidcRoutes: FastifyPluginAsync = async (fastify) => {
         .limit(1);
 
       const tokens = await issueTokens({ userId: user.id, username: user.username, role: user.role });
-      return reply.redirect(`/login#sso=${tokens.refreshToken}`);
+      const session = new URLSearchParams({ sso: tokens.refreshToken, ...(id_token ? { id_token } : {}) });
+      return reply.redirect(`/login#${session}`);
     } catch (error) {
       request.log.warn({ err: error }, "Single sign-on failed");
       return reply.redirect(FAILURE_REDIRECT);
+    }
+  });
+
+  fastify.post(`${OIDC_PATH}/end-session`, async (request) => {
+    const { idToken } = endSessionSchema.parse(request.body ?? {});
+    const endSession = await discover().then(
+      (document) => document.end_session_endpoint,
+      () => undefined
+    );
+    if (!endSession) return { url: null };
+
+    const url = new URL(endSession);
+    url.searchParams.set("client_id", oidc.clientId);
+    url.searchParams.set("post_logout_redirect_uri", `${baseUrl}/`);
+    if (idToken) url.searchParams.set("id_token_hint", idToken);
+    return { url: url.toString() };
+  });
+
+  fastify.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    (_request, body, done) => done(null, Object.fromEntries(new URLSearchParams(String(body))))
+  );
+
+  fastify.post(`${OIDC_PATH}/backchannel-logout`, async (request, reply) => {
+    try {
+      const token = z.object({ logout_token: z.string().min(1) }).parse(request.body).logout_token;
+      const { jwks_uri } = await discover();
+      if (!jwks_uri) return reply.code(400).send();
+
+      const kid = jwt.decode(token, { complete: true })?.header.kid;
+      const { keys } = jwksSchema.parse(await fetchJson(jwks_uri));
+      const key = keys.find((candidate) => candidate.kid === kid);
+      if (!key) return reply.code(400).send();
+
+      const claims = logoutTokenSchema.parse(
+        jwt.verify(token, crypto.createPublicKey({ key, format: "jwk" }), {
+          algorithms: ["RS256", "PS256", "ES256"],
+          issuer: oidc.issuer,
+          audience: oidc.clientId
+        })
+      );
+
+      const signedOutAt = nowIso();
+      const [user] = await db
+        .update(users)
+        .set({ signedOutAt })
+        .where(eq(users.oidcSubject, claims.sub))
+        .returning({ id: users.id });
+      if (user) {
+        await db
+          .update(refreshTokens)
+          .set({ revokedAt: signedOutAt })
+          .where(and(eq(refreshTokens.userId, user.id), isNull(refreshTokens.revokedAt)));
+      }
+      return reply.code(204).header("cache-control", "no-store").send();
+    } catch (error) {
+      request.log.warn({ err: error }, "Back-channel logout failed");
+      return reply.code(400).send();
     }
   });
 };

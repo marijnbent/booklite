@@ -6,6 +6,7 @@ export interface AccessPayload {
   role: "OWNER" | "MEMBER";
   username: string;
   jti?: string;
+  iat?: number;
 }
 
 export const signAccessToken = (
